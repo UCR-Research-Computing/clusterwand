@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repo.
 ## What this is
 
 `ursa-bifrost`: one Go binary (`bifrost`) that is both a CLI and an MCP server giving AI
-assistants read-only, structured access to the Ursa Major Slurm cluster. Spec:
+assistants read-only, structured access to a Slurm cluster. Spec:
 `docs/SPEC.md` (phases P0-P4, tool catalog, open questions Q1-Q15). Keep the spec's
 status table and change log current when behaviour changes.
 

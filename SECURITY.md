@@ -21,7 +21,7 @@ two working days and to ship a fix for confirmed issues within a week.
   credential files.
 - Acting (submit, cancel, hold, release, upload) without the two-step confirm, or beyond
   the caps.
-- Bypassing sign-in, the ucr.edu restriction, `users.yaml`, token rotation or expiry on
+- Bypassing sign-in, the Workspace domain restriction, `users.yaml`, token rotation or expiry on
   the hosted server.
 - Secrets leaking through tool output or the audit log.
 - Prompt injection that makes the server, not the model, do something it should not.

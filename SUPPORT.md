@@ -1,7 +1,7 @@
 # Getting help
 
-- **Using the hosted server at UCR** (sign-in, access, tiers): contact UCR Research
-  Computing. Access is granted per person in the server's `users.yaml`.
+- **Using a hosted server** (sign-in, access, tiers): contact the administrator of
+  that server. Access is granted per person in the server's `users.yaml`.
 - **Connecting a client**: start with [docs/CLIENTS.md](docs/CLIENTS.md), which has a
   troubleshooting table.
 - **A bug or a wrong diagnosis**: open an issue with the bug form. Include
