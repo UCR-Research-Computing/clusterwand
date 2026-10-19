@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ursa-bifrost - let any AI assistant work a Slurm cluster, safely</title>
-  <meta name="description" content="One Go binary that is both an MCP server and a CLI: typed, audited, read-mostly access to the Ursa Major Slurm cluster at UC Riverside for Claude, Codex, Gemini, Hermes, OpenCode and your own scripts.">
+  <meta name="description" content="One Go binary that is both an MCP server and a CLI: typed, audited, read-mostly access to a Slurm cluster for Claude, Codex, Gemini, Hermes, OpenCode and your own scripts.">
   <meta name="theme-color" content="#00287a">
   <link rel="canonical" href="https://ucr-research-computing.github.io/ursa-bifrost/">
   <meta property="og:type" content="website">
@@ -46,7 +46,7 @@
       <div class="kicker">MCP server<span class="sep">/</span>CLI<span class="sep">/</span>One Go binary</div>
       <h1>ursa-bifrost</h1>
       <p class="tagline">Let any AI assistant work a Slurm cluster, safely.</p>
-      <p class="lead">One Go binary that is both an MCP server and a CLI. It gives Claude, Codex, Gemini, Hermes, OpenCode and your own scripts typed, audited, read-mostly access to the Ursa Major HPC cluster at UC Riverside: job status, failure diagnosis, costs, software modules, batch-script checks, results, and (opt-in, two-step) submit and cancel.</p>
+      <p class="lead">One Go binary that is both an MCP server and a CLI. It gives Claude, Codex, Gemini, Hermes, OpenCode and your own scripts typed, audited, read-mostly access to a Slurm cluster: job status, failure diagnosis, costs, software modules, batch-script checks, results, and (opt-in, two-step) submit and cancel.</p>
       <div class="cta">
         <a class="btn gold solid" href="#start"><i class="fa-solid fa-play" aria-hidden="true"></i> Get started</a>
         <a class="btn gold" href="https://github.com/UCR-Research-Computing/ursa-bifrost"><i class="fa-brands fa-github" aria-hidden="true"></i> View on GitHub</a>
@@ -62,9 +62,9 @@
       <div class="term-bar" aria-hidden="true"><span></span><span></span><span></span><b>job_explain</b></div>
 <pre class="term-body"><code><span class="t-you">You:</span>      Why did job 236 fail?
 <span class="t-ai">Claude:</span>   <span class="t-tool">[job_explain 236]</span>
-          It failed after one minute on gpul4: the log says
+          It failed after one minute on the gpu partition: the log says
           "ModuleNotFoundError: No module named 'pandas'". The script calls python
-          without an environment. Load python-ml (PyTorch/GPU) or python-sci (CPU)
+          without an environment. Load the site's PyTorch or SciPy module
           before running it, or create a uv/Pixi environment inside the job.</code></pre>
       <figcaption>That diagnosis came from the live cluster. The server holds no language model: it runs allow-listed scheduler queries and fixed diagnosis rules, returns JSON with the evidence and the exact commands it ran, and the assistant does the reasoning. Nothing a model sends is ever run as a shell command.</figcaption>
     </figure>
@@ -137,7 +137,7 @@
       <li>"Which modules give me LAMMPS with GPU support?"</li>
       <li>"Check this batch script before I submit it."</li>
       <li>"How much did I spend last month, and how much was wasted on idle cores?"</li>
-      <li>"Write a script for PyTorch on one L4 GPU for 4 hours, show me the cost, then submit it."</li>
+      <li>"Write a script for PyTorch on one GPU for 4 hours, show me the cost, then submit it."</li>
       <li>"Show the last 200 lines of job 265's stderr, then give me download links for its results."</li>
       <li>"Give me the exact command for an interactive session with 8 cores and a GPU."</li>
       <li><span class="who">Staff</span> "Which nodes are down?" / "Draft a reply to this ticket about job 236."</li>
@@ -149,19 +149,19 @@
       <p class="sub">Everything the MCP tools do is also a <code>bifrost</code> command. Two examples from the README:</p>
     </div>
 <pre class="code"><code>$ bifrost check train.sbatch
-PROBLEMS FOUND  partition standard  worst-case cost $0.13  (1 cores, 6% of a node)
-  error   line 4: module "python3" not found in the cluster catalog; closest: pythia8, python-ml
-  error   standard shares nodes between jobs: this script asks for no cores, so Slurm gives
-          it 1 core and about 8 GB on standard. Ask for the cores it needs ...
+PROBLEMS FOUND  partition cpu  worst-case cost $X.XX  (1 cores, 6% of a node)
+  error   line 4: module "python3" not found in the cluster catalog; closest: python-sci, python-ml
+  error   cpu shares nodes between jobs: this script asks for no cores, so Slurm gives
+          it 1 core and about 8 GB on cpu. Ask for the cores it needs ...
   warning calls python without loading python-sci/python-ml or an environment</code></pre>
 <pre class="code"><code>$ bifrost submit hello.sh
 Plan (nothing submitted yet):
-  partition  standard, 1 node(s), time limit 0 h 05 min
-  scheduler  would start at ... on ... (standard)
-  worst case $0.12  (today so far $0.00 of $50.00 day cap)
+  partition  cpu, 1 node(s), time limit 0 h 05 min
+  scheduler  would start at ... on ... (cpu)
+  worst case $X.XX  (today so far $0.00 of your day cap)
 Submit this job? [y/N] y
 Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifrost-hello</code></pre>
-    <p class="note">Submitting needs tier A1. Each submitted job runs in its own <code>~/bifrost-jobs/&lt;stamp&gt;-&lt;name&gt;</code> folder, so its results are exactly that folder. Default caps: 4 nodes, 24 h, $25 per job, $50 per day; a plan over a cap is refused before anything reaches the scheduler.</p>
+    <p class="note">Submitting needs tier A1. Each submitted job runs in its own <code>~/bifrost-jobs/&lt;stamp&gt;-&lt;name&gt;</code> folder, so its results are exactly that folder. Caps limit nodes, hours and spend per job and per day; a plan over a cap is refused before anything reaches the scheduler.</p>
   </div>
 </section>
 
@@ -205,10 +205,10 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
     <div class="modes">
       <article class="mode">
         <h3><i class="fa-solid fa-cloud" aria-hidden="true"></i> Hosted server</h3>
-        <p class="mode-sub">Nothing to install. Recommended at UCR.</p>
+        <p class="mode-sub">Nothing to install for users.</p>
         <ul>
           <li><code>bifrost serve</code> on Cloud Run, Streamable HTTP at <code>/mcp</code></li>
-          <li>Google sign-in restricted to ucr.edu accounts listed in <code>users.yaml</code> (re-read on every request)</li>
+          <li>Google sign-in restricted to your Workspace domain and the accounts listed in <code>users.yaml</code> (re-read on every request)</li>
           <li>OAuth 2.1 with PKCE and dynamic client registration; rotating refresh tokens (30 days); sealed token storage</li>
           <li>Per-user IAP tunnels and OS Login keys, so each person reaches the cluster as themselves</li>
           <li>Works from any MCP client on any machine</li>
@@ -316,21 +316,21 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       <div>
         <div class="kicker">Quick start</div>
         <h2>Hosted or local, pick one</h2>
-        <p class="sub">The hosted server needs a UCR account that Research Computing has added. The local binary uses your own gcloud login and SSH.</p>
+        <p class="sub">The hosted server needs an account your cluster's administrator has added. The local binary uses your own gcloud login and SSH.</p>
       </div>
     </div>
 
     <div class="start-grid">
       <article class="start">
         <h3><span class="step-n">A</span> Use the hosted server</h3>
-        <p>Point your client at this URL and sign in with Google when it asks:</p>
+        <p>Point your client at your organization's server URL and sign in with Google when it asks:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-url">https://bifrost-mcp-125853442225.us-central1.run.app/mcp</code></pre>
+<pre class="code"><code id="cmd-url">https://YOUR-SERVER/mcp</code></pre>
           <button class="copy" type="button" data-copy="cmd-url" aria-label="Copy server URL"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
         <p>For example, in Claude Code:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-claude">claude mcp add --transport http ursa https://bifrost-mcp-125853442225.us-central1.run.app/mcp</code></pre>
+<pre class="code"><code id="cmd-claude">claude mcp add --transport http ursa https://YOUR-SERVER/mcp</code></pre>
           <button class="copy" type="button" data-copy="cmd-claude" aria-label="Copy Claude Code command"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
         <p class="note">Then run <code>/mcp</code>, pick <code>ursa</code> and choose Authenticate. Other clients are listed <a href="#clients">below</a>.</p>
@@ -425,7 +425,7 @@ python3 examples/mcp_client.py call job_explain '{"job_id": "236"}'</code></pre>
     <div>
       <div class="kicker">Self-hosting</div>
       <h2>Bring it to your own cluster</h2>
-      <p>Nothing in bifrost is specific to UCR except configuration: the login node, the catalog (partitions, prices, modules, recipes), log roots and caps. Start with <code>bifrost config init</code>, point <code>ssh</code> or <code>iap</code> at your login node, and write a catalog.</p>
+      <p>Nothing in bifrost is specific to one site except configuration: the login node, the catalog (partitions, prices, modules, recipes), log roots and caps. Start with <code>bifrost config init</code>, point <code>ssh</code> or <code>iap</code> at your login node, and write a catalog.</p>
       <p>The hosted Cloud Run deployment (Secret Manager, sealed token store, users file) is documented step by step in <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/DEPLOY.md">docs/DEPLOY.md</a>; <code>deploy/deploy.sh</code> does it idempotently.</p>
 <pre class="code"><code>deploy/deploy.sh plan      # read-only: shows what is missing
 deploy/deploy.sh apply     # asks before each billable or IAM change</code></pre>
@@ -436,7 +436,7 @@ deploy/deploy.sh apply     # asks before each billable or IAM change</code></pre
 <pre class="code"><code>make check                  # gofmt, go vet, go test -race, build   (before every commit)
 scripts/mutation_check.sh   # every safety guard must be caught by a test
 scripts/mcp_smoke.py        # drives `bifrost mcp` over stdio like a real client</code></pre>
-      <p>Tests run against anonymized recordings of real Ursa Major output in <code>testdata/</code> (Slurm 25.11.4). <code>scripts/make_fixtures.py</code> regenerates them from a read-only probe and refuses to write if a real username survives; CI checks again.</p>
+      <p>Tests run against anonymized recordings of real cluster output in <code>testdata/</code> (Slurm 25.11.4). <code>scripts/make_fixtures.py</code> regenerates them from a read-only probe and refuses to write if a real username survives; CI checks again.</p>
       <p class="note">Also in the repo: <code>agent/</code>, a separate read-only web dashboard (ursa-agent) whose panels call bifrost tools directly as the signed-in person, with an assistant drawer that plans jobs that only run after you press Approve.</p>
     </div>
   </div>
