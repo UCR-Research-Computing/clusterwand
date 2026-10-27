@@ -130,6 +130,22 @@ func (s *Server) userConfig(u *User) config.Config {
 	}
 	c.StatePath = filepath.Join(config.Expand(s.cfg.Server.DataDir), "ledger", hashTok(u.Email)+".json")
 	c.ClusterUser = "" // learned from the login node (id -un) as this person
+	if u.AllocationUSD > 0 || u.Lab != "" {
+		c.Allocation = &config.AllocationConfig{
+			PersonUSD: u.AllocationUSD,
+		}
+		if u.Lab != "" {
+			if l := s.users.Lab(u.Lab); l != nil {
+				c.Allocation.Lab = &config.AllocationLabConfig{
+					ID:            l.ID,
+					Name:          l.Name,
+					AllocationUSD: l.AllocationUSD,
+					Period:        l.Period,
+					Members:       s.users.LabClusterUsers(u.Lab),
+				}
+			}
+		}
+	}
 	return c
 }
 
@@ -183,7 +199,7 @@ func (s *Server) conn(u *User, p *ProgramClient) *userConn {
 	if p != nil {
 		cfg = programConfig(cfg, p)
 	}
-	sigB, _ := json.Marshal([]any{cfg.Tiers, cfg.Caps, cfg.Limits.CallsPerMin})
+	sigB, _ := json.Marshal([]any{cfg.Tiers, cfg.Caps, cfg.Limits.CallsPerMin, cfg.Allocation})
 	sig := string(sigB)
 	key := connKey(u.Email, p)
 	s.mu.Lock()
@@ -202,6 +218,7 @@ func (s *Server) conn(u *User, p *ProgramClient) *userConn {
 	svc.StateSealer = s.store.s // A1 plans and ledger sealed at rest (v0.9.16)
 	if p != nil {
 		svc.Program = p.ID
+		svc.ProgramOwnCaps = p.MaxCostPerDayUSD > 0
 	}
 	c := &userConn{svc: svc, srv: mcpserver.New(svc), sig: sig, last: time.Now()}
 	s.conns[key] = c
