@@ -26,10 +26,11 @@ jobs:
           # No Windows build: internal/core/a1.go uses syscall.Flock (Unix only); use WSL.
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
             os=${target%/*}; arch=${target#*/}
-            name="bifrost_${V#v}_${os}_${arch}"
+            name="clusterwand_${V#v}_${os}_${arch}"
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
-              -ldflags "-s -w -X github.com/UCR-Research-Computing/ursa-bifrost/internal/version.Version=${V}" \
-              -o "dist/$name/bifrost" ./cmd/bifrost
+              -ldflags "-s -w -X github.com/UCR-Research-Computing/clusterwand/internal/version.Version=${V}" \
+              -o "dist/$name/clusterwand" ./cmd/clusterwand
+            ln -s clusterwand "dist/$name/wand"   # short alias
             cp LICENSE README.md docs/CLIENTS.md "dist/$name/"
             tar -C dist -czf "dist/$name.tar.gz" "$name"
           done
@@ -50,7 +51,7 @@ jobs:
               if on:
                   out.append(line)
           text = "\n".join(out).strip() or f"Release {tag}. See CHANGELOG.md."
-          open("notes.md", "w").write(text + "\n\nInstall: download the archive for your platform, or `go install github.com/UCR-Research-Computing/ursa-bifrost/cmd/bifrost@" + tag + "`. Clients: docs/CLIENTS.md.\n")
+          open("notes.md", "w").write(text + "\n\nInstall: download the archive for your platform, or `go install github.com/UCR-Research-Computing/clusterwand/cmd/clusterwand@" + tag + "`. Clients: docs/CLIENTS.md.\n")
           EOF
       - name: publish
         env:

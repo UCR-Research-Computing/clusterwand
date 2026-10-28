@@ -1,14 +1,12 @@
-module github.com/UCR-Research-Computing/ursa-bifrost
+module github.com/UCR-Research-Computing/clusterwand
 
 go 1.26.0
 
 toolchain go1.26.8
 
 require (
-	github.com/coder/websocket v1.8.15
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	golang.org/x/crypto v0.57.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

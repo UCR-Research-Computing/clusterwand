@@ -2,332 +2,16 @@ package core
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
+	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 )
-
-// ---- a fake staging bucket -------------------------------------------------------
-
-type fakeStaging struct {
-	objs   map[string]staging.Object
-	signed []string // "METHOD object ttl headers"
-	key    *rsa.PrivateKey
-	gcs    *staging.GCS
-}
-
-func newFakeStaging(t *testing.T) *fakeStaging {
-	k, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &fakeStaging{objs: map[string]staging.Object{}, key: k}
-	f.gcs = &staging.GCS{BucketName: "test-staging", SignAs: "bifrost@test.iam.gserviceaccount.com",
-		Now: func() time.Time { return time.Unix(1790875401, 0) },
-		SignBytes: func(_ context.Context, b []byte) ([]byte, error) {
-			h := sha256.Sum256(b)
-			return rsa.SignPKCS1v15(rand.Reader, k, crypto.SHA256, h[:])
-		}}
-	return f
-}
-
-func (f *fakeStaging) Bucket() string { return "test-staging" }
-
-func (f *fakeStaging) SignURL(ctx context.Context, method, object string, ttl time.Duration, headers map[string]string) (string, error) {
-	f.signed = append(f.signed, fmt.Sprintf("%s %s %s %v", method, object, ttl, headers))
-	return f.gcs.SignURL(ctx, method, object, ttl, headers)
-}
-
-func (f *fakeStaging) List(_ context.Context, prefix string) ([]staging.Object, error) {
-	var out []staging.Object
-	for k, o := range f.objs {
-		if strings.HasPrefix(k, prefix) {
-			out = append(out, o)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
-}
-
-func (f *fakeStaging) Stat(_ context.Context, object string) (staging.Object, bool, error) {
-	o, ok := f.objs[object]
-	return o, ok, nil
-}
-
-func (f *fakeStaging) put(name string, size int64, gen string) {
-	f.objs[name] = staging.Object{Name: name, Size: size, Generation: gen, Created: time.Unix(1790870000, 0)}
-}
-
-func stagedService(t *testing.T, principal string) (*Service, *backend.Fixture, *fakeStaging) {
-	t.Helper()
-	s, fx := a1Service(t)
-	st := newFakeStaging(t)
-	s.Staging, s.Principal = st, principal
-	s.Cfg.Staging.Bucket = "test-staging"
-	return s, fx, st
-}
-
-func ownerOf(t *testing.T, s *Service) string {
-	o, err := s.ownerKey(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return o
-}
-
-// ---- signed URLs -----------------------------------------------------------------
-
-func TestSignedURLVerifies(t *testing.T) {
-	st := newFakeStaging(t)
-	u, err := st.SignURL(context.Background(), http.MethodPut, "in/abc/u0123456789abcdef/my data.csv", 15*time.Minute,
-		map[string]string{"x-goog-content-length-range": "0,100"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	pu, err := url.Parse(u)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if pu.Host != "storage.googleapis.com" || pu.EscapedPath() != "/test-staging/in/abc/u0123456789abcdef/my%20data.csv" {
-		t.Fatalf("url: %s", u)
-	}
-	q := pu.Query()
-	if q.Get("X-Goog-Expires") != "900" || q.Get("X-Goog-SignedHeaders") != "host;x-goog-content-length-range" {
-		t.Fatalf("query: %v", q)
-	}
-	sts, _, _ := staging.StringToSign("PUT", "test-staging", "in/abc/u0123456789abcdef/my data.csv", "bifrost@test.iam.gserviceaccount.com",
-		time.Unix(1790875401, 0), 15*time.Minute, map[string]string{"x-goog-content-length-range": "0,100"})
-	sig, _ := hex.DecodeString(q.Get("X-Goog-Signature"))
-	h := sha256.Sum256([]byte(sts))
-	if err := rsa.VerifyPKCS1v15(&st.key.PublicKey, crypto.SHA256, h[:], sig); err != nil {
-		t.Fatalf("signature does not verify: %v", err)
-	}
-	for _, bad := range []string{"", "/abs", "a/../b"} {
-		if _, err := st.gcs.SignURL(context.Background(), "GET", bad, time.Minute, nil); err == nil {
-			t.Errorf("signed bad object %q", bad)
-		}
-	}
-	if _, err := st.gcs.SignURL(context.Background(), "DELETE", "x", time.Minute, nil); err == nil {
-		t.Error("signed DELETE")
-	}
-	if _, err := st.gcs.SignURL(context.Background(), "GET", "x", 8*24*time.Hour, nil); err == nil {
-		t.Error("signed a link longer than 7 days")
-	}
-}
-
-func TestSignedURLsAreRedacted(t *testing.T) {
-	st := newFakeStaging(t)
-	u, _ := st.SignURL(context.Background(), "GET", "out/x/1/a.txt", time.Hour, nil)
-	r := policy.Redact("curl -T a " + u)
-	if strings.Contains(r, u[strings.Index(u, "X-Goog-Signature=")+17:]) || !strings.Contains(r, "X-Goog-Signature=[REDACTED]") {
-		t.Fatalf("signature not redacted: %s", r)
-	}
-}
-
-// ---- uploads -----------------------------------------------------------------------
-
-func TestUploadPrepareCapsAndOwner(t *testing.T) {
-	s, _, st := stagedService(t, "alice@ucr.edu")
-	ctx := context.Background()
-	tk, err := s.UploadPrepare(ctx, "data.csv", 1234)
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner := ownerOf(t, s)
-	if !strings.Contains(st.signed[0], "PUT in/"+owner+"/"+tk.UploadID+"/data.csv 15m0s map[x-goog-content-length-range:0,1234]") {
-		t.Fatalf("signed: %v", st.signed)
-	}
-	if tk.Headers["x-goog-content-length-range"] != "0,1234" || !strings.Contains(tk.Curl, "x-goog-content-length-range: 0,1234") {
-		t.Errorf("ticket: %+v", tk)
-	}
-	for _, bad := range []string{"../x", ".bashrc", "-rf", "a/b", "x\ny", "", "name;id", strings.Repeat("a", 121)} {
-		if _, err := s.UploadPrepare(ctx, bad, 10); err == nil {
-			t.Errorf("accepted name %q", bad)
-		}
-	}
-	if _, err := s.UploadPrepare(ctx, "big.bin", s.Cfg.Staging.MaxUploadBytes+1); !errors.Is(err, ErrCapExceeded) {
-		t.Errorf("per-file cap: %v", err)
-	}
-	st.put("in/"+owner+"/u00000000000000aa/old.bin", s.Cfg.Staging.MaxUserBytes-100, "1")
-	if _, err := s.UploadPrepare(ctx, "more.bin", 200); !errors.Is(err, ErrCapExceeded) {
-		t.Errorf("per-user cap: %v", err)
-	}
-	// another person's files do not count against alice and cannot be seen
-	bob, _, _ := stagedService(t, "bob@ucr.edu")
-	if ownerOf(t, bob) == owner {
-		t.Fatal("two people share a staging folder")
-	}
-}
-
-func TestUploadsNeedStaging(t *testing.T) {
-	s, _ := a1Service(t)
-	if _, err := s.UploadPrepare(context.Background(), "a.txt", 1); !errors.Is(err, ErrNoStaging) {
-		t.Fatalf("want ErrNoStaging, got %v", err)
-	}
-	if _, err := s.ResultsLink(context.Background(), "236", []string{"a"}); !errors.Is(err, ErrNoStaging) {
-		t.Fatalf("want ErrNoStaging, got %v", err)
-	}
-}
-
-func TestSubmitWithInputs(t *testing.T) {
-	s, fx, st := stagedService(t, "alice@ucr.edu")
-	ctx := context.Background()
-	owner := ownerOf(t, s)
-	st.put("in/"+owner+"/u0123456789abcdef/data set.csv", 42, "7")
-	plan, err := s.PrepareSubmit(ctx, SubmitInput{Script: goodScript, Inputs: []string{"u0123456789abcdef"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(plan.Inputs) != 1 || plan.Inputs[0].Filename != "data set.csv" || !strings.Contains(plan.Next, "inputs/") {
-		t.Fatalf("plan inputs: %+v %s", plan.Inputs, plan.Next)
-	}
-	c, err := s.ConfirmSubmit(ctx, plan.Token)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.JobID == "" {
-		t.Fatal("no job id")
-	}
-	script := string(fx.Stdin[len(fx.Stdin)-1])
-	if !strings.Contains(script, "curl -sS -f --retry 3") || !strings.Contains(script, "-o 'inputs/data set.csv'") {
-		t.Fatalf("no fetch block:\n%s", script)
-	}
-	// the block sits after every #SBATCH line and before the first command
-	lastSbatch := strings.LastIndex(script, "#SBATCH")
-	block := strings.Index(script, "# ---- bifrost: fetch")
-	firstCmd := strings.Index(script, "\necho ")
-	if !(lastSbatch < block && (firstCmd < 0 || block < firstCmd)) {
-		t.Fatalf("fetch block misplaced:\n%s", script)
-	}
-	// the GET link lives as long as the staged object
-	if got := st.signed[len(st.signed)-1]; !strings.HasPrefix(got, "GET in/"+owner+"/u0123456789abcdef/data set.csv 168h0m0s") {
-		t.Errorf("GET link: %s", got)
-	}
-}
-
-func TestSubmitInputsGuards(t *testing.T) {
-	s, _, st := stagedService(t, "alice@ucr.edu")
-	ctx := context.Background()
-	owner := ownerOf(t, s)
-	// someone else's upload, even with a known id, is not found
-	st.put("in/0000000000other0000/u0123456789abcdef/x.csv", 1, "1")
-	if _, err := s.PrepareSubmit(ctx, SubmitInput{Script: goodScript, Inputs: []string{"u0123456789abcdef"}}); err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("other person's upload accepted: %v", err)
-	}
-	for _, bad := range []string{"../in/x", "u123", "U0123456789ABCDEF", "u0123456789abcdef/../../x"} {
-		_, err := s.PrepareSubmit(ctx, SubmitInput{Script: goodScript, Inputs: []string{bad}})
-		if err == nil || !strings.Contains(err.Error(), "is not an upload id") {
-			t.Errorf("input %q: want a format error, got %v", bad, err)
-		}
-	}
-	// replacing the staged bytes after the plan voids the plan
-	st.put("in/"+owner+"/u00000000000000bb/y.csv", 5, "1")
-	plan, err := s.PrepareSubmit(ctx, SubmitInput{Script: goodScript, Inputs: []string{"u00000000000000bb"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	st.put("in/"+owner+"/u00000000000000bb/y.csv", 5, "2") // new generation, same size
-	if _, err := s.ConfirmSubmit(ctx, plan.Token); err == nil || !strings.Contains(err.Error(), "changed") {
-		t.Fatalf("changed input not caught: %v", err)
-	}
-	// tampering with the stored inputs breaks the plan hash
-	plan, _ = s.PrepareSubmit(ctx, SubmitInput{Script: goodScript, Inputs: []string{"u00000000000000bb"}})
-	lk, _ := s.lockState()
-	stt, _ := s.loadState()
-	for k, p := range stt.Pending {
-		p.Inputs[0].Object = "in/0000000000other0000/u0123456789abcdef/x.csv"
-		stt.Pending[k] = p
-	}
-	_ = s.saveState(stt)
-	lk.unlock()
-	if _, err := s.ConfirmSubmit(ctx, plan.Token); err == nil || !strings.Contains(err.Error(), "hash") {
-		t.Fatalf("tampered inputs not caught: %v", err)
-	}
-}
-
-func TestInsertAfterHeader(t *testing.T) {
-	got := insertAfterHeader("#!/bin/bash\n#SBATCH -p x\n\n# note\n#SBATCH -t 5\nmodule load gcc\necho hi\n", "BLOCK\n")
-	want := "#!/bin/bash\n#SBATCH -p x\n\n# note\n#SBATCH -t 5\nBLOCK\nmodule load gcc\necho hi\n"
-	if got != want {
-		t.Fatalf("got %q", got)
-	}
-	if got := insertAfterHeader("echo hi\n", "B\n"); got != "B\necho hi\n" {
-		t.Fatalf("no header: %q", got)
-	}
-}
-
-// ---- results_link ------------------------------------------------------------------
-
-func TestResultsLink(t *testing.T) {
-	s, fx, st := stagedService(t, "alice@ucr.edu")
-	ctx := context.Background()
-	dir := "/home/alice_ucr_edu/deep-research-lab/run_76"
-	resultsFixture(s, fx, dir)
-	r, err := s.ResultsLink(ctx, "236", []string{"out/data.csv", "answer.txt"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(r.Links) != 2 || !strings.HasPrefix(r.Links[0].URL, "https://storage.googleapis.com/test-staging/out/") {
-		t.Fatalf("links: %+v", r.Links)
-	}
-	if len(fx.Puts) != 2 {
-		t.Fatalf("puts: %v", fx.Puts)
-	}
-	for u, p := range fx.Puts {
-		if !strings.HasPrefix(p, dir+"/") || backend.ValidSignedURL(u) != nil {
-			t.Errorf("put %s <- %s", u, p)
-		}
-	}
-	// the command lines in the answer and the audit trail carry no signature
-	for _, c := range fx.Calls {
-		_ = c
-	}
-	if _, err := s.ResultsLink(ctx, "236", []string{"../../.ssh/id_rsa"}); err == nil {
-		t.Error("linked a path outside the job folder")
-	}
-	if _, err := s.ResultsLink(ctx, "236", []string{"missing.txt"}); err == nil {
-		t.Error("linked a file not in the listing")
-	}
-	s.Cfg.Staging.MaxLinkBytes = 3
-	if _, err := s.ResultsLink(ctx, "236", []string{"out/data.csv"}); !errors.Is(err, ErrCapExceeded) {
-		t.Errorf("size cap: %v", err)
-	}
-	if _, err := s.ResultsLink(ctx, "253", []string{"x"}); err == nil {
-		t.Error("linked another user's job")
-	}
-	_ = st
-}
-
-func TestResultsLinkCommandsRedactedInTrace(t *testing.T) {
-	s, fx, _ := stagedService(t, "alice@ucr.edu")
-	resultsFixture(s, fx, "/home/alice_ucr_edu/deep-research-lab/run_76")
-	res, err := Call(context.Background(), s, "test", "results_link", "R1", nil, false, func(ctx context.Context) (*ResultLinks, error) {
-		return s.ResultsLink(ctx, "236", []string{"answer.txt"})
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range res.Source.Commands {
-		if strings.Contains(c, "X-Goog-Signature=") && !strings.Contains(c, "X-Goog-Signature=[REDACTED]") {
-			t.Fatalf("signed URL leaked into source: %s", c)
-		}
-	}
-}
 
 // ---- paging ------------------------------------------------------------------------
 
@@ -566,7 +250,7 @@ func TestStorageUsage(t *testing.T) {
 	s, fx := newTestService(t)
 	fx.Out = map[string]string{
 		"df":                        "Filesystem 1-blocks Used Available Capacity Mounted on\n10.0.0.1:/homeshare 2704467296256 99455336448 2467556229120 4% /home\n10.0.0.1:/scratchshare 2704467296256 1718616064 2565292949504 1% /scratch\n",
-		backend.DuTemplateForTest(): "8218501120\t/home/alice_ucr_edu/bifrost-jobs\n?\t/home/alice_ucr_edu/huge\n512\t/home/alice_ucr_edu/.aws_credentials\n2000\t/home/alice_ucr_edu/.cache\n100\t/scratch/alice_ucr_edu/big\n",
+		backend.DuTemplateForTest(): "8218501120\t/home/alice_ucr_edu/clusterwand-jobs\n?\t/home/alice_ucr_edu/huge\n512\t/home/alice_ucr_edu/.aws_credentials\n2000\t/home/alice_ucr_edu/.cache\n100\t/scratch/alice_ucr_edu/big\n",
 	}
 	r, err := s.StorageUsage(context.Background())
 	if err != nil {
@@ -575,7 +259,7 @@ func TestStorageUsage(t *testing.T) {
 	if len(r.Filesystems) != 2 || r.Filesystems[0].Mount != "/home" || r.Filesystems[0].UsedPct != 3.7 {
 		t.Fatalf("fs: %+v", r.Filesystems)
 	}
-	if r.Folders[0].Path != "/home/alice_ucr_edu/bifrost-jobs" || r.HomeBytes != 8218501120+2000 || r.ScratchByte != 100 {
+	if r.Folders[0].Path != "/home/alice_ucr_edu/clusterwand-jobs" || r.HomeBytes != 8218501120+2000 || r.ScratchByte != 100 {
 		t.Fatalf("folders: %+v home %d scratch %d", r.Folders, r.HomeBytes, r.ScratchByte)
 	}
 	for _, f := range r.Folders {
@@ -656,7 +340,7 @@ func TestInteractiveHelp(t *testing.T) {
 	if r.Command != "srun -p computehigh -N 1 -t 2:00:00 -c 8 --mem=16G --pty bash -l" || r.WorstCaseUSD != 3.74 {
 		t.Fatalf("help: %+v", r)
 	}
-	if !strings.Contains(r.Connect, "--tunnel-through-iap") {
+	if !strings.HasPrefix(r.Connect, "ssh ") {
 		t.Errorf("connect: %s", r.Connect)
 	}
 	for _, c := range fx.Calls[n:] {
@@ -705,4 +389,53 @@ func (u unreachable) Run(ctx context.Context, c backend.Command) ([]byte, error)
 		return nil, fmt.Errorf("%w: connection reset", backend.ErrUnreachable)
 	}
 	return u.Fixture.Run(ctx, c)
+}
+
+// Guards whose tests lived in the removed hosted server and staging packages
+// (F0, SSH only); the code they protect is still in core.
+
+func TestRemoteServiceRefusesDownload(t *testing.T) {
+	s, fx := a1Service(t)
+	resultsFixture(s, fx, "/home/alice_ucr_edu/deep-research-lab/run_76")
+	s.Remote = true
+	if _, err := s.JobResults(context.Background(), ResultsInput{JobID: "236", Download: true}); err == nil || !strings.Contains(err.Error(), "not available") {
+		t.Fatalf("a remote service must refuse downloads: %v", err)
+	}
+}
+
+func TestTraceCommandsRedacted(t *testing.T) {
+	s, fx := a1Service(t)
+	resultsFixture(s, fx, "/home/alice_ucr_edu/deep-research-lab/run_76")
+	res, err := Call(context.Background(), s, "test", "job_results", "R1", nil, false, func(ctx context.Context) (*Results, error) {
+		return s.JobResults(ctx, ResultsInput{JobID: "236", Read: "log.txt", Grep: "API_TOKEN=supersecret123"})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Source.Commands) == 0 {
+		t.Fatal("no commands in source")
+	}
+	for _, c := range res.Source.Commands {
+		if strings.Contains(c, "supersecret123") {
+			t.Fatalf("secret leaked into source commands: %s", c)
+		}
+	}
+	b, _ := os.ReadFile(s.Audit.Path())
+	if strings.Contains(string(b), "supersecret123") {
+		t.Fatal("secret leaked into the audit log")
+	}
+}
+
+func TestAuditNamesProgram(t *testing.T) {
+	s, _ := newTestService(t)
+	s.Program = "dash"
+	if _, err := Call(context.Background(), s, "mcp:test", "jobs_list", "R1", nil, false, func(ctx context.Context) ([]JobSummary, error) {
+		return s.JobsList(ctx, JobsListInput{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(s.Audit.Path())
+	if !strings.Contains(string(b), `"client":"program:dash/mcp:test"`) {
+		t.Fatalf("audit should name the program client: %s", b)
+	}
 }

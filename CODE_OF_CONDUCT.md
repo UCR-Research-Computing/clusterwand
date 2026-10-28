@@ -8,6 +8,6 @@ in issues, pull requests, discussions or any other project space.
 
 Report problems privately to the maintainers through
 [UCR Research Computing](https://github.com/UCR-Research-Computing) or GitHub's
-[private reporting](https://github.com/UCR-Research-Computing/ursa-bifrost/security/advisories/new).
+[private reporting](https://github.com/UCR-Research-Computing/clusterwand/security/advisories/new).
 Reports are handled confidentially, and maintainers may remove content or block
 participants who break these rules.

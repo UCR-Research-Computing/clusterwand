@@ -46,12 +46,10 @@ type Fixture struct {
 	// the path realpath resolves it to.
 	Paths map[string]string
 	Links map[string]string
-	// Puts records signed-URL uploads (results_link): URL -> local file path.
-	Puts map[string]string
 	// Out answers a bash template exactly (env_check, du ...): template -> output.
 	Out map[string]string
 	// IgnoreJobFilter answers `squeue/sacct -j` with every recorded job, as a
-	// Slurm that ignored the list would (tests bifrost's own job_ids filter).
+	// Slurm that ignored the list would (tests clusterwand's own job_ids filter).
 	IgnoreJobFilter bool
 	// Sharing answers `sinfo -h -o %R|%h` (partition|OverSubscribe lines); empty
 	// means every partition is EXCLUSIVE, as on the real cluster in 2026-10.
@@ -134,7 +132,7 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		if strings.Contains(a[2], "module -t show") {
 			// emulate the site's hierarchical Lmod: MPI-built packages are only
 			// in the module path after an MPI is loaded (Lmod prints a warning
-			// and exits 1 otherwise; bifrost runs it with 2>&1)
+			// and exits 1 otherwise; clusterwand runs it with 2>&1)
 			if f.MPIOnly != nil {
 				for _, m := range f.MPIOnly {
 					if strings.Contains(a[2], "show "+m) && !strings.Contains(a[2], "module load ") {
@@ -242,12 +240,6 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 			return []byte(out), nil
 		}
 		return nil, fmt.Errorf("fixture backend: no df recording")
-	case "curl":
-		if f.Puts == nil {
-			f.Puts = map[string]string{}
-		}
-		f.Puts[a[len(a)-1]] = a[len(a)-2]
-		return nil, nil
 	case "head":
 		p := a[len(a)-1]
 		for dir, files := range f.Files {

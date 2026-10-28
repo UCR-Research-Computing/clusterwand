@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ursa-bifrost - let any AI assistant work a Slurm cluster, safely</title>
-  <meta name="description" content="One Go binary that is both an MCP server and a CLI: typed, audited, read-mostly access to a Slurm cluster for Claude, Codex, Gemini, Hermes, OpenCode and your own scripts.">
+  <title>ClusterWand - the Bifrost between AI and your HPC cluster</title>
+  <meta name="description" content="ClusterWand: safe, typed MCP tools that let AI assistants do real work on any Slurm cluster over SSH. One Go binary, MCP server and CLI. Forked from ursa-bifrost.">
   <meta name="theme-color" content="#00287a">
-  <link rel="canonical" href="https://ucr-research-computing.github.io/ursa-bifrost/">
+  <link rel="canonical" href="https://ucr-research-computing.github.io/clusterwand/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ursa-bifrost - let any AI assistant work a Slurm cluster, safely">
+  <meta property="og:title" content="ClusterWand - the Bifrost between AI and your HPC cluster">
   <meta property="og:description" content="An MCP server and CLI in one Go binary. Job status, failure diagnosis, costs, modules, batch-script checks and results, with opt-in two-step submit and cancel. No shell, ever.">
-  <meta property="og:url" content="https://ucr-research-computing.github.io/ursa-bifrost/">
+  <meta property="og:url" content="https://ucr-research-computing.github.io/clusterwand/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;family=Fira+Sans+Condensed:wght@500;600;700&amp;family=Fira+Code:wght@400;500&amp;display=swap">
@@ -24,7 +24,7 @@
   <div class="container util-row">
     <a class="util-home" href="https://ucr-research-computing.github.io/">UCR Research Computing</a>
     <span class="util-sep" aria-hidden="true">/</span>
-    <span class="util-proj">ursa-bifrost</span>
+    <span class="util-proj">ClusterWand</span>
     <span class="sp"></span>
     <nav class="util-nav" aria-label="Page sections">
       <a href="#features">Features</a>
@@ -33,7 +33,7 @@
       <a href="#safety">Safety</a>
       <a href="#start">Quick start</a>
     </nav>
-    <a class="util-gh" href="https://github.com/UCR-Research-Computing/ursa-bifrost" aria-label="ursa-bifrost on GitHub"><i class="fa-brands fa-github" aria-hidden="true"></i></a>
+    <a class="util-gh" href="https://github.com/UCR-Research-Computing/clusterwand" aria-label="ClusterWand on GitHub"><i class="fa-brands fa-github" aria-hidden="true"></i></a>
   </div>
 </header>
 
@@ -44,17 +44,17 @@
   <div class="container hero-grid">
     <div class="hero-copy">
       <div class="kicker">MCP server<span class="sep">/</span>CLI<span class="sep">/</span>One Go binary</div>
-      <h1>ursa-bifrost</h1>
-      <p class="tagline">Let any AI assistant work a Slurm cluster, safely.</p>
-      <p class="lead">One Go binary that is both an MCP server and a CLI. It gives Claude, Codex, Gemini, Hermes, OpenCode and your own scripts typed, audited, read-mostly access to a Slurm cluster: job status, failure diagnosis, costs, software modules, batch-script checks, results, and (opt-in, two-step) submit and cancel.</p>
+      <h1>ClusterWand</h1>
+      <p class="tagline">The Bifrost between AI and your HPC cluster.</p>
+      <p class="lead">Safe, typed MCP tools that let AI assistants do real work on a Slurm cluster over SSH. One Go binary on your own machine that is both a stdio MCP server and a CLI, reaching the cluster through your own OpenSSH login: Claude, Copilot, Gemini, Hermes, Codex, OpenCode and your own scripts get audited, read-mostly access to job status, failure diagnosis, costs, software modules, batch-script checks, results, and (opt-in, two-step) submit and cancel.</p>
       <div class="cta">
         <a class="btn gold solid" href="#start"><i class="fa-solid fa-play" aria-hidden="true"></i> Get started</a>
-        <a class="btn gold" href="https://github.com/UCR-Research-Computing/ursa-bifrost"><i class="fa-brands fa-github" aria-hidden="true"></i> View on GitHub</a>
-        <a class="btn gold" href="https://github.com/UCR-Research-Computing/ursa-bifrost/releases/tag/v0.9.14"><i class="fa-solid fa-tag" aria-hidden="true"></i> Release <span class="ver">v0.9.14</span></a>
+        <a class="btn gold" href="https://github.com/UCR-Research-Computing/clusterwand"><i class="fa-brands fa-github" aria-hidden="true"></i> View on GitHub</a>
+        <a class="btn gold" href="https://github.com/UCR-Research-Computing/clusterwand/releases/tag/v0.1.0"><i class="fa-solid fa-tag" aria-hidden="true"></i> Release <span class="ver">v0.1.0</span></a>
       </div>
       <ul class="facts" aria-label="Project facts">
         <li><i class="fa-brands fa-golang" aria-hidden="true"></i> Go 1.26</li>
-        <li><i class="fa-solid fa-plug" aria-hidden="true"></i> Streamable HTTP + stdio</li>
+        <li><i class="fa-solid fa-plug" aria-hidden="true"></i> stdio MCP, your own SSH</li>
         <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> MIT</li>
       </ul>
     </div>
@@ -110,7 +110,7 @@
       <article class="task">
         <div class="ic"><i class="fa-solid fa-folder-open" aria-hidden="true"></i></div>
         <h3>Logs, files and results</h3>
-        <p>Paged, redacted log windows; listings and chunked reads of your own home, scratch and job folders; signed download links for job outputs when a staging bucket is configured.</p>
+        <p>Paged, redacted log windows; listings and chunked reads of your own home, scratch and job folders; job folders copied to your machine over the same SSH connection.</p>
       </article>
       <article class="task">
         <div class="ic"><i class="fa-solid fa-terminal" aria-hidden="true"></i></div>
@@ -146,22 +146,22 @@
     <div class="cli-head">
       <div class="kicker">The CLI</div>
       <h2>Same tools, in a terminal</h2>
-      <p class="sub">Everything the MCP tools do is also a <code>bifrost</code> command. Two examples from the README:</p>
+      <p class="sub">Everything the MCP tools do is also a <code>clusterwand</code> command. Two examples from the README:</p>
     </div>
-<pre class="code"><code>$ bifrost check train.sbatch
+<pre class="code"><code>$ clusterwand check train.sbatch
 PROBLEMS FOUND  partition cpu  worst-case cost $X.XX  (1 cores, 6% of a node)
   error   line 4: module "python3" not found in the cluster catalog; closest: python-sci, python-ml
   error   cpu shares nodes between jobs: this script asks for no cores, so Slurm gives
           it 1 core and about 8 GB on cpu. Ask for the cores it needs ...
   warning calls python without loading python-sci/python-ml or an environment</code></pre>
-<pre class="code"><code>$ bifrost submit hello.sh
+<pre class="code"><code>$ clusterwand submit hello.sh
 Plan (nothing submitted yet):
   partition  cpu, 1 node(s), time limit 0 h 05 min
   scheduler  would start at ... on ... (cpu)
   worst case $X.XX  (today so far $0.00 of your day cap)
 Submit this job? [y/N] y
-Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifrost-hello</code></pre>
-    <p class="note">Submitting needs tier A1. Each submitted job runs in its own <code>~/bifrost-jobs/&lt;stamp&gt;-&lt;name&gt;</code> folder, so its results are exactly that folder. Caps limit nodes, hours and spend per job and per day; a plan over a cap is refused before anything reaches the scheduler.</p>
+Submitted job 265 ...  folder on the cluster: ~/clusterwand-jobs/&lt;stamp&gt;-hello</code></pre>
+    <p class="note">Submitting needs tier A1. Each submitted job runs in its own <code>~/clusterwand-jobs/&lt;stamp&gt;-&lt;name&gt;</code> folder, so its results are exactly that folder. Caps limit nodes, hours and spend per job and per day; a plan over a cap is refused before anything reaches the scheduler.</p>
   </div>
 </section>
 
@@ -172,20 +172,20 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       <div>
         <div class="kicker">How it works</div>
         <h2>A narrow, well-guarded crossing</h2>
-        <p class="sub">The assistant sits on one side and the scheduler on the other. bifrost is the bridge: tier checks, rate limits, a short-TTL cache, redaction and audit, and a backend that can only build allow-listed commands.</p>
+        <p class="sub">The assistant sits on one side and the scheduler on the other. clusterwand is the bridge: tier checks, rate limits, a short-TTL cache, redaction and audit, and a backend that can only build allow-listed commands.</p>
       </div>
     </div>
 
-    <div class="arch" role="img" aria-label="Architecture: MCP clients connect over Streamable HTTP with OAuth 2.1 (hosted) or stdio (local) to bifrost, whose layers are mcpserver, core.Call, rules, policy and backend. bifrost reaches the Slurm login node over one multiplexed SSH connection (local) or a per-user IAP tunnel with an OS Login key (hosted), and runs squeue, sacct, sinfo, scontrol --json, module and sbatch.">
+    <div class="arch" role="img" aria-label="Architecture: MCP clients start clusterwand on the same machine and talk to it over stdio. Its layers are mcpserver, core.Call, rules, policy and backend. clusterwand reaches the Slurm login node over one multiplexed OpenSSH connection with your own login, and runs squeue, sacct, sinfo, scontrol --json, module and sbatch.">
       <div class="arch-row arch-clients">
         <span class="chip-c">Claude</span><span class="chip-c">Codex</span><span class="chip-c">Gemini</span><span class="chip-c">Hermes</span><span class="chip-c">OpenCode</span><span class="chip-c">your scripts</span>
       </div>
       <div class="arch-link">
         <span class="arrow" aria-hidden="true"></span>
-        <span class="lbl"><b>MCP</b> Streamable HTTP + OAuth 2.1 (hosted) &nbsp;or&nbsp; stdio (local)</span>
+        <span class="lbl"><b>MCP</b> over stdio, on your machine</span>
       </div>
       <div class="arch-core">
-        <div class="arch-core-title">bifrost</div>
+        <div class="arch-core-title">clusterwand</div>
         <div class="layer"><b>mcpserver</b><span>tools, resources, prompts</span></div>
         <div class="layer"><b>core.Call</b><span>tier check, rate limit, cache, result envelope, audit</span></div>
         <div class="layer"><b>rules</b><span>deterministic job diagnosis (job_explain)</span></div>
@@ -194,7 +194,7 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       </div>
       <div class="arch-link">
         <span class="arrow" aria-hidden="true"></span>
-        <span class="lbl">one multiplexed SSH connection (local) &nbsp;/&nbsp; per-user IAP tunnel + OS Login key (hosted)</span>
+        <span class="lbl">one multiplexed OpenSSH connection, as you</span>
       </div>
       <div class="arch-row arch-slurm">
         <span class="node"><i class="fa-solid fa-server" aria-hidden="true"></i> Slurm login node</span>
@@ -204,25 +204,21 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
 
     <div class="modes">
       <article class="mode">
-        <h3><i class="fa-solid fa-cloud" aria-hidden="true"></i> Hosted server</h3>
-        <p class="mode-sub">Nothing to install for users.</p>
+        <h3><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> Runs on your machine</h3>
+        <p class="mode-sub">Your own SSH login, no server.</p>
         <ul>
-          <li><code>bifrost serve</code> on Cloud Run, Streamable HTTP at <code>/mcp</code></li>
-          <li>Google sign-in restricted to your Workspace domain and the accounts listed in <code>users.yaml</code> (re-read on every request)</li>
-          <li>OAuth 2.1 with PKCE and dynamic client registration; rotating refresh tokens (30 days); sealed token storage</li>
-          <li>Per-user IAP tunnels and OS Login keys, so each person reaches the cluster as themselves</li>
-          <li>Works from any MCP client on any machine</li>
+          <li><code>clusterwand mcp</code> over stdio, plus the full CLI</li>
+          <li>No network listener, no sign-in, no credentials of its own</li>
+          <li>Tiers come from your local config</li>
         </ul>
       </article>
       <article class="mode">
-        <h3><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> Local binary</h3>
-        <p class="mode-sub">Your own gcloud login, no server.</p>
+        <h3><i class="fa-solid fa-key" aria-hidden="true"></i> SSH only</h3>
+        <p class="mode-sub">Nothing installed or changed on the cluster.</p>
         <ul>
-          <li><code>bifrost mcp</code> over stdio, plus the full CLI</li>
-          <li>Reaches the login node the same way you would by hand, through gcloud and IAP</li>
+          <li>Reaches the login node the way you would by hand: any OpenSSH host alias, with your keys, agent, ProxyJump and MFA (<a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SSH.md">docs/SSH.md</a>)</li>
           <li>One multiplexed SSH connection reused for every call: about 0.3 s per command once warm</li>
-          <li>Or <code>backend: iap</code>: bifrost opens the IAP tunnel itself with an OS Login key (8 h expiry) and pinned host keys</li>
-          <li>Works from your machine only</li>
+          <li>A normal researcher login is enough</li>
         </ul>
       </article>
     </div>
@@ -236,20 +232,20 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       <div>
         <div class="kicker">Tools</div>
         <h2>Three tiers, granted per caller</h2>
-        <p class="sub">A caller only sees, and can only call, the tiers granted to them (<code>tiers</code> in the local config, <code>users.yaml</code> on the hosted server). Read tools carry <code>readOnlyHint: true</code>, act tools <code>false</code>.</p>
+        <p class="sub">A caller only sees, and can only call, the tiers granted to them (<code>tiers</code> in your local config). Read tools carry <code>readOnlyHint: true</code>, act tools <code>false</code>.</p>
       </div>
     </div>
     <div class="tiers">
       <article class="tier">
         <div class="tier-head"><span class="badge">R1</span><div><h3>Read</h3><p>Everyone</p></div></div>
         <ul class="toolchips">
-          <li>cluster_status</li><li>partitions</li><li>jobs_list</li><li>job_show</li><li>job_explain</li><li>job_log_tail</li><li>job_results</li><li>modules_search</li><li>module_show</li><li>recipes</li><li>script_check</li><li>my_usage</li><li>waste_report</li><li>storage_usage</li><li>files_list</li><li>files_read</li><li>env_check</li><li>interactive_help</li><li>my_allocation</li><li>results_link*</li>
+          <li>cluster_status</li><li>partitions</li><li>jobs_list</li><li>job_show</li><li>job_explain</li><li>job_log_tail</li><li>job_results</li><li>modules_search</li><li>module_show</li><li>recipes</li><li>script_check</li><li>my_usage</li><li>waste_report</li><li>storage_usage</li><li>files_list</li><li>files_read</li><li>env_check</li><li>interactive_help</li><li>my_allocation</li>
         </ul>
       </article>
       <article class="tier tier-act">
         <div class="tier-head"><span class="badge">A1</span><div><h3>Act</h3><p>Opt-in per person</p></div></div>
         <ul class="toolchips">
-          <li>job_submit</li><li>job_submit_confirm</li><li>job_cancel</li><li>job_cancel_confirm</li><li>job_hold</li><li>job_hold_confirm</li><li>job_release</li><li>job_release_confirm</li><li>upload_prepare*</li><li>uploads_list*</li>
+          <li>job_submit</li><li>job_submit_confirm</li><li>job_cancel</li><li>job_cancel_confirm</li><li>job_hold</li><li>job_hold_confirm</li><li>job_release</li><li>job_release_confirm</li>
         </ul>
       </article>
       <article class="tier tier-staff">
@@ -260,7 +256,7 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
         <p class="tier-note"><code>ticket_draft</code> writes a reply draft for a "my job failed" ticket. It is never sent.</p>
       </article>
     </div>
-    <p class="footnote">* when a staging bucket is configured. Also: resources <code>hpc://catalog</code> and <code>hpc://policies</code>; prompts <code>diagnose_job</code>, <code>write_batch_script</code>, <code>monthly_usage_summary</code>, <code>triage_ticket</code>. Full catalog: <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/SPEC.md#7-tool-catalog">SPEC section 7</a>.</p>
+    <p class="footnote">Also: resources <code>hpc://catalog</code> and <code>hpc://policies</code>; prompts <code>diagnose_job</code>, <code>write_batch_script</code>, <code>monthly_usage_summary</code>, <code>triage_ticket</code>. Full catalog: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#7-tool-catalog">SPEC section 7</a>.</p>
   </div>
 </section>
 
@@ -271,7 +267,7 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       <div>
         <div class="kicker">Safety model</div>
         <h2>Built for a model that will sometimes be wrong</h2>
-        <p class="sub">bifrost assumes the model on the other end will sometimes be wrong, and will occasionally be manipulated by text it reads.</p>
+        <p class="sub">clusterwand assumes the model on the other end will sometimes be wrong, and will occasionally be manipulated by text it reads.</p>
       </div>
     </div>
 
@@ -302,10 +298,10 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
       <div class="kc"><i class="fa-solid fa-tag" aria-hidden="true"></i><h3>Untrusted text is labelled</h3><p>Log lines, scripts and submit lines come back only in <code>untrusted</code> blocks with a note telling the model it is data, not instructions.</p></div>
       <div class="kc"><i class="fa-solid fa-user-secret" aria-hidden="true"></i><h3>Secrets redacted</h3><p>Tokens, keys, passwords, JWTs, private keys and credentials in URLs are removed from every output and from the audit log.</p></div>
       <div class="kc"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><h3>Everything audited</h3><p>Every call, CLI or MCP, appends a JSON line (mode 600): caller, client, tool, redacted args, decision, commands, size, duration.</p></div>
-      <div class="kc"><i class="fa-solid fa-feather" aria-hidden="true"></i><h3>Low load</h3><p>Short-TTL cache, per-user rate limits, at most 8 concurrent SSH sessions per connection (the login node allows 10), and no background polling.</p></div>
-      <div class="kc"><i class="fa-solid fa-link" aria-hidden="true"></i><h3>Signed links for data</h3><p>Uploads and downloads use short-lived signed Cloud Storage links in a private 7-day staging bucket. Jobs fetch their own inputs, so compute nodes hold no credentials.</p></div>
+      <div class="kc"><i class="fa-solid fa-feather" aria-hidden="true"></i><h3>Low load</h3><p>Short-TTL cache, a per-user rate limit, one shared SSH connection, and no background polling.</p></div>
+      <div class="kc"><i class="fa-solid fa-key" aria-hidden="true"></i><h3>Your login, nothing more</h3><p>ClusterWand runs as you over your own SSH connection and never sees your private keys. It can do only what your login can, and less: only the allow-listed commands.</p></div>
     </div>
-    <p class="safety-more">Shared partitions: a script must ask for its cores or <code>script_check</code> and <code>job_submit</code> refuse it, and costs are the share of the node the job holds. Programs such as a dashboard can use a pre-registered client with a tier ceiling and their own call budget. Details: <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/SPEC.md#9-security-and-governance">SPEC section 9</a>.</p>
+    <p class="safety-more">Shared partitions: a script must ask for its cores or <code>script_check</code> and <code>job_submit</code> refuse it, and costs are the share of the node the job holds. Details: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#9-security-and-governance">SPEC section 9</a>.</p>
   </div>
 </section>
 
@@ -315,48 +311,47 @@ Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/&lt;stamp&gt;-bifro
     <div class="band-head">
       <div>
         <div class="kicker">Quick start</div>
-        <h2>Hosted or local, pick one</h2>
-        <p class="sub">The hosted server needs an account your cluster's administrator has added. The local binary uses your own gcloud login and SSH.</p>
+        <h2>Your laptop + any cluster over SSH</h2>
+        <p class="sub">If <code>ssh mycluster</code> works without a prompt, ClusterWand works too: it uses your own OpenSSH login and keeps one multiplexed connection open. Or try it first with no cluster at all.</p>
       </div>
     </div>
 
     <div class="start-grid">
       <article class="start">
-        <h3><span class="step-n">A</span> Use the hosted server</h3>
-        <p>Point your client at your organization's server URL and sign in with Google when it asks:</p>
+        <h3><span class="step-n">A</span> 60-second demo, no cluster</h3>
+        <p>The repo ships anonymized recordings of real Slurm output; the <code>fixture</code> backend replays them:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-url">https://YOUR-SERVER/mcp</code></pre>
-          <button class="copy" type="button" data-copy="cmd-url" aria-label="Copy server URL"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+<pre class="code"><code id="cmd-demo">git clone https://github.com/UCR-Research-Computing/clusterwand &amp;&amp; cd clusterwand
+go build -o clusterwand ./cmd/clusterwand
+printf 'backend: fixture\nfixtures_dir: %s/testdata\ntiers: [R1, R2, A1]\naudit_path: /tmp/cw-audit.jsonl\nstate_path: /tmp/cw-a1.json\n' "$PWD" > /tmp/cw-demo.yaml
+./clusterwand job explain 236 --config /tmp/cw-demo.yaml</code></pre>
+          <button class="copy" type="button" data-copy="cmd-demo" aria-label="Copy demo commands"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
-        <p>For example, in Claude Code:</p>
-        <div class="codewrap">
-<pre class="code"><code id="cmd-claude">claude mcp add --transport http ursa https://YOUR-SERVER/mcp</code></pre>
-          <button class="copy" type="button" data-copy="cmd-claude" aria-label="Copy Claude Code command"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
-        </div>
-        <p class="note">Then run <code>/mcp</code>, pick <code>ursa</code> and choose Authenticate. Other clients are listed <a href="#clients">below</a>.</p>
+        <p class="note">Then try <code>status</code>, <code>jobs</code>, <code>modules lammps</code>, or <code>mcp</code> to serve the same over stdio.</p>
       </article>
       <article class="start">
-        <h3><span class="step-n">B</span> Run it locally</h3>
-        <p>Linux/macOS release binary to <code>~/.local/bin</code>, checksum-verified:</p>
+        <h3><span class="step-n">B</span> Install and point it at your cluster</h3>
+        <p>Linux/macOS release binary to <code>~/.local/bin</code>, checksum-verified, with the short alias <code>wand</code>:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-get">curl -fsSL https://raw.githubusercontent.com/UCR-Research-Computing/ursa-bifrost/main/scripts/get.sh | sh</code></pre>
+<pre class="code"><code id="cmd-get">curl -fsSL https://raw.githubusercontent.com/UCR-Research-Computing/clusterwand/main/scripts/get.sh | sh</code></pre>
           <button class="copy" type="button" data-copy="cmd-get" aria-label="Copy install command"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
         <p>Or with Go:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-go">go install github.com/UCR-Research-Computing/ursa-bifrost/cmd/bifrost@latest</code></pre>
+<pre class="code"><code id="cmd-go">go install github.com/UCR-Research-Computing/clusterwand/cmd/clusterwand@latest</code></pre>
           <button class="copy" type="button" data-copy="cmd-go" aria-label="Copy go install command"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
         <p>Then set up and check:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-init">bifrost config init     # writes ~/.config/ursa-bifrost/config.yaml
-bifrost doctor          # checks gcloud, SSH to the login node, the catalog
-bifrost status</code></pre>
+<pre class="code"><code id="cmd-init">clusterwand config init     # writes ~/.config/clusterwand/config.yaml
+#   set ssh.host: mycluster (see docs/SSH.md)
+clusterwand doctor          # checks the config, SSH to the login node, the catalog
+clusterwand status</code></pre>
           <button class="copy" type="button" data-copy="cmd-init" aria-label="Copy first-run commands"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
         <p>Add it to a client as a stdio server, in any JSON config:</p>
         <div class="codewrap">
-<pre class="code"><code id="cmd-json">{ "mcpServers": { "ursa": { "command": "bifrost", "args": ["mcp"] } } }</code></pre>
+<pre class="code"><code id="cmd-json">{ "mcpServers": { "cluster": { "command": "clusterwand", "args": ["mcp"] } } }</code></pre>
           <button class="copy" type="button" data-copy="cmd-json" aria-label="Copy JSON client config"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
         </div>
       </article>
@@ -371,51 +366,53 @@ bifrost status</code></pre>
       <div>
         <div class="kicker">Clients</div>
         <h2>One line for each common client</h2>
-        <p class="sub">The hosted server does OAuth 2.1 with dynamic client registration, PKCE and discovery, so any client that supports remote MCP servers signs you in by itself. Below, <code>URL</code> means the hosted <code>/mcp</code> URL above.</p>
+        <p class="sub">Every client starts <code>clusterwand mcp</code> as a local stdio server. The server name <code>cluster</code> is your choice.</p>
       </div>
     </div>
     <div class="clients">
       <article class="client">
         <h3><i class="fa-solid fa-robot" aria-hidden="true"></i> Hermes Agent</h3>
-        <pre class="code sm"><code>hermes mcp add ursa --url URL --auth oauth</code></pre>
-        <p>Local: <code>hermes mcp add ursa --command bifrost --args mcp</code></p>
+        <pre class="code sm"><code>hermes mcp add cluster --command clusterwand --args mcp</code></pre>
       </article>
       <article class="client">
         <h3><i class="fa-solid fa-code" aria-hidden="true"></i> Claude Code</h3>
-        <pre class="code sm"><code>claude mcp add --transport http ursa URL</code></pre>
-        <p>Then <code>/mcp</code> &rarr; Authenticate. Local: <code>claude mcp add ursa -- bifrost mcp</code></p>
+        <pre class="code sm"><code>claude mcp add cluster -- clusterwand mcp</code></pre>
+        <p>Add <code>-s user</code> for every project.</p>
       </article>
       <article class="client">
-        <h3><i class="fa-solid fa-comments" aria-hidden="true"></i> claude.ai / Claude Desktop</h3>
-        <p>Settings &rarr; Connectors &rarr; Add custom connector, paste the URL. On a Team or Enterprise plan an owner may need to allow custom connectors first.</p>
+        <h3><i class="fa-solid fa-comments" aria-hidden="true"></i> Claude Desktop</h3>
+        <pre class="code sm"><code>{"mcpServers": {"cluster": {
+  "command": "clusterwand", "args": ["mcp"]}}}</code></pre>
+        <p>In <code>claude_desktop_config.json</code>.</p>
       </article>
       <article class="client">
         <h3><i class="fa-solid fa-terminal" aria-hidden="true"></i> Codex CLI</h3>
-        <pre class="code sm"><code>codex mcp add ursa --url URL</code></pre>
-        <p>Signs in right away (Codex 0.160+). Local: <code>codex mcp add ursa -- bifrost mcp</code></p>
+        <pre class="code sm"><code>codex mcp add cluster -- clusterwand mcp</code></pre>
       </article>
       <article class="client">
         <h3><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> OpenCode</h3>
-        <pre class="code sm"><code>opencode mcp add ursa --url URL
-opencode mcp auth ursa</code></pre>
+        <pre class="code sm"><code>"cluster": {"type": "local",
+  "command": ["clusterwand", "mcp"]}</code></pre>
+        <p>Under <code>mcp</code> in <code>opencode.jsonc</code>.</p>
       </article>
       <article class="client">
         <h3><i class="fa-solid fa-star" aria-hidden="true"></i> Gemini CLI</h3>
-        <pre class="code sm"><code>gemini mcp add -s user -t http ursa URL</code></pre>
-        <p>Then <code>/mcp auth ursa</code>. Local: <code>gemini mcp add -s user ursa bifrost mcp</code></p>
+        <pre class="code sm"><code>gemini mcp add -s user cluster clusterwand mcp</code></pre>
       </article>
       <article class="client">
-        <h3><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> OpenAI API</h3>
-        <p>A <code>{"type": "mcp", "server_url": ...}</code> tool in the Responses API. Keep <code>allowed_tools</code> to read tools when approval is off.</p>
+        <h3><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub Copilot (VS Code)</h3>
+        <pre class="code sm"><code>{"servers": {"cluster": {"type": "stdio",
+  "command": "clusterwand", "args": ["mcp"]}}}</code></pre>
+        <p>In <code>.vscode/mcp.json</code>, then enable the tools in Copilot Chat agent mode.</p>
       </article>
       <article class="client">
-        <h3><i class="fa-brands fa-python" aria-hidden="true"></i> Python / curl</h3>
-        <pre class="code sm"><code>python3 examples/mcp_client.py login
+        <h3><i class="fa-brands fa-python" aria-hidden="true"></i> Scripts</h3>
+        <pre class="code sm"><code>clusterwand job explain 236 --json
 python3 examples/mcp_client.py call job_explain '{"job_id": "236"}'</code></pre>
-        <p>A complete client in one file, standard library only.</p>
+        <p>Every tool is a CLI command with <code>--json</code>; the example is a stdio MCP client in one file.</p>
       </article>
     </div>
-    <p class="footnote">Config-file versions, local (stdio) variants and troubleshooting for every client: <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/CLIENTS.md">docs/CLIENTS.md</a>.</p>
+    <p class="footnote">Config-file versions and troubleshooting for every client: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/CLIENTS.md">docs/CLIENTS.md</a>.</p>
   </div>
 </section>
 
@@ -425,19 +422,16 @@ python3 examples/mcp_client.py call job_explain '{"job_id": "236"}'</code></pre>
     <div>
       <div class="kicker">Self-hosting</div>
       <h2>Bring it to your own cluster</h2>
-      <p>Nothing in bifrost is specific to one site except configuration: the login node, the catalog (partitions, prices, modules, recipes), log roots and caps. Start with <code>bifrost config init</code>, point <code>ssh</code> or <code>iap</code> at your login node, and write a catalog.</p>
-      <p>The hosted Cloud Run deployment (Secret Manager, sealed token store, users file) is documented step by step in <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/DEPLOY.md">docs/DEPLOY.md</a>; <code>deploy/deploy.sh</code> does it idempotently.</p>
-<pre class="code"><code>deploy/deploy.sh plan      # read-only: shows what is missing
-deploy/deploy.sh apply     # asks before each billable or IAM change</code></pre>
+      <p>Nothing in ClusterWand is specific to one site except configuration: the login node, the catalog (partitions, prices, modules, recipes), log roots and caps. Start with <code>clusterwand config init</code>, point <code>ssh.host</code> at your login node, and write a catalog. Site profiles and <code>clusterwand discover</code> are on the roadmap to replace the hand-written catalog.</p>
+      <p>ClusterWand never needs anything installed or changed on the cluster: a normal researcher login is enough, and the catalog can live in your own home folder. Ursa Major's notes live under <a href="https://github.com/UCR-Research-Computing/clusterwand/tree/main/sites/ursa-major">sites/ursa-major/</a>.</p>
     </div>
     <div>
       <div class="kicker">Tested against real output</div>
       <h2>Development</h2>
 <pre class="code"><code>make check                  # gofmt, go vet, go test -race, build   (before every commit)
 scripts/mutation_check.sh   # every safety guard must be caught by a test
-scripts/mcp_smoke.py        # drives `bifrost mcp` over stdio like a real client</code></pre>
+scripts/mcp_smoke.py        # drives `clusterwand mcp` over stdio like a real client</code></pre>
       <p>Tests run against anonymized recordings of real cluster output in <code>testdata/</code> (Slurm 25.11.4). <code>scripts/make_fixtures.py</code> regenerates them from a read-only probe and refuses to write if a real username survives; CI checks again.</p>
-      <p class="note">Also in the repo: <code>agent/</code>, a separate read-only web dashboard (ursa-agent) whose panels call bifrost tools directly as the signed-in person, with an assistant drawer that plans jobs that only run after you press Approve.</p>
     </div>
   </div>
 </section>
@@ -448,14 +442,14 @@ scripts/mcp_smoke.py        # drives `bifrost mcp` over stdio like a real client
     <div class="kicker">Links</div>
     <h2>Read more</h2>
     <div class="links">
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/README.md"><i class="fa-solid fa-book" aria-hidden="true"></i><span><b>README</b>Overview, CLI and safety model</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/CLIENTS.md"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><b>Clients</b>Every client, hosted and local</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/SPEC.md"><i class="fa-solid fa-compass-drafting" aria-hidden="true"></i><span><b>Spec</b>Design, tools, rules, security</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/docs/DEPLOY.md"><i class="fa-solid fa-cloud" aria-hidden="true"></i><span><b>Deploy</b>Hosting on Cloud Run</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/CHANGELOG.md"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span><b>Changelog</b>Every release, latest v0.9.14</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/examples/mcp_client.py"><i class="fa-solid fa-flask" aria-hidden="true"></i><span><b>Example client</b>examples/mcp_client.py</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/LICENSE"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span><b>License</b>MIT</span></a>
-      <a class="lk" href="https://github.com/UCR-Research-Computing/ursa-bifrost/issues"><i class="fa-solid fa-bug" aria-hidden="true"></i><span><b>Issues</b>Report a bug or ask for a feature</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/README.md"><i class="fa-solid fa-book" aria-hidden="true"></i><span><b>README</b>Overview, CLI and safety model</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/CLIENTS.md"><i class="fa-solid fa-plug" aria-hidden="true"></i><span><b>Clients</b>Every client, with troubleshooting</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md"><i class="fa-solid fa-compass-drafting" aria-hidden="true"></i><span><b>Spec</b>Design, tools, rules, security</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SSH.md"><i class="fa-solid fa-key" aria-hidden="true"></i><span><b>SSH setup</b>Keys, ProxyJump, ControlMaster, MFA</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/CHANGELOG.md"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span><b>Changelog</b>Every release, latest v0.1.0</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/examples/mcp_client.py"><i class="fa-solid fa-flask" aria-hidden="true"></i><span><b>Example client</b>examples/mcp_client.py</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/LICENSE"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span><b>License</b>MIT</span></a>
+      <a class="lk" href="https://github.com/UCR-Research-Computing/clusterwand/issues"><i class="fa-solid fa-bug" aria-hidden="true"></i><span><b>Issues</b>Report a bug or ask for a feature</span></a>
     </div>
   </div>
 </section>
@@ -465,7 +459,7 @@ scripts/mcp_smoke.py        # drives `bifrost mcp` over stdio like a real client
 <footer class="foot">
   <div class="container foot-row">
     <p>Built by <a href="https://ucr-research-computing.github.io/">UCR Research Computing</a>, University of California, Riverside.</p>
-    <p>ursa-bifrost is released under the <a href="https://github.com/UCR-Research-Computing/ursa-bifrost/blob/main/LICENSE">MIT License</a>.</p>
+    <p>ClusterWand is released under the <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/LICENSE">MIT License</a>. Forked from <a href="https://github.com/UCR-Research-Computing/ursa-bifrost">ursa-bifrost</a>.</p>
   </div>
 </footer>
 

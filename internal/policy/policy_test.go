@@ -10,18 +10,19 @@ import (
 
 func TestRedact(t *testing.T) {
 	cases := map[string]string{
-		"export API_TOKEN=abc123secretvalue":                                   "abc123secretvalue",
-		"SLURM_JWT=eyJhbGciOiJIUzI1NiJ9.e30.sig":                               "eyJhbGciOiJIUzI1NiJ9",
-		"key AIzaSyA1234567890abcdefghijklmnopqrstu":                           "AIzaSyA1234567890",
-		"Authorization: Bearer abcdefghijklmnop123456":                         "abcdefghijklmnop123456",
-		"aws AKIAABCDEFGHIJKLMNOP":                                             "AKIAABCDEFGHIJKLMNOP",
-		"DB_PASSWORD='hunter2 x'":                                              "hunter2",
-		"tok ghp_abcdefghijklmnopqrstuvwxyz0123456789":                         "ghp_abcdefghijklmnop",
-		"https://user:pa55w0rd@example.com/data.tar.gz":                        "pa55w0rd",
-		"sk-proj-abcdefghijklmnopqrstuvwxyz":                                   "abcdefghijklmnopqrstuvwxyz",
-		"-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----": "MIIE",
-		`{"private_key": "-----BEGIN"}`:                                        "-----BEGIN",
-		"OPENAI_API_KEY: sk-abc":                                               "sk-abc",
+		"export API_TOKEN=abc123secretvalue":                                       "abc123secretvalue",
+		"SLURM_JWT=eyJhbGciOiJIUzI1NiJ9.e30.sig":                                   "eyJhbGciOiJIUzI1NiJ9",
+		"key AIzaSyA1234567890abcdefghijklmnopqrstu":                               "AIzaSyA1234567890",
+		"Authorization: Bearer abcdefghijklmnop123456":                             "abcdefghijklmnop123456",
+		"aws AKIAABCDEFGHIJKLMNOP":                                                 "AKIAABCDEFGHIJKLMNOP",
+		"DB_PASSWORD='hunter2 x'":                                                  "hunter2",
+		"tok ghp_abcdefghijklmnopqrstuvwxyz0123456789":                             "ghp_abcdefghijklmnop",
+		"https://user:pa55w0rd@example.com/data.tar.gz":                            "pa55w0rd",
+		"sk-proj-abcdefghijklmnopqrstuvwxyz":                                       "abcdefghijklmnopqrstuvwxyz",
+		"-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----":     "MIIE",
+		`{"private_key": "-----BEGIN"}`:                                            "-----BEGIN",
+		"OPENAI_API_KEY: sk-abc":                                                   "sk-abc",
+		"https://storage.googleapis.com/b/o?X-Goog-Signature=0123456789abcdef0123": "0123456789abcdef0123",
 	}
 	for in, secret := range cases {
 		out := Redact(in)

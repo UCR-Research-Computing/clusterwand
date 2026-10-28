@@ -1,15 +1,15 @@
-// Command bifrost is the ursa-bifrost CLI and MCP server.
+// Command clusterwand is the clusterwand CLI and MCP server.
 //
-//	bifrost mcp                  run the MCP server on stdio
-//	bifrost status               cluster status
-//	bifrost jobs [--state S]     your jobs
-//	bifrost job show|explain|log <id>
-//	bifrost modules <query>      search modules
-//	bifrost recipes [query]
-//	bifrost check <script.sh>    static check of a batch script
-//	bifrost usage [--since now-30days] [--by partition|state|user]
-//	bifrost config init|show|path
-//	bifrost doctor
+//	clusterwand mcp                  run the MCP server on stdio
+//	clusterwand status               cluster status
+//	clusterwand jobs [--state S]     your jobs
+//	clusterwand job show|explain|log <id>
+//	clusterwand modules <query>      search modules
+//	clusterwand recipes [query]
+//	clusterwand check <script.sh>    static check of a batch script
+//	clusterwand usage [--since now-30days] [--by partition|state|user]
+//	clusterwand config init|show|path
+//	clusterwand doctor
 //
 // Every command takes --json (machine output) and --config PATH.
 package main
@@ -21,58 +21,51 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/mcpserver"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/server"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/version"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/mcpserver"
+	"github.com/UCR-Research-Computing/clusterwand/internal/version"
 )
 
-const usage = `bifrost - read-only bridge between AI assistants and the Ursa Major Slurm cluster
+const usage = `clusterwand - read-only bridge between AI assistants and the Ursa Major Slurm cluster
 
 Usage:
-  bifrost mcp                              run the MCP server on stdio
-  bifrost status                           cluster status (nodes, queue, $/hour)
-  bifrost partitions                       partitions from the cluster catalog
-  bifrost jobs [--state S] [--since T] [--all] [--user U]
-  bifrost job show <id> [--script] [--any]
-  bifrost job explain <id> [--lines N] [--any]
-  bifrost job log <id> [--stderr] [--lines N] [--start N] [--grep RE] [--any]
-  bifrost modules [query]                  search software modules
-  bifrost module [--mpi M] <name>          module show (MPI-built ones under their MPI)
-  bifrost recipes [query]                  known-good recipes and site rules
-  bifrost check <script.sh|->              static check of a batch script
-  bifrost allocation                       your Ursa Major allocation and use
-  bifrost usage [--since T] [--until T] [--by partition|state|user] [--all]
-  bifrost waste [--since T] [--cpu PCT] [--all] [--user U]   avoidable spend
-  bifrost health                           down/drained nodes, stockouts, stuck jobs (R2)
-  bifrost ticket <id> [--text FILE|-]      draft a ticket reply (R2; never sent)
-  bifrost results <id> [--prefix DIR] [--pattern GLOB] [--offset N] [--limit N]
+  clusterwand mcp                              run the MCP server on stdio
+  clusterwand status                           cluster status (nodes, queue, $/hour)
+  clusterwand partitions                       partitions from the cluster catalog
+  clusterwand jobs [--state S] [--since T] [--all] [--user U]
+  clusterwand job show <id> [--script] [--any]
+  clusterwand job explain <id> [--lines N] [--any]
+  clusterwand job log <id> [--stderr] [--lines N] [--start N] [--grep RE] [--any]
+  clusterwand modules [query]                  search software modules
+  clusterwand module [--mpi M] <name>          module show (MPI-built ones under their MPI)
+  clusterwand recipes [query]                  known-good recipes and site rules
+  clusterwand check <script.sh|->              static check of a batch script
+  clusterwand allocation                       your Ursa Major allocation and use
+  clusterwand usage [--since T] [--until T] [--by partition|state|user] [--all]
+  clusterwand waste [--since T] [--cpu PCT] [--all] [--user U]   avoidable spend
+  clusterwand health                           down/drained nodes, stockouts, stuck jobs (R2)
+  clusterwand ticket <id> [--text FILE|-]      draft a ticket reply (R2; never sent)
+  clusterwand results <id> [--prefix DIR] [--pattern GLOB] [--offset N] [--limit N]
                   [--read FILE [--read-offset N] [--bytes N] [--grep RE]] [--download] [--files a,b]
-  bifrost link <id> FILE [FILE...]         signed download links for job outputs (staging)
-  bifrost upload FILE                      stage an input file; then submit --input <id> (A1)
-  bifrost uploads                          your staged uploads (A1)
-  bifrost storage                          space used in your home and scratch folders
-  bifrost ls [PATH] [--pattern GLOB] [--offset N]   a folder under your home or scratch
-  bifrost cat PATH [--offset N] [--bytes N] [--grep RE]   a text file under home or scratch
-  bifrost env [--module M]... [CMD...]     what modules load and which tools you get
-  bifrost interactive [--partition P] [--nodes N] [--cpus N] [--gpus N] [--time T] [--mem M]
-  bifrost submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--input ID,...] [--yes]   (A1)
-  bifrost cancel|hold|release <id> [--yes]                      (A1)
-  bifrost confirm <token>                  confirm a prepared action (A1)
-  bifrost serve                       hosted MCP server (HTTP + Google sign-in; see docs/CLOUD_PLAN.md)
-  bifrost config init|show|path
-  bifrost doctor                           check config, SSH and the catalog
-  bifrost version
+  clusterwand storage                          space used in your home and scratch folders
+  clusterwand ls [PATH] [--pattern GLOB] [--offset N]   a folder under your home or scratch
+  clusterwand cat PATH [--offset N] [--bytes N] [--grep RE]   a text file under home or scratch
+  clusterwand env [--module M]... [CMD...]     what modules load and which tools you get
+  clusterwand interactive [--partition P] [--nodes N] [--cpus N] [--gpus N] [--time T] [--mem M]
+  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]   (A1)
+  clusterwand cancel|hold|release <id> [--yes]                      (A1)
+  clusterwand confirm <token>                  confirm a prepared action (A1)
+  clusterwand config init|show|path
+  clusterwand doctor                           check config, SSH and the catalog
+  clusterwand version
 
 Global flags (anywhere): --json  --config PATH
 Times: now-7days, now-12hours, YYYY-MM-DD. --all/--any need tier R2 in the config.
@@ -130,7 +123,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch cmd {
 	case "version", "--version":
 		return emit(stdout, g, map[string]string{"version": version.Version}, func(w io.Writer) {
-			fmt.Fprintln(w, "bifrost", version.Version)
+			fmt.Fprintln(w, "clusterwand", version.Version)
 		})
 	case "config":
 		return configCmd(rest, stdout, stderr, g)
@@ -140,14 +133,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stdout, stderr, g, err)
 	}
-	if cmd == "serve" {
-		return serveCmd(cfg, stderr)
-	}
 	svc, err := core.New(cfg)
 	if err != nil {
 		return fail(stdout, stderr, g, err)
 	}
-	defer func() { _ = svc.Close() }() // iap backend: delete the OS Login key
+	defer func() { _ = svc.Close() }()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -155,7 +145,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "mcp":
 		srv := mcpserver.New(svc)
 		if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
-			fmt.Fprintln(stderr, "bifrost mcp:", err)
+			fmt.Fprintln(stderr, "clusterwand mcp:", err)
 			return 1
 		}
 		return 0
@@ -203,7 +193,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return fail(stdout, stderr, g, err)
 		}
 		if fs.NArg() != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost module [--mpi openmpi] <name>"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand module [--mpi openmpi] <name>"))
 		}
 		name := fs.Arg(0)
 		r, err := core.Call(ctx, svc, "cli", "module_show", "R1", map[string]any{"name": name, "mpi": *mpi}, false,
@@ -230,7 +220,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printRecipes(w, r.Data) })
 	case "check":
 		if len(rest) != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost check <script.sh|->"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand check <script.sh|->"))
 		}
 		var b []byte
 		if rest[0] == "-" {
@@ -297,7 +287,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return code
 	case "ticket":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost ticket <job id> [--text FILE|-]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand ticket <job id> [--text FILE|-]"))
 		}
 		id := rest[0]
 		fs := newFlags("ticket")
@@ -325,7 +315,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printTicket(w, r.Data) })
 	case "results":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost results <job id> [--read FILE] [--download] [--files a,b]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand results <job id> [--read FILE] [--download] [--files a,b]"))
 		}
 		id := rest[0]
 		fs := newFlags("results")
@@ -350,49 +340,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		r, err := core.Call(ctx, svc, "cli", "job_results", "R1", map[string]any{"job_id": id, "read": *read, "download": in.Download}, false,
 			func(ctx context.Context) (*core.Results, error) { return svc.JobResults(ctx, in) })
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printResults(w, r.Data) })
-	case "link":
-		if len(rest) < 2 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost link <job id> FILE [FILE...]"))
-		}
-		id, files := rest[0], rest[1:]
-		r, err := core.Call(ctx, svc, "cli", "results_link", "R1", map[string]any{"job_id": id, "files": files}, false,
-			func(ctx context.Context) (*core.ResultLinks, error) { return svc.ResultsLink(ctx, id, files) })
-		return out(stdout, stderr, g, r, err, func(w io.Writer) {
-			for _, l := range r.Data.Links {
-				fmt.Fprintf(w, "%s (%d bytes, until %s)\n  %s\n", l.File, l.Bytes, l.ExpiresAt, l.URL)
-			}
-			for _, n := range r.Data.Notes {
-				fmt.Fprintln(w, "note:", n)
-			}
-		})
-	case "upload":
-		if len(rest) != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost upload FILE"))
-		}
-		fi, err := os.Stat(rest[0])
-		if err != nil {
-			return fail(stdout, stderr, g, err)
-		}
-		name := filepathBase(rest[0])
-		r, err := core.Call(ctx, svc, "cli", "upload_prepare", "A1", map[string]any{"filename": name, "bytes": fi.Size()}, false,
-			func(ctx context.Context) (*core.UploadTicket, error) { return svc.UploadPrepare(ctx, name, fi.Size()) })
-		if err != nil {
-			return fail(stdout, stderr, g, err)
-		}
-		if err := putFile(ctx, rest[0], r.Data); err != nil {
-			return fail(stdout, stderr, g, fmt.Errorf("upload failed: %w", err))
-		}
-		return out(stdout, stderr, g, r, nil, func(w io.Writer) {
-			fmt.Fprintf(w, "Staged %s as %s. Submit with: bifrost submit job.sh --input %s\n", name, r.Data.UploadID, r.Data.UploadID)
-		})
-	case "uploads":
-		r, err := core.Call(ctx, svc, "cli", "uploads_list", "A1", nil, false, svc.UploadsList)
-		return out(stdout, stderr, g, r, err, func(w io.Writer) {
-			for _, u := range r.Data.Uploads {
-				fmt.Fprintf(w, "%s  %-30s %12d  deleted after %s\n", u.UploadID, u.Filename, u.Bytes, u.ExpiresAt)
-			}
-			fmt.Fprintf(w, "%d upload(s), %d of %d bytes\n", len(r.Data.Uploads), r.Data.TotalBytes, r.Data.LimitBytes)
-		})
 	case "storage":
 		r, err := core.Call(ctx, svc, "cli", "storage_usage", "R1", nil, false, svc.StorageUsage)
 		return out(stdout, stderr, g, r, err, func(w io.Writer) {
@@ -442,7 +389,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		})
 	case "cat":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost cat PATH [--offset N] [--bytes N] [--grep RE]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand cat PATH [--offset N] [--bytes N] [--grep RE]"))
 		}
 		p := rest[0]
 		fs := newFlags("cat")
@@ -521,7 +468,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		})
 	case "submit":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--input ID,...] [--yes]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]"))
 		}
 		src := rest[0]
 		fs := newFlags("submit")
@@ -529,7 +476,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		nodes := fs.Int("nodes", 0, "nodes")
 		tl := fs.String("time", "", "time limit")
 		name := fs.String("name", "", "job name")
-		inputs := fs.String("input", "", "comma-separated staged upload ids (bifrost upload)")
 		yes := fs.Bool("yes", false, "confirm without asking (still within caps)")
 		if err := fs.Parse(rest[1:]); err != nil {
 			return fail(stdout, stderr, g, err)
@@ -546,9 +492,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		r, err := core.Call(ctx, svc, "cli", "job_submit", "A1", map[string]any{"file": src, "partition": *part, "nodes": *nodes, "time": *tl}, false,
 			func(ctx context.Context) (*core.SubmitPlan, error) {
 				in := core.SubmitInput{Script: string(b), Partition: *part, Nodes: *nodes, Time: *tl, JobName: *name}
-				if *inputs != "" {
-					in.Inputs = strings.Split(*inputs, ",")
-				}
 				return svc.PrepareSubmit(ctx, in)
 			})
 		if err != nil {
@@ -567,7 +510,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return confirmCmd(ctx, svc, "submit", r.Data.Token, stdout, stderr, g)
 	case "cancel", "hold", "release":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, fmt.Errorf("usage: bifrost %s <job id> [--yes]", cmd))
+			return fail(stdout, stderr, g, fmt.Errorf("usage: clusterwand %s <job id> [--yes]", cmd))
 		}
 		id := rest[0]
 		fs := newFlags(cmd)
@@ -593,13 +536,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return confirmCmd(ctx, svc, cmd, r.Data.Token, stdout, stderr, g)
 	case "confirm":
 		if len(rest) != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: bifrost confirm <token>"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand confirm <token>"))
 		}
 		return confirmCmd(ctx, svc, "", rest[0], stdout, stderr, g)
 	case "doctor":
 		return doctor(ctx, svc, stdout, g)
 	}
-	return fail(stdout, stderr, g, fmt.Errorf("unknown command %q (bifrost --help)", cmd))
+	return fail(stdout, stderr, g, fmt.Errorf("unknown command %q (clusterwand --help)", cmd))
 }
 
 // confirmCmd runs a prepared action; kind "" looks the kind up from the token.
@@ -624,7 +567,7 @@ func confirmCmd(ctx context.Context, svc *core.Service, kind, token string, stdo
 			fmt.Fprintf(w, "folder on the cluster: %s\n", r.Data.RemoteDir)
 		}
 		if r.Data.JobID != "" && kind == "submit" {
-			fmt.Fprintf(w, "watch: bifrost job show %s    results: bifrost results %s --download\n", r.Data.JobID, r.Data.JobID)
+			fmt.Fprintf(w, "watch: clusterwand job show %s    results: clusterwand results %s --download\n", r.Data.JobID, r.Data.JobID)
 		}
 	})
 }
@@ -641,7 +584,7 @@ func askYes(w io.Writer, q string) bool {
 
 func jobCmd(ctx context.Context, svc *core.Service, args []string, stdout, stderr io.Writer, g globals) int {
 	if len(args) < 2 {
-		return fail(stdout, stderr, g, errors.New("usage: bifrost job show|explain|log <id>"))
+		return fail(stdout, stderr, g, errors.New("usage: clusterwand job show|explain|log <id>"))
 	}
 	sub, id, rest := args[0], args[1], args[2:]
 	fs := newFlags("job " + sub)
@@ -768,44 +711,9 @@ func fail(stdout, stderr io.Writer, g globals, err error) int {
 		enc := json.NewEncoder(stdout)
 		_ = enc.Encode(map[string]string{"error": err.Error()})
 	} else {
-		fmt.Fprintln(stderr, "bifrost:", err)
+		fmt.Fprintln(stderr, "clusterwand:", err)
 	}
 	return 1
-}
-
-// serveCmd runs the hosted MCP server. Secrets come from environment variables
-// named in the config (Cloud Run: Secret Manager), never from the file.
-func serveCmd(cfg config.Config, stderr io.Writer) int {
-	sc := cfg.Server
-	secret := os.Getenv(firstNonEmptyStr(sc.SecretKeyEnv, "BIFROST_SECRET_KEY"))
-	gsecret := os.Getenv(firstNonEmptyStr(sc.GoogleClientSecretEnv, "BIFROST_GOOGLE_CLIENT_SECRET"))
-	if secret == "" || gsecret == "" || sc.GoogleClientID == "" {
-		fmt.Fprintln(stderr, "bifrost serve: needs server.google_client_id plus the secret key and Google client secret in the environment")
-		return 2
-	}
-	if cfg.Backend != "iap" {
-		fmt.Fprintln(stderr, "bifrost serve: backend must be iap (each user reaches the cluster with their own Google identity)")
-		return 2
-	}
-	srv, err := server.New(cfg, server.NewGoogle(sc.GoogleClientID, gsecret), secret)
-	if err != nil {
-		fmt.Fprintln(stderr, "bifrost serve:", err)
-		return 1
-	}
-	addr := sc.Listen
-	if p := os.Getenv("PORT"); p != "" {
-		addr = ":" + p
-	}
-	if addr == "" {
-		addr = ":8080"
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if err := srv.Run(ctx, addr); err != nil {
-		fmt.Fprintln(stderr, "bifrost serve:", err)
-		return 1
-	}
-	return 0
 }
 
 func firstNonEmptyStr(v ...string) string {
@@ -827,31 +735,4 @@ func filepathBase(p string) string {
 		return p[i+1:]
 	}
 	return p
-}
-
-// putFile sends a local file to a signed upload link (bifrost upload).
-func putFile(ctx context.Context, p string, t *core.UploadTicket) error {
-	f, err := os.Open(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	req, err := http.NewRequestWithContext(ctx, t.Method, t.URL, f)
-	if err != nil {
-		return err
-	}
-	req.ContentLength = t.MaxBytes
-	for k, v := range t.Headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := (&http.Client{Timeout: 2 * time.Hour}).Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2000))
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
-	}
-	return nil
 }

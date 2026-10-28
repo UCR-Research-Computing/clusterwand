@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // ---- cluster status -------------------------------------------------------------

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 )
 
 // countingBackend counts runs per command and can be slowed down.

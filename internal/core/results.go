@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 )
 
 // ResultFile is one file in a job's folder.
@@ -82,7 +82,7 @@ func (s *Service) jobFolder(ctx context.Context, jobID string) (*JobDetail, stri
 	}
 	home := "/home/" + d.User
 	if dir == home || dir == home+"/" {
-		return nil, "", fmt.Errorf("job %s ran in your home folder itself (%s); listing it would show everything you own. Submit jobs with bifrost (they run in ~/bifrost-jobs/...) or give it a folder", jobID, dir)
+		return nil, "", fmt.Errorf("job %s ran in your home folder itself (%s); listing it would show everything you own. Submit jobs with clusterwand (they run in ~/clusterwand-jobs/...) or give it a folder", jobID, dir)
 	}
 	return d, dir, nil
 }
@@ -136,7 +136,7 @@ func matchResult(f ResultFile, prefix, pattern string) bool {
 // accounting record and must sit under the caller's allowed roots.
 func (s *Service) JobResults(ctx context.Context, in ResultsInput) (*Results, error) {
 	if in.Download && s.Remote {
-		return nil, errors.New("download writes to the machine running bifrost; on the hosted server use results_link (signed download links) or read")
+		return nil, errors.New("download is not available in this mode; use read")
 	}
 	if in.Prefix != "" {
 		in.Prefix = strings.TrimSuffix(in.Prefix, "/")
@@ -199,7 +199,7 @@ func (s *Service) JobResults(ctx context.Context, in ResultsInput) (*Results, er
 		} else {
 			info, text, err := s.readChunk(ctx, dir+"/"+in.Read, in.ReadOffset, in.ReadBytes)
 			if errors.Is(err, errBinary) {
-				return nil, fmt.Errorf("%s is binary; use results_link (or download on the laptop)", in.Read)
+				return nil, fmt.Errorf("%s is binary; use download to copy it to this machine", in.Read)
 			}
 			if err != nil {
 				return nil, err

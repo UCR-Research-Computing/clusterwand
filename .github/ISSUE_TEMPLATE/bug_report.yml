@@ -5,22 +5,28 @@ body:
   - type: input
     id: version
     attributes:
-      label: bifrost version
-      description: Output of `bifrost version`, or the hosted server's /health
+      label: ClusterWand version
+      description: Output of `clusterwand version`
     validations:
       required: true
   - type: dropdown
     id: mode
     attributes:
       label: How you ran it
-      options: [CLI, MCP stdio (local), Hosted server, ursa-agent dashboard]
+      options: [CLI, MCP stdio, Other]
     validations:
       required: true
+  - type: input
+    id: slurm
+    attributes:
+      label: Slurm version and site (if relevant)
+      description: Output of `sinfo --version`; the cluster or site profile, if you can share it
+      placeholder: slurm 23.11.4, a university cluster
   - type: input
     id: client
     attributes:
       label: MCP client (if any)
-      placeholder: Claude Code 2.x, Codex 0.160, Hermes, OpenCode, Gemini CLI, script...
+      placeholder: Claude Code, GitHub Copilot, Gemini CLI, Hermes, Codex, OpenCode, script...
   - type: textarea
     id: what
     attributes:

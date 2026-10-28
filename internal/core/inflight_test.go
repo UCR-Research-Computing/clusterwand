@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 )
 
 // gateBackend records the most accounting runs it saw at once.

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 )
 
 const goodScript = "#!/bin/bash\n#SBATCH -p computehigh\n#SBATCH -N 1\n#SBATCH -t 01:00:00\n#SBATCH -J hello\nmodule load python-sci\npython -c 'print(42)' > answer.txt\n"
@@ -57,7 +57,7 @@ func TestSubmitTwoStep(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"--partition=computehigh", "--nodes=1", "--time=60", "--comment=bifrost:"} {
+	for _, want := range []string{"--partition=computehigh", "--nodes=1", "--time=60", "--comment=clusterwand:"} {
 		if !strings.Contains(testOnly, want) {
 			t.Errorf("test-only lacks %s: %s", want, testOnly)
 		}
@@ -67,7 +67,7 @@ func TestSubmitTwoStep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.JobID != "9001" || !strings.HasPrefix(res.RemoteDir, "~/bifrost-jobs/") {
+	if res.JobID != "9001" || !strings.HasPrefix(res.RemoteDir, "~/clusterwand-jobs/") {
 		t.Errorf("confirmed: %+v", res)
 	}
 	last := fx.Calls[len(fx.Calls)-1]
@@ -521,9 +521,9 @@ func TestNoValTimestamps(t *testing.T) {
 }
 
 // TestStateLockIsHonored proves the A1 state file lock works across processes
-// deterministically: another holder of the flock (as a second bifrost process
+// deterministically: another holder of the flock (as a second clusterwand process
 // would be) blocks a confirm until it lets go. The parallel-process race test
-// in cmd/bifrost only catches a missing lock some of the time.
+// in cmd/clusterwand only catches a missing lock some of the time.
 func TestStateLockIsHonored(t *testing.T) {
 	s, _ := a1Service(t)
 	ctx := context.Background()

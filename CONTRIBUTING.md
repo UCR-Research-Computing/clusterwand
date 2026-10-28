@@ -1,13 +1,13 @@
 # Contributing
 
-Thanks for helping. bifrost is small on purpose and strict about safety, so a few rules
+Thanks for helping. ClusterWand is small on purpose and strict about safety, so a few rules
 matter more than usual.
 
 ## Setup
 
 ```bash
-git clone https://github.com/UCR-Research-Computing/ursa-bifrost
-cd ursa-bifrost
+git clone https://github.com/UCR-Research-Computing/clusterwand
+cd clusterwand
 make check          # gofmt, go vet, go test -race, build (Go toolchain auto-fetched)
 ```
 
@@ -37,6 +37,9 @@ access to contribute.
 - **Diagnosis rules need a real sample** in `TestEachLogRuleFires`; anonymize logs with
   `scripts/make_fixtures.py`.
 - **No real usernames, uids, internal IPs or secrets** in fixtures or code; CI checks.
+- **Nothing site-specific in the core.** Partition names, paths, prices and cluster names
+  belong in configuration (from v0.2.0, a site profile under `sites/<name>/`), not in
+  `internal/`. Ursa Major-only code lives in `sites/ursa-major/`.
 
 ## Reporting bugs and ideas
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 )
 
 // mutatedFixtures copies testdata into a temp dir and lets the test edit one JSON file.

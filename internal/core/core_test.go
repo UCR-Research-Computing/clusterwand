@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // newTestService returns a Service over the recorded fixtures, acting as the
@@ -624,7 +624,7 @@ func TestJobsListByIDs(t *testing.T) {
 	if _, err := s.JobsList(ctx, JobsListInput{JobIDs: []string{"260; rm -rf ~"}}); err == nil {
 		t.Error("a bad job id was accepted")
 	}
-	// refused by bifrost itself, before anything reaches the cluster
+	// refused by clusterwand itself, before anything reaches the cluster
 	if _, err := s.JobsList(ctx, JobsListInput{JobIDs: []string{"229", "x"}}); err == nil || !strings.Contains(err.Error(), "expected digits") {
 		t.Errorf("bad id among good ones: %v", err)
 	}

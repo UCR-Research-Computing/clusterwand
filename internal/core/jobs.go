@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/rules"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/rules"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // ---- jobs list -----------------------------------------------------------------

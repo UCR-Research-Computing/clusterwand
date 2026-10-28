@@ -16,7 +16,7 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
-      - run: go build ./cmd/bifrost
+      - run: go build ./cmd/clusterwand
       - name: fixtures use only the fake user
         run: |
           # every *_ucr_edu name in testdata must be the fake user
@@ -25,16 +25,15 @@ jobs:
         run: |
           ! git ls-files | grep -vE 'policy_test.go|ci.yml' | xargs grep -nIE 'AIza[0-9A-Za-z_-]{30,}|GOCSPX|ghp_[A-Za-z0-9]{36}|xox[bp]-[0-9]|192\.168\.[0-9]+\.[0-9]+|\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
 
+  # Required check name kept from the fork (the repo ruleset requires `test` and `agent`).
+  # The ursa-agent web app was removed (SSH-only); this job now checks the Python helper
+  # scripts and example client.
   agent:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agent
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv lock --check
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest -q
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: python helpers compile
+        run: python -m py_compile scripts/*.py examples/*.py

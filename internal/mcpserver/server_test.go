@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
 )
 
 func connect(t *testing.T, tiers ...string) *mcp.ClientSession {

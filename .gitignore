@@ -1,4 +1,4 @@
-/bifrost
+/clusterwand
 /dist/
 *.test
 *.out
@@ -7,11 +7,10 @@
 local/
 .vscode/
 .idea/
-deploy/env
-agent/.venv/
-agent/**/__pycache__/
-agent/.pytest_cache/
-agent/.ruff_cache/
 __pycache__/
 *.pyc
 .worktrees/
+build/logs/
+build/STOP
+build/spend_start.txt
+build/cards/

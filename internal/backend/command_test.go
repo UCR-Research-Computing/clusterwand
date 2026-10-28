@@ -69,7 +69,7 @@ func TestAllowListIsClosed(t *testing.T) {
 	// Every constructor's program must be one of these. If you add a command,
 	// add it here deliberately.
 	allowed := map[string]bool{"id": true, "squeue": true, "sacct": true, "sinfo": true, "scontrol": true, "cat": true, "tail": true, "bash": true,
-		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "curl": true, "srun": true}
+		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "srun": true}
 	u, _ := SqueueUser("alice")
 	j, _ := SqueueJob("1")
 	st, _ := SqueueStart("1")
@@ -79,15 +79,15 @@ func TestAllowListIsClosed(t *testing.T) {
 	cat, _ := Catalog("/apps/docs/catalog.json")
 	tl, _ := Tail("/home/alice/x.log", 5)
 	ms, _ := ModuleShow("gcc")
-	o := SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 30, JobName: "x", Comment: "bifrost:0123456789ab"}
+	o := SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 30, JobName: "x", Comment: "clusterwand:0123456789ab"}
 	to, _ := SbatchTestOnly(o, []byte("#!/bin/bash\n"))
-	sb, _ := SubmitBatch("bifrost-jobs/20261001-120000-x", o, []byte("#!/bin/bash\n"))
+	sb, _ := SubmitBatch("clusterwand-jobs/20261001-120000-x", o, []byte("#!/bin/bash\n"))
 	sc, _ := Scancel("1")
 	ho, _ := Hold("1")
 	re, _ := Release("1")
-	lf, _ := ListFiles("/home/alice/bifrost-jobs/x")
-	hd, _ := Head("/home/alice/bifrost-jobs/x/a.txt", 100)
-	td, _ := TarDir("/home/alice/bifrost-jobs/x", nil)
+	lf, _ := ListFiles("/home/alice/clusterwand-jobs/x")
+	hd, _ := Head("/home/alice/clusterwand-jobs/x/a.txt", 100)
+	td, _ := TarDir("/home/alice/clusterwand-jobs/x", nil)
 	sqj, _ := SqueueJobs([]string{"1", "2"})
 	saj, _ := SacctJobs([]string{"1", "2"})
 	sam, _ := SacctSummaryUsers([]string{"alice", "bob"}, "now-1days", "")
@@ -119,19 +119,8 @@ func TestAllowListIsClosed(t *testing.T) {
 	}
 }
 
-func TestSplitShell(t *testing.T) {
-	in := `/usr/bin/ssh -t -i /k -o "ProxyCommand /py gcloud.py start-iap-tunnel x %p --listen-on-stdin" -o ProxyUseFdpass=no u@compute.1`
-	got, err := splitShell(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 9 || got[5] != "ProxyCommand /py gcloud.py start-iap-tunnel x %p --listen-on-stdin" || got[8] != "u@compute.1" {
-		t.Fatalf("%q", got)
-	}
-}
-
 func TestSubmitConstructorsValidate(t *testing.T) {
-	good := SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 30, JobName: "x", Comment: "bifrost:0123456789ab"}
+	good := SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 30, JobName: "x", Comment: "clusterwand:0123456789ab"}
 	bad := []SubmitOpts{
 		{Partition: "std; id", Nodes: 1, TimeMin: 30, Comment: good.Comment},
 		{Partition: "standard", Nodes: 0, TimeMin: 30, Comment: good.Comment},
@@ -153,17 +142,17 @@ func TestSubmitConstructorsValidate(t *testing.T) {
 			t.Errorf("accepted %+v", o)
 		}
 	}
-	for _, dir := range []string{"../etc", "bifrost-jobs/../../x", "/tmp/x", "bifrost-jobs/20261001-120000-a;id", "bifrost-jobs/x"} {
+	for _, dir := range []string{"../etc", "clusterwand-jobs/../../x", "/tmp/x", "clusterwand-jobs/20261001-120000-a;id", "clusterwand-jobs/x"} {
 		if _, err := SubmitBatch(dir, good, []byte("x")); err == nil {
 			t.Errorf("accepted job folder %q", dir)
 		}
 	}
 	// the folder and flags travel as positional parameters, not inside the shell code
-	c, err := SubmitBatch("bifrost-jobs/20261001-120000-hello", good, []byte("#!/bin/bash\n"))
+	c, err := SubmitBatch("clusterwand-jobs/20261001-120000-hello", good, []byte("#!/bin/bash\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.argv[2] != submitTemplate || c.argv[4] != "bifrost-jobs/20261001-120000-hello" || c.argv[5] != "--partition=standard" {
+	if c.argv[2] != submitTemplate || c.argv[4] != "clusterwand-jobs/20261001-120000-hello" || c.argv[5] != "--partition=standard" {
 		t.Errorf("argv: %q", c.argv)
 	}
 	for _, p := range []string{"../x", "a/../../b", "", "-rf"} {
@@ -184,7 +173,7 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 		name string
 		mk   func() (Command, error)
 	}{
-		{"tree", func() (Command, error) { return ListTree("/home/alice/bifrost-jobs/x") }},
+		{"tree", func() (Command, error) { return ListTree("/home/alice/clusterwand-jobs/x") }},
 		{"read", func() (Command, error) { return ReadRange("/home/alice/a.txt", 0, 10) }},
 		{"grep", func() (Command, error) { return GrepFile("/home/alice/a.txt", "$(id); x", 10, 2) }},
 		{"window", func() (Command, error) { return LogWindow("/home/alice/a.log", 0, 10) }},
@@ -211,7 +200,7 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 			}
 			argv = argv[len(pre):]
 		}
-		if argv[0] != "bash" || !fixed[argv[2]] || argv[3] != "bifrost" {
+		if argv[0] != "bash" || !fixed[argv[2]] || argv[3] != "clusterwand" {
 			t.Errorf("%s: not a fixed template: %v", c.name, argv[:3])
 		}
 		if cmd.Write() {
@@ -238,13 +227,6 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 		func() (Command, error) { return EnvCheck("check", nil, []string{"-c"}, nil) },
 		func() (Command, error) { return EnvCheck("check --uid=0", nil, nil, nil) },
 		func() (Command, error) { return EnvCheck("", nil, nil, nil) },
-		func() (Command, error) {
-			return PutFile("/home/alice/x", "https://evil.example.com/?X-Goog-Signature=00")
-		},
-		func() (Command, error) { return PutFile("/home/alice/x", "https://storage.googleapis.com/b/o") },
-		func() (Command, error) {
-			return PutFile("/home/alice/x", "https://storage.googleapis.com/b/o?X-Goog-Signature=00 -o /tmp/x")
-		},
 	} {
 		if _, err := bad(); err == nil {
 			t.Errorf("case %d: accepted a bad argument", i)
@@ -253,10 +235,6 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 	if _, err := GrepFile("/home/alice/x", "a\nb", 10, 2); err == nil {
 		// "\\n" in a Go string is a backslash-n regex, which is fine
 		_ = err
-	}
-	pf, err := PutFile("/home/alice/x", "https://storage.googleapis.com/b/o?X-Goog-Signature=00ff")
-	if err != nil || pf.argv[0] != "curl" || pf.Write() {
-		t.Errorf("put: %v %v", pf.argv, err)
 	}
 }
 
@@ -297,7 +275,7 @@ func TestSacctSummaryCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(c.argv[3:], " "); got != "bifrost -u alice_ucr_edu -S now-7days" {
+	if got := strings.Join(c.argv[3:], " "); got != "clusterwand -u alice_ucr_edu -S now-7days" {
 		t.Errorf("user args: %q", got)
 	}
 	if c.Kind() != KindAcct || c.Write() || c.Public() {
@@ -307,7 +285,7 @@ func TestSacctSummaryCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(a.argv[3:], " "); got != "bifrost -a -S now-1days -E 2026-10-05" {
+	if got := strings.Join(a.argv[3:], " "); got != "clusterwand -a -S now-1days -E 2026-10-05" {
 		t.Errorf("all args: %q", got)
 	}
 	for _, bad := range []func() (Command, error){
