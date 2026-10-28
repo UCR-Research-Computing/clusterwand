@@ -5,6 +5,41 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.1.0 - 2026-10-28
+
+ClusterWand: the Bifrost between AI and your HPC cluster. First release, forked from
+ursa-bifrost v0.10.1 (77cb4cd) with full history. Tool behaviour is identical to
+ursa-bifrost v0.10.1; what changed is names, layout and docs.
+
+- **Renamed.** Go module `github.com/UCR-Research-Computing/clusterwand`; binary
+  `clusterwand`, with a `wand` alias installed by `scripts/get.sh`, `scripts/install.sh`
+  and shipped in release archives (`clusterwand_<version>_<os>_<arch>.tar.gz`).
+- **New default paths (upgrade note for ursa-bifrost users).** Config
+  `~/.config/clusterwand/config.yaml`, audit and A1 state under `~/.local/share/clusterwand/`,
+  downloads in `~/clusterwand-results`, IAP keys in `~/.local/share/clusterwand/iap-keys`.
+  Nothing is migrated: copy your old config if you want it. Environment variables use the
+  `CLUSTERWAND_` prefix (`CLUSTERWAND_TRACE`, `CLUSTERWAND_SECRET_KEY`,
+  `CLUSTERWAND_GOOGLE_CLIENT_SECRET`, installer `CLUSTERWAND_VERSION`/`CLUSTERWAND_DIR`).
+- **On the cluster.** Submitted jobs run in `~/clusterwand-jobs/<stamp>-<name>` (config
+  `jobs_root: clusterwand-jobs`), carry the sbatch comment `clusterwand:<plan hash>`, and the
+  env_check job is named `clusterwand-env-check`. The MCP server name is `clusterwand`, the
+  OAuth scope `clusterwand`, the SSH control socket `cw-%C`.
+- **Layout.** Ursa Major-only parts moved to `sites/ursa-major/`: the Cloud Run deploy
+  (`deploy/`, `DEPLOY.md`, kept as a historical example) and the ursa-agent dashboard
+  (`agent/`, still tested in CI). Removed: `scripts/onboard_lab.py` and `agent/deploy.sh`,
+  which act on the live ursa-bifrost service. `examples/mcp_client.py` defaults to
+  `http://localhost:8080` instead of the live Ursa server.
+- **Docs.** New README (60-second fixture demo, laptop + any cluster over SSH, client
+  setup for Claude Code, Hermes, Gemini CLI, GitHub Copilot, Codex, OpenCode), GitHub Pages
+  site published from `docs/` by a new `pages` workflow, Copilot section in
+  docs/CLIENTS.md, `sites/ursa-major/README.md`, SPEC fork note.
+- **Repo hygiene.** Dependabot for Go modules and GitHub Actions; issue forms ask for the
+  Slurm version; CONTRIBUTING adds "nothing site-specific in the core".
+
+## ursa-bifrost history
+
+Entries below are ursa-bifrost releases, kept for history.
+
 ## v0.10.1 - 2026-10-27
 - `my_allocation`: `notes` is always a list (`[]`), never `null`, as the contract says (found in the first live call).
 

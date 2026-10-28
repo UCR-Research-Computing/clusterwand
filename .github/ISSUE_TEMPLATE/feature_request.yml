@@ -6,7 +6,7 @@ body:
     id: problem
     attributes:
       label: The problem
-      description: What do you or your users need to do that bifrost can't do today?
+      description: What do you or your users need to do that clusterwand can't do today?
     validations:
       required: true
   - type: textarea

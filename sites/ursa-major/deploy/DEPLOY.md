@@ -1,5 +1,12 @@
 # Deploying the hosted ursa-bifrost (C2/C3)
 
+> **Historical, carried over from ursa-bifrost.** This describes how the live Ursa Major
+> service (`bifrost-mcp`) was deployed from the ursa-bifrost repo, which still owns it.
+> ClusterWand does not deploy or change that service. In this repo the renamed script is
+> `sites/ursa-major/deploy/deploy.sh` (it would create new `clusterwand-*` resources);
+> `agent/deploy.sh` stays in ursa-bifrost. Names below (`bifrost serve`, `bifrost-*`
+> secrets) are the ursa-bifrost ones.
+
 The hosted server is `bifrost serve`: the same MCP tools over Streamable HTTP at
 `<url>/mcp`, with OAuth sign-in through Google. Every cluster call runs as the
 signed-in person through IAP + OS Login, with their own Google token. The Cloud
@@ -36,29 +43,29 @@ done in the console:
    (the Cloud Run URL is deterministic, so it is known before the first deploy) and
    `http://localhost:8080/oauth/google/callback` for a local sign-in test. Download the JSON.
 4. Put the client ID in the config (`server.google_client_id`) and point `CLIENT_JSON`
-   in deploy/env at the downloaded file; deploy.sh loads the secret into Secret Manager
+   in sites/ursa-major/deploy/env at the downloaded file; deploy.sh loads the secret into Secret Manager
    without printing it.
 
 ## Deploy
 
 ```
-cp deploy/config.example.yaml ~/bifrost-deploy/config.yaml    # fill in host_keys, client id, base_url
-cp deploy/users.example.yaml  ~/bifrost-deploy/users.yaml     # the people allowed
-cat > deploy/env <<EOF                                        # git-ignored
+cp sites/ursa-major/deploy/config.example.yaml ~/bifrost-deploy/config.yaml    # fill in host_keys, client id, base_url
+cp sites/ursa-major/deploy/users.example.yaml  ~/bifrost-deploy/users.yaml     # the people allowed
+cat > sites/ursa-major/deploy/env <<EOF                                        # git-ignored
 PROJECT=ucr-ursa-major-hpc-cluster
 REGION=us-central1
 CONFIG=$HOME/bifrost-deploy/config.yaml
 USERS=$HOME/bifrost-deploy/users.yaml
 CLIENT_JSON=$HOME/.config/secrets/google/bifrost-oauth-client.json
 EOF
-deploy/deploy.sh plan      # read-only: shows what is missing
-deploy/deploy.sh apply     # asks before each billable or IAM change
+sites/ursa-major/deploy/deploy.sh plan      # read-only: shows what is missing
+sites/ursa-major/deploy/deploy.sh apply     # asks before each billable or IAM change
 ```
 
 One instance is kept warm (min-instances 1, since v0.9.1 scaling phase 2): no cold
 start, and the shared cache and sign-in state survive between calls. Idle cost is
 about $10 a month (1 vCPU, 512 MiB, CPU billed only during requests) plus a few MB
-in Cloud Storage and Secret Manager versions. `MIN_INSTANCES=0 deploy/deploy.sh
+in Cloud Storage and Secret Manager versions. `MIN_INSTANCES=0 sites/ursa-major/deploy/deploy.sh
 apply` returns to zero idle cost with cold starts.
 
 ### Without Docker (ko)

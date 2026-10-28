@@ -1,27 +1,27 @@
 <div align="center">
 
-# ursa-bifrost
+# ClusterWand
 
-**Let any AI assistant work a Slurm cluster, safely.**
+**The Bifrost between AI and your HPC cluster.**
 
-One Go binary that is both an MCP server and a CLI. It gives Claude, Codex, Gemini,
-Hermes, OpenCode and your own scripts typed, audited, read-mostly access to a Slurm
-cluster: job status, failure diagnosis, costs, software modules, batch-script checks,
-results, and (opt-in, two-step) submit and cancel.
+Safe, typed MCP tools that let AI assistants do real work on a Slurm cluster over SSH.
+One Go binary, both an MCP server and a CLI. No language model inside, and no shell, ever.
 
-[![CI](https://github.com/UCR-Research-Computing/ursa-bifrost/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/UCR-Research-Computing/ursa-bifrost/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/UCR-Research-Computing/ursa-bifrost?sort=semver)](https://github.com/UCR-Research-Computing/ursa-bifrost/releases)
-[![Go version](https://img.shields.io/github/go-mod/go-version/UCR-Research-Computing/ursa-bifrost)](go.mod)
-[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20stdio-blue)](https://modelcontextprotocol.io)
+[![CI](https://github.com/UCR-Research-Computing/clusterwand/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/UCR-Research-Computing/clusterwand/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/UCR-Research-Computing/clusterwand?sort=semver)](https://github.com/UCR-Research-Computing/clusterwand/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/UCR-Research-Computing/clusterwand)](go.mod)
+[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20Streamable%20HTTP-blue)](https://modelcontextprotocol.io)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-informational)](https://ucr-research-computing.github.io/clusterwand/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[Quick start](#quick-start) ·
-[All clients](docs/CLIENTS.md) ·
-[What you can ask](#what-you-can-ask) ·
-[Tools](#tools) ·
+[60-second demo](#60-second-demo) ·
+[Install](#install) ·
+[Quick start](#quick-start-your-laptop--any-cluster-over-ssh) ·
+[MCP clients](#connect-an-ai-assistant) ·
 [Safety](#safety-model) ·
-[Self-host](docs/DEPLOY.md) ·
-[Spec](docs/SPEC.md)
+[Architecture](#architecture) ·
+[Roadmap](#roadmap) ·
+[Docs site](https://ucr-research-computing.github.io/clusterwand/)
 
 </div>
 
@@ -36,284 +36,253 @@ Claude:   [job_explain 236]
           before running it, or create a uv/Pixi environment inside the job.
 ```
 
-That is the shape of a real answer. The server holds no language model: it runs
-allow-listed scheduler queries and fixed diagnosis rules, returns JSON with the evidence
-and the exact commands it ran, and the assistant does the reasoning. Nothing a model
-sends is ever run as a shell command.
+ClusterWand runs allow-listed scheduler queries and fixed diagnosis rules on your
+cluster's login node, and hands the assistant JSON with the data, the evidence and the
+exact commands it ran. The assistant does the reasoning; ClusterWand does the safe,
+checkable part. Nothing a model sends is ever run as a shell command.
 
-## Quick start
+## What it is
 
-### Use the hosted server (nothing to install)
+- **For researchers (tier R1, opt-in A1):** job status and failure diagnosis, log windows,
+  batch-script checks before you submit, software module search, usage and waste,
+  storage, your own files, interactive-session commands, and (opt-in) a two-step submit,
+  cancel, hold and release with caps.
+- **For cluster staff (tier R2):** all jobs, any job's diagnosis, usage and waste by user,
+  node health, and draft replies to "my job failed" tickets (never sent).
+- **For any MCP client:** Claude Code, Claude Desktop, Hermes, Gemini CLI, GitHub Copilot,
+  Codex, OpenCode, or your own scripts. Every tool is also a CLI command with `--json`.
 
-Once your cluster's administrator has added your account, point your client at your
-organization's server
+ClusterWand is a fork of [ursa-bifrost](https://github.com/UCR-Research-Computing/ursa-bifrost)
+v0.10.1, UCR Research Computing's MCP server for its Ursa Major cluster, on its way to
+working with any Slurm cluster. v0.1.0 is the renamed fork with identical behaviour; site
+profiles and text-format Slurm parsing come next (see [Roadmap](#roadmap)).
 
-```text
-https://YOUR-SERVER/mcp
-```
+## 60-second demo
 
-(`YOUR-SERVER` below) and sign in with Google when it asks. One line for each common client:
-
-| Client | Install |
-|---|---|
-| **Hermes Agent** | `hermes mcp add ursa --url https://YOUR-SERVER/mcp --auth oauth` |
-| **Claude Code** | `claude mcp add --transport http ursa https://YOUR-SERVER/mcp`, then `/mcp` -> Authenticate |
-| **Codex CLI** | `codex mcp add ursa --url https://YOUR-SERVER/mcp` (signs in right away) |
-| **OpenCode** | `opencode mcp add ursa --url https://YOUR-SERVER/mcp`, then `opencode mcp auth ursa` |
-| **Gemini CLI** | `gemini mcp add -s user -t http ursa https://YOUR-SERVER/mcp`, then `/mcp auth ursa` |
-| **claude.ai / Claude Desktop** | Settings -> Connectors -> Add custom connector, paste the URL |
-| **OpenAI API** | a `{"type": "mcp", "server_url": ...}` tool in the Responses API ([example](docs/CLIENTS.md#openai-api-responses-api)) |
-| **Python / curl** | [`examples/mcp_client.py`](examples/mcp_client.py): `python3 examples/mcp_client.py login`, standard library only |
-
-Config-file versions, local (stdio) variants and troubleshooting for every client:
-**[docs/CLIENTS.md](docs/CLIENTS.md)**.
-
-### Or run it locally (your own gcloud login, no server)
+No cluster needed: the repo ships anonymized recordings of real Slurm output, and the
+`fixture` backend replays them.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UCR-Research-Computing/ursa-bifrost/main/scripts/get.sh | sh
-# Linux/macOS release binary to ~/.local/bin, checksum-verified. Or, with Go:
-go install github.com/UCR-Research-Computing/ursa-bifrost/cmd/bifrost@latest
-# or from a clone: scripts/install.sh   (stamps the version; Go toolchain auto-fetched)
-
-bifrost config init     # writes ~/.config/ursa-bifrost/config.yaml
-bifrost doctor          # checks gcloud, SSH to the login node, the catalog
-bifrost status
+git clone https://github.com/UCR-Research-Computing/clusterwand && cd clusterwand
+go build -o clusterwand ./cmd/clusterwand          # the Go toolchain is fetched if needed
+cat > /tmp/cw-demo.yaml <<EOF
+backend: fixture
+fixtures_dir: $PWD/testdata
+tiers: [R1, R2, A1]
+audit_path: /tmp/cw-demo-audit.jsonl
+state_path: /tmp/cw-demo-a1.json
+EOF
+./clusterwand status            --config /tmp/cw-demo.yaml   # nodes, queue, cost per hour now
+./clusterwand jobs              --config /tmp/cw-demo.yaml   # your jobs
+./clusterwand job explain 236   --config /tmp/cw-demo.yaml   # deterministic diagnosis
+./clusterwand modules lammps    --config /tmp/cw-demo.yaml   # software search
+./clusterwand mcp               --config /tmp/cw-demo.yaml   # all of it as an MCP server on stdio
 ```
 
-Then add it to a client as a stdio server: `claude mcp add ursa -- bifrost mcp`,
-`hermes mcp add ursa --command bifrost --args mcp`, `codex mcp add ursa -- bifrost mcp`,
-or in any JSON config:
+```text
+$ ./clusterwand job explain 236 --config /tmp/cw-demo.yaml
+Job 236  FAILED  partition gpul4  exit 1  elapsed 1m00s
 
-```json
-{ "mcpServers": { "ursa": { "command": "bifrost", "args": ["mcp"] } } }
+[ERROR] Python package not installed in the environment (python-import)
+  evidence: log: ModuleNotFoundError: No module named 'pandas'
+  fix: Package "pandas" is missing. Load python-sci (CPU) or python-ml (PyTorch/GPU), ...
 ```
 
-Local mode reaches the login node the same way you would by hand
-(for example `gcloud compute ssh LOGIN-NODE --tunnel-through-iap`), with one
-multiplexed SSH connection reused for every call: about 0.3 s per command once warm.
+## Install
 
-## What you can ask
+```bash
+curl -fsSL https://raw.githubusercontent.com/UCR-Research-Computing/clusterwand/main/scripts/get.sh | sh
+```
+
+This puts the release binary for Linux or macOS (amd64, arm64) in `~/.local/bin`, checks it
+against the release's `SHA256SUMS`, and adds the short alias `wand`. Other ways:
+
+```bash
+go install github.com/UCR-Research-Computing/clusterwand/cmd/clusterwand@latest
+scripts/install.sh            # from a clone: stamps the version, installs clusterwand + wand
+```
+
+Release archives on the [releases page](https://github.com/UCR-Research-Computing/clusterwand/releases)
+hold `clusterwand`, the `wand` symlink, the license and the client guide. Windows: use WSL.
+
+## Quick start: your laptop + any cluster over SSH
+
+ClusterWand reaches the login node the way you already do: OpenSSH, your own account. If
+`ssh mycluster` works without a prompt (a key or an agent; ClusterWand runs ssh with
+`BatchMode=yes`), ClusterWand works too. It keeps one multiplexed connection open and
+reuses it: about 0.3 s per command once warm.
+
+```bash
+clusterwand config init          # writes ~/.config/clusterwand/config.yaml
+```
+
+Edit the file: remove the `ssh.gcloud` block and set your host alias.
+
+```yaml
+backend: ssh
+ssh:
+  host: mycluster                # any ~/.ssh/config alias or user@host
+catalog_path: /home/you/clusterwand/catalog.json   # a file in your own home; no admin needed
+log_roots: ["/home/{user}/", "/scratch/{user}/"]
+tiers: [R1]                      # add A1 for two-step submit/cancel, R2 for staff tools
+```
+
+```bash
+clusterwand doctor               # checks the config, SSH to the login node and the catalog
+clusterwand status
+clusterwand jobs --state FAILED
+```
+
+**Honest note for v0.1.0:** the tools still expect a cluster catalog JSON on the login node
+(`catalog_path`: partitions, prices, modules, recipes; see
+[`testdata/catalog.json`](testdata/catalog.json) for the shape), and the defaults are Ursa
+Major's. ClusterWand never needs anything installed or changed on the cluster: a normal
+researcher login is enough, and the catalog can live in your own home folder. Site
+profiles (F1) and `clusterwand discover` (F3) replace the hand-written catalog. On Ursa
+Major the defaults work as they are.
+
+## Connect an AI assistant
+
+Add ClusterWand as a local (stdio) MCP server. The server name `cluster` is your choice;
+the tools appear as `cluster_status`, `job_explain`, and so on.
+
+| Client | Setup |
+|---|---|
+| **Claude Code** | `claude mcp add cluster -- clusterwand mcp` (add `-s user` for every project) |
+| **Hermes Agent** | `hermes mcp add cluster --command clusterwand --args mcp` |
+| **Gemini CLI** | `gemini mcp add -s user cluster clusterwand mcp` |
+| **GitHub Copilot (VS Code)** | `.vscode/mcp.json`: `{"servers": {"cluster": {"type": "stdio", "command": "clusterwand", "args": ["mcp"]}}}`, then enable the tools in Copilot Chat agent mode |
+| **Codex CLI** | `codex mcp add cluster -- clusterwand mcp` |
+| **OpenCode** | `"cluster": {"type": "local", "command": ["clusterwand", "mcp"]}` under `mcp` in `opencode.jsonc` |
+| **Claude Desktop, any JSON config** | `{"mcpServers": {"cluster": {"command": "clusterwand", "args": ["mcp"]}}}` |
+
+Read tools carry `readOnlyHint: true` and acting tools need a second confirm call, so it is
+reasonable to let your client run reads without asking. Remote use (a hosted server with
+sign-in, `clusterwand serve`), per-client details and troubleshooting:
+[docs/CLIENTS.md](docs/CLIENTS.md).
+
+Things to ask:
 
 - "What's running on the cluster and what is it costing per hour?"
 - "Why did my job 236 fail?"
 - "Which modules give me LAMMPS with GPU support?"
 - "Check this batch script before I submit it."
-- "How much did I spend last month, and how much was wasted on idle cores?"
-- "Write a script for PyTorch on one GPU for 4 hours, show me the cost, then submit it."
-- "Show the last 200 lines of job 265's stderr, then give me download links for its results."
-- "Give me the exact command for an interactive session with 8 cores and a GPU."
+- "How much did I use last month, and how much was wasted on idle cores?"
+- "Write a script for PyTorch on one GPU for 4 hours, show me the plan, then submit it."
 - Staff: "Which nodes are down?" / "Draft a reply to this ticket about job 236."
 
-## The CLI
-
-Everything the MCP tools do is also a command, and every command takes `--json`.
-
-```text
-$ bifrost status
-mycluster (Slurm 25.11): 3 running, 1 pending, 4 node(s) powered up, now $X.XX/hour
-
-PARTITION    NODES  UP  ALLOC  IDLE-UP  BOOT  DOWN  RUN  PEND  $/NODE-H  $/H NOW
-debug        2      1   0      1        0     0     0    0     $a.aa     $a.aa
-cpu*         32     2   2      0        0     0     2    0     $b.bb     $b.bb
-gpu          4      1   1      0        0     0     1    1     $c.cc     $c.cc
-...
-(illustrative output: names and prices come from your cluster's catalog)
-
-$ bifrost check train.sbatch
-PROBLEMS FOUND  partition cpu  worst-case cost $X.XX  (1 cores, 6% of a node)
-  error   line 4: module "python3" not found in the cluster catalog; closest: python-sci, python-ml
-  error   cpu shares nodes between jobs: this script asks for no cores, so Slurm gives
-          it 1 core and about 8 GB on cpu. Ask for the cores it needs ...
-  warning calls python without loading python-sci/python-ml or an environment
-```
-
-```text
-bifrost status                    nodes powered up/down, queue, $/hour being spent now
-bifrost partitions                partitions, cores, memory, GPUs, prices, what each is for
-bifrost jobs [--state FAILED]     your jobs (queue + recent accounting)
-bifrost job show 236              merged squeue + sacct record, efficiency, steps
-bifrost job explain 236           deterministic diagnosis with evidence and a fix
-bifrost job log 236 [--stderr]    redacted log window (--start N to page, --grep RE to search)
-bifrost modules lammps            module search (versions, MPI prerequisite, GPU builds)
-bifrost module hdf5/1.14.6        what a module sets (MPI-built ones under their MPI; --mpi mpich)
-bifrost recipes pytorch           known-good recipes from the cluster catalog
-bifrost check job.sbatch          static check of a batch script + worst-case cost (exit 2 on errors)
-bifrost usage --since now-30days  node-hours, core-hours, efficiency, estimated cost
-bifrost waste --since now-30days  avoidable spend: idle cores, idle nodes, repeat failures
-bifrost results 265 [--download]  paged listing / chunked read / grep / download of a job folder
-bifrost link 265 out.csv          signed download links for job outputs (staging bucket)
-bifrost upload data.csv           stage an input file; then submit --input <upload id>
-bifrost storage                   space used in your home and scratch folders
-bifrost ls ~/project              a folder under your home or scratch (hidden files excluded)
-bifrost cat ~/project/notes.txt   a text file (--offset to page, --grep RE to search)
-bifrost env --module gcc python3  whether modules load and which tools you get
-bifrost interactive -p gpu ...    the exact srun/salloc command for an interactive session
-bifrost submit job.sh             plan, show worst-case cost, ask, submit           (tier A1)
-bifrost cancel|hold|release 265   two-step, own jobs only                           (tier A1)
-bifrost health                    down/drained nodes, slow boots, long-pending jobs (tier R2)
-bifrost ticket 236 [--text f.txt] reply draft for a "my job failed" ticket          (tier R2; never sent)
-bifrost serve                     the hosted MCP server (HTTP + Google sign-in)
-bifrost config init|show|path     bifrost doctor     bifrost version
-```
-
-### Submitting and getting results (tier A1)
-
-Add `A1` to `tiers` in the config. Then:
-
-```text
-$ bifrost submit hello.sh
-Plan (nothing submitted yet):
-  partition  cpu, 1 node(s), time limit 0 h 05 min
-  scheduler  would start at ... on cpu-node-0 (cpu)
-  worst case $X.XX  (today so far $0.00 of your day cap)
-Submit this job? [y/N] y
-Submitted job 265 ...  folder on the cluster: ~/bifrost-jobs/<stamp>-bifrost-hello
-$ bifrost job show 265
-$ bifrost results 265 --download      # -> ~/ursa-results/265/
-```
-
-Each job runs in its own `~/bifrost-jobs/<stamp>-<name>` folder, so its results are
-exactly that folder. Caps (config `caps:`) limit nodes, hours and spend per job and per day;
-a plan over a cap is refused before anything reaches the scheduler.
-
-### Backend: per-user IAP (`backend: iap`)
-
-bifrost can reach the login node itself, as the Google user, with no gcloud call per
-connection: it registers one OS Login key on your profile (8 h expiry, reused, stored 0600
-under `~/.local/share/ursa-bifrost/iap-keys/`), opens an IAP TCP tunnel and logs in over
-SSH with the login node's host keys pinned. Access is whatever Google already allows you
-(IAP tunnel + OS Login). This is the same path the hosted server uses for each signed-in
-user ([docs/CLOUD_PLAN.md](docs/CLOUD_PLAN.md)).
-
-```yaml
-backend: iap
-iap:
-  project: my-hpc-project
-  zone: us-central1-a
-  instance: my-login-node
-  host_keys: ["ssh-ed25519 AAAA...", "ecdsa-sha2-nistp256 AAAA..."]
-```
-
 ## Tools
-
-Tools come in tiers. A caller only sees, and can only call, the tiers granted to them
-(`tiers` in the local config, `users.yaml` on the hosted server).
 
 | Tier | Who | Tools |
 |---|---|---|
 | **R1** read | everyone | `cluster_status`, `partitions`, `jobs_list`, `job_show`, `job_explain`, `job_log_tail`, `job_results`, `modules_search`, `module_show`, `recipes`, `script_check`, `my_usage`, `waste_report`, `storage_usage`, `files_list`, `files_read`, `env_check`, `interactive_help`, `my_allocation`, `results_link`* |
-| **A1** act | opt-in per person | `job_submit` (optional `inputs`) + `job_submit_confirm`, `job_cancel` / `job_hold` / `job_release` + `_confirm`, `upload_prepare`*, `uploads_list`* |
+| **A1** act | opt-in per person | `job_submit` + `job_submit_confirm`, `job_cancel` / `job_hold` / `job_release` + `_confirm`, `upload_prepare`*, `uploads_list`* |
 | **R2** staff | cluster administrators | `jobs_list_all`, `job_show_any`, `job_explain_any`, `usage_report`, `waste_report_all`, `health`, `ticket_draft` |
 
-\* when a staging bucket is configured. Also: resources `hpc://catalog` and
-`hpc://policies`; prompts `diagnose_job`, `write_batch_script`, `monthly_usage_summary`,
-`triage_ticket`.
+\* with a staging bucket configured. Also resources `hpc://catalog`, `hpc://policies` and
+prompts `diagnose_job`, `write_batch_script`, `monthly_usage_summary`, `triage_ticket`.
+A caller only sees, and can only call, the tiers granted to them. Every result is an
+envelope with the data, the evidence, and the scheduler commands that produced it, so an
+answer can be checked rather than trusted.
 
-Every result is an envelope with the data, the evidence, and the scheduler commands that
-produced it, so an answer can be checked rather than trusted.
+The CLI mirrors the tools (`clusterwand --help` lists every flag):
+
+```text
+clusterwand status | partitions | jobs | job show|explain|log <id>
+clusterwand modules <query> | module <name> | recipes | check <script.sh>
+clusterwand usage | waste | storage | ls | cat | env | interactive | allocation
+clusterwand submit <script.sh> | cancel|hold|release <id> | confirm <token>   (tier A1)
+clusterwand health | ticket <id>                                              (tier R2)
+clusterwand mcp | serve | config init|show|path | doctor | version
+```
+
+Submitted jobs run in their own `~/clusterwand-jobs/<stamp>-<name>` folder on the cluster,
+so a job's results are exactly that folder.
 
 ## Safety model
 
-bifrost assumes the model on the other end will sometimes be wrong, and will
+ClusterWand assumes the model on the other end will sometimes be wrong, and will
 occasionally be manipulated by text it reads.
 
-- **No shell, ever** ([SPEC](docs/SPEC.md) 18.5). Remote commands can only be built by
-  constructors in `internal/backend/command.go` and `files.go`, each validating its
-  arguments; shell templates are fixed text and caller values arrive only as positional
-  parameters. `TestAllowListIsClosed` pins the allow-list, and
-  `scripts/mutation_check.sh` disables each of 116 guards in turn and requires a test
-  to fail.
-- **Read-only by default; acting takes two steps.** State changes exist only in tier A1.
-  A prepare call stores the exact action under a random single-use token (10-minute
-  expiry, bound to the plan hash); the confirm call accepts nothing but the token. Caps
-  are checked at prepare and the day cap again at confirm. Read tools carry
-  `readOnlyHint: true`, act tools `false`.
-- **Your files only.** Reads are limited to the caller's own home, scratch and job
-  folders; hidden and credential-like files are refused and left out of listings;
-  symlinks are resolved and checked again. Log paths come from the job's accounting
-  record, never from the caller, and must sit under `log_roots` for the job's owner.
-- **Uploads and downloads** go through short-lived signed Cloud Storage links in a private
-  7-day staging bucket, under a folder derived from the signed-in identity; the job
-  fetches its own inputs when it starts, so compute nodes hold no credentials.
-- **Untrusted text is labelled.** Anything written by users or programs (log lines,
-  scripts, submit lines) comes back only in `untrusted` blocks with a note telling the
-  model it is data, not instructions.
-- **Secrets are redacted** (tokens, keys, passwords, JWTs, private keys, credentials in
-  URLs) from every output and from the audit log.
-- **Everything is audited.** Every call, CLI or MCP, appends a JSON line (mode 600):
-  caller, client, tool, redacted args, decision, commands, size, duration.
-- **Low load.** Short-TTL cache, per-user rate limits, at most 8 concurrent SSH sessions
-  per connection (the login node allows 10); no background polling.
-- **Other users' jobs** are denied unless the caller has tier R2.
-- **Shared partitions** ([SPEC](docs/SPEC.md) 19): which partitions share nodes is read
-  from Slurm. On a shared one, a script must ask for its cores (`--cpus-per-task`,
-  `--ntasks-per-node` or `--exclusive`) or `script_check` and `job_submit` refuse it, and
-  costs are the share of the node the job holds.
+- **No shell, ever.** Remote commands can only be built by constructors in
+  `internal/backend/command.go` and `files.go`, each validating its arguments; shell
+  templates are fixed text and caller values arrive only as positional parameters.
+  `TestAllowListIsClosed` pins the allow-list, and `scripts/mutation_check.sh` disables
+  each of 219 guards in turn and requires a test to fail.
+- **Read-only by default; acting takes two steps.** State changes exist only in tier A1. A
+  prepare call stores the exact action under a random single-use token (10-minute expiry,
+  bound to the plan hash); the confirm call accepts nothing but the token. Caps on nodes,
+  hours, cost and submits per day are checked at prepare, and the day cap again at confirm.
+- **Your files only.** Reads stay inside the caller's own home, scratch and job folders;
+  hidden and credential-like files are refused; symlinks are resolved and checked again.
+  Log paths come from the job's accounting record, never from the caller.
+- **Untrusted text is labelled.** Log lines, scripts and submit lines come back only in
+  `untrusted` blocks marked as data, not instructions.
+- **Secrets are redacted** (tokens, keys, passwords, JWTs, private keys, credentials in URLs)
+  from every output and from the audit log.
+- **Everything is audited.** Every call, CLI or MCP, appends a JSON line (mode 600) under
+  `~/.local/share/clusterwand/`.
+- **Gentle on the login node.** Short-TTL caches, per-user rate limits, at most 8 SSH
+  sessions per connection, no background polling, and no compute on the login node.
+- **Other users' jobs** are denied without tier R2.
 
-The hosted server adds Google sign-in restricted to your Google Workspace domain and to the people in
-`users.yaml` (re-read on every request), OAuth 2.1 with PKCE and dynamic registration,
-rotating refresh tokens (30 days), sealed token storage, and per-user IAP tunnels and
-OS Login keys, so each person reaches the cluster as themselves. Programs (a dashboard,
-a workstation app) can use a pre-registered client from `users.yaml` with a tier ceiling
-and their own call budget, so a program never holds more than it needs
-([SPEC](docs/SPEC.md) 21).
+Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
+
 ## Architecture
 
 ```text
- Claude / Codex / Gemini / Hermes / OpenCode / your scripts
-        |  MCP: Streamable HTTP + OAuth 2.1 (hosted)   or   stdio (local)
+ Claude / Copilot / Gemini / Hermes / Codex / OpenCode / your scripts
+        |  MCP over stdio (local)   or   Streamable HTTP + OAuth 2.1 (hosted)
         v
- +----------------------------- bifrost ------------------------------+
- | mcpserver    tools, resources, prompts                              |
- | core.Call    tier check, rate limit, cache, result envelope, audit  |
- | rules        deterministic job diagnosis (job_explain)              |
- | policy       redaction, untrusted wrapping, caps                    |
- | backend      allow-listed command constructors, nothing else        |
+ +--------------------------- clusterwand ----------------------------+
+ | mcpserver    tools, resources, prompts                             |
+ | core.Call    tier check, rate limit, cache, result envelope, audit |
+ | rules        deterministic job diagnosis (job_explain)             |
+ | policy       redaction, untrusted wrapping, caps                   |
+ | backend      allow-listed command constructors, nothing else       |
  +--------------------------------------------------------------------+
-        |  one multiplexed SSH connection (local)
-        |  per-user IAP tunnel + OS Login key (hosted)
+        |  one multiplexed OpenSSH connection, as you
         v
- Slurm login node  ->  squeue / sacct / sinfo / scontrol --json, module, sbatch
+ Slurm login node  ->  squeue / sacct / sinfo / scontrol, module, sbatch
 ```
 
-### Web dashboard (ursa-agent)
+| Path | What |
+|---|---|
+| `cmd/clusterwand/` | CLI entry and text renderers |
+| `internal/backend/` | the command allow-list; SSH, IAP and fixture backends |
+| `internal/core/` | typed operations, caching, the result envelope, `Call` |
+| `internal/rules/` | deterministic diagnosis rules for `job_explain` |
+| `internal/policy/` | redaction, untrusted wrapping, tiers, rate limit, audit |
+| `internal/mcpserver/` | MCP tools, resources, prompts |
+| `internal/server/` | the hosted server (`clusterwand serve`, Google sign-in) |
+| `sites/ursa-major/` | Ursa Major only: Cloud Run deploy notes and the ursa-agent dashboard |
 
-`agent/` is a separate Cloud Run service: sign in with Google through bifrost and get a
-read-only view of the cluster as yourself: cluster pulse, your jobs (with `job_explain`
-for failures), usage and estimated cost, waste, storage, partitions with an
-interactive-session command builder, software search, staged files, and for staff
-(tier R2) health, all jobs, usage and waste by user. Panels call bifrost tools directly
-(no model). The assistant (a Gemini model through an OpenAI-compatible gateway) sits in a drawer and plans
-jobs that only run after you press Approve. Design: [docs/SPEC.md](docs/SPEC.md)
-section 20; deploy: [docs/DEPLOY.md](docs/DEPLOY.md).
+## Roadmap
 
-## Self-hosting on your own cluster
-
-Nothing in bifrost is specific to one site except configuration: the login node, the catalog
-(partitions, prices, modules, recipes), log roots and caps. Start with
-`bifrost config init`, point `ssh` or `iap` at your login node, and write a catalog. The
-hosted Cloud Run deployment (Secret Manager, sealed token store, users file) is
-documented step by step in [docs/DEPLOY.md](docs/DEPLOY.md); `deploy/deploy.sh` does it
-idempotently.
+| Phase | What | Status |
+|---|---|---|
+| F0 | Fork and polish: renamed module, binary and paths; docs; CI | v0.1.0 |
+| F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | planned, v0.2.0 |
+| F2 | Slurm adapter: text-format parsers for older Slurm, JSON behind a flag; lab-locked partitions | planned, v0.3.0 |
+| F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey | planned, v0.4.0 |
+| F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |
+| Later | Hosted credential modes (registered keys, OIDC), multi-cluster, SFTP staging | not started |
 
 ## Development
 
 ```bash
 make check                  # gofmt, go vet, go test -race, build   (before every commit)
 scripts/mutation_check.sh   # every safety guard must be caught by a test
-scripts/mcp_smoke.py        # drives `bifrost mcp` over stdio like a real client
+scripts/mcp_smoke.py        # drives `clusterwand mcp` over stdio like a real client
 ```
 
-Tests run against anonymized recordings of real cluster output in `testdata/`
-(Slurm 25.11.4, data_parser v0.0.44). `scripts/make_fixtures.py` regenerates them from a
-read-only probe and refuses to write if a real username survives; CI checks again.
+Tests run against anonymized recordings of real cluster output in `testdata/`. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) first; the no-shell and two-step rules are not
+negotiable. Changes: [CHANGELOG.md](CHANGELOG.md). Design and history:
+[docs/SPEC.md](docs/SPEC.md).
 
-Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Security: [SECURITY.md](SECURITY.md) ·
-Changes: [CHANGELOG.md](CHANGELOG.md) · Design, phases and open questions:
-[docs/SPEC.md](docs/SPEC.md)
+## Credits
 
-## About
-
-Built by [UCR Research Computing](https://github.com/UCR-Research-Computing). Released under the [MIT License](LICENSE). The name: a bridge between two worlds, the assistant
-on one side and the scheduler on the other, with a narrow, well-guarded crossing between.
+ClusterWand is forked from [ursa-bifrost](https://github.com/UCR-Research-Computing/ursa-bifrost)
+by [UCR Research Computing](https://github.com/UCR-Research-Computing), with its full
+history, tests and mutation guards. Released under the [MIT License](LICENSE).

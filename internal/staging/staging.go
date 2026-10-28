@@ -1,6 +1,6 @@
-// Package staging is bifrost's private Cloud Storage staging area (SPEC
+// Package staging is clusterwand's private Cloud Storage staging area (SPEC
 // section 18): V4 signed URLs for uploads and downloads, and the few object
-// lookups the tools need. File bytes never pass through bifrost.
+// lookups the tools need. File bytes never pass through clusterwand.
 //
 // Signing uses the IAM Credentials signBlob API as a service account, so no
 // private key file exists anywhere. Tests replace SignBytes with a local key.

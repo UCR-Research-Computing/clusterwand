@@ -2,7 +2,7 @@ package core
 
 // Files in and out through the private staging bucket (SPEC sections 18.1,
 // 18.2). Bytes go between the person and Cloud Storage, or between the job and
-// Cloud Storage, through short-lived signed links; never through bifrost.
+// Cloud Storage, through short-lived signed links; never through clusterwand.
 
 import (
 	"context"
@@ -18,12 +18,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
 )
 
 // ErrNoStaging means the deployment has no staging bucket configured.
-var ErrNoStaging = errors.New("file staging is not configured on this bifrost (no staging.bucket)")
+var ErrNoStaging = errors.New("file staging is not configured on this clusterwand (no staging.bucket)")
 
 var reUploadName = regexp.MustCompile(`^[A-Za-z0-9_+][A-Za-z0-9._+ -]{0,119}$`)
 
@@ -276,16 +276,16 @@ func inputsHash(in []SubmitInputFile) string {
 
 // fetchBlock is inserted after the #SBATCH header: it downloads each staged
 // file into inputs/ before the person's commands run. URLs are signed by
-// bifrost and quoted for the shell; names were validated.
+// clusterwand and quoted for the shell; names were validated.
 func fetchBlock(urls, names []string) string {
 	var b strings.Builder
-	b.WriteString("\n# ---- bifrost: fetch staged input files (SPEC 18.1) ----\n")
+	b.WriteString("\n# ---- clusterwand: fetch staged input files (SPEC 18.1) ----\n")
 	b.WriteString("mkdir -p inputs\n")
 	for i := range urls {
-		fmt.Fprintf(&b, "curl -sS -f --retry 3 --max-time 3600 -o %s %s || { echo \"bifrost: could not fetch input %s\" >&2; exit 66; }\n",
+		fmt.Fprintf(&b, "curl -sS -f --retry 3 --max-time 3600 -o %s %s || { echo \"clusterwand: could not fetch input %s\" >&2; exit 66; }\n",
 			backend.Quote("inputs/"+names[i]), backend.Quote(urls[i]), strings.ReplaceAll(names[i], `"`, ``))
 	}
-	b.WriteString("# ---- end bifrost ----\n\n")
+	b.WriteString("# ---- end clusterwand ----\n\n")
 	return b.String()
 }
 

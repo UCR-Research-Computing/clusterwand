@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
 )
 
 // ---- a fake staging bucket -------------------------------------------------------
@@ -37,7 +37,7 @@ func newFakeStaging(t *testing.T) *fakeStaging {
 		t.Fatal(err)
 	}
 	f := &fakeStaging{objs: map[string]staging.Object{}, key: k}
-	f.gcs = &staging.GCS{BucketName: "test-staging", SignAs: "bifrost@test.iam.gserviceaccount.com",
+	f.gcs = &staging.GCS{BucketName: "test-staging", SignAs: "clusterwand@test.iam.gserviceaccount.com",
 		Now: func() time.Time { return time.Unix(1790875401, 0) },
 		SignBytes: func(_ context.Context, b []byte) ([]byte, error) {
 			h := sha256.Sum256(b)
@@ -110,7 +110,7 @@ func TestSignedURLVerifies(t *testing.T) {
 	if q.Get("X-Goog-Expires") != "900" || q.Get("X-Goog-SignedHeaders") != "host;x-goog-content-length-range" {
 		t.Fatalf("query: %v", q)
 	}
-	sts, _, _ := staging.StringToSign("PUT", "test-staging", "in/abc/u0123456789abcdef/my data.csv", "bifrost@test.iam.gserviceaccount.com",
+	sts, _, _ := staging.StringToSign("PUT", "test-staging", "in/abc/u0123456789abcdef/my data.csv", "clusterwand@test.iam.gserviceaccount.com",
 		time.Unix(1790875401, 0), 15*time.Minute, map[string]string{"x-goog-content-length-range": "0,100"})
 	sig, _ := hex.DecodeString(q.Get("X-Goog-Signature"))
 	h := sha256.Sum256([]byte(sts))
@@ -209,7 +209,7 @@ func TestSubmitWithInputs(t *testing.T) {
 	}
 	// the block sits after every #SBATCH line and before the first command
 	lastSbatch := strings.LastIndex(script, "#SBATCH")
-	block := strings.Index(script, "# ---- bifrost: fetch")
+	block := strings.Index(script, "# ---- clusterwand: fetch")
 	firstCmd := strings.Index(script, "\necho ")
 	if !(lastSbatch < block && (firstCmd < 0 || block < firstCmd)) {
 		t.Fatalf("fetch block misplaced:\n%s", script)
@@ -566,7 +566,7 @@ func TestStorageUsage(t *testing.T) {
 	s, fx := newTestService(t)
 	fx.Out = map[string]string{
 		"df":                        "Filesystem 1-blocks Used Available Capacity Mounted on\n10.0.0.1:/homeshare 2704467296256 99455336448 2467556229120 4% /home\n10.0.0.1:/scratchshare 2704467296256 1718616064 2565292949504 1% /scratch\n",
-		backend.DuTemplateForTest(): "8218501120\t/home/alice_ucr_edu/bifrost-jobs\n?\t/home/alice_ucr_edu/huge\n512\t/home/alice_ucr_edu/.aws_credentials\n2000\t/home/alice_ucr_edu/.cache\n100\t/scratch/alice_ucr_edu/big\n",
+		backend.DuTemplateForTest(): "8218501120\t/home/alice_ucr_edu/clusterwand-jobs\n?\t/home/alice_ucr_edu/huge\n512\t/home/alice_ucr_edu/.aws_credentials\n2000\t/home/alice_ucr_edu/.cache\n100\t/scratch/alice_ucr_edu/big\n",
 	}
 	r, err := s.StorageUsage(context.Background())
 	if err != nil {
@@ -575,7 +575,7 @@ func TestStorageUsage(t *testing.T) {
 	if len(r.Filesystems) != 2 || r.Filesystems[0].Mount != "/home" || r.Filesystems[0].UsedPct != 3.7 {
 		t.Fatalf("fs: %+v", r.Filesystems)
 	}
-	if r.Folders[0].Path != "/home/alice_ucr_edu/bifrost-jobs" || r.HomeBytes != 8218501120+2000 || r.ScratchByte != 100 {
+	if r.Folders[0].Path != "/home/alice_ucr_edu/clusterwand-jobs" || r.HomeBytes != 8218501120+2000 || r.ScratchByte != 100 {
 		t.Fatalf("folders: %+v home %d scratch %d", r.Folders, r.HomeBytes, r.ScratchByte)
 	}
 	for _, f := range r.Folders {

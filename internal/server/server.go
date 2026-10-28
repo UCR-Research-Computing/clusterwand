@@ -1,4 +1,4 @@
-// Package server is the hosted ursa-bifrost: the same MCP tools over
+// Package server is the hosted clusterwand: the same MCP tools over
 // Streamable HTTP, with OAuth sign-in through Google, and every cluster call
 // made as the signed-in person (backend.IAP with their own Google token).
 package server
@@ -18,16 +18,16 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/mcpserver"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/version"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/mcpserver"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/version"
 )
 
-// Server is the hosted bifrost.
+// Server is the hosted clusterwand.
 type Server struct {
 	cfg    config.Config
 	base   string
@@ -93,7 +93,7 @@ func New(cfg config.Config, google *Google, secret string) (*Server, error) {
 	store := NewStore(dataDir, sealer)
 	s := &Server{cfg: cfg, base: strings.TrimRight(sc.BaseURL, "/"), users: users, store: store, google: google,
 		auth: newAuthState(), tokens: &tokenCache{g: google, store: store, m: map[string]cachedTok{}},
-		audits: audit, logger: log.New(os.Stderr, "bifrost-serve ", log.LstdFlags), conns: map[string]*userConn{},
+		audits: audit, logger: log.New(os.Stderr, "clusterwand-serve ", log.LstdFlags), conns: map[string]*userConn{},
 		backends: map[string]backend.Backend{}, shared: core.NewSharedCache(), gate: core.NewGate()}
 	s.staging = core.NewStaging(cfg.Staging, os.Getenv("K_SERVICE") != "")
 	s.newBackend = func(email string) backend.Backend {
@@ -325,7 +325,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		fmt.Fprintf(w, "ursa-bifrost %s: MCP server for the Ursa Major HPC cluster.\nMCP endpoint: %s/mcp (OAuth sign-in with your %s Google account)\n", version.Version, s.base, s.users.Domain())
+		fmt.Fprintf(w, "clusterwand %s: MCP server for the Ursa Major HPC cluster.\nMCP endpoint: %s/mcp (OAuth sign-in with your %s Google account)\n", version.Version, s.base, s.users.Domain())
 	})
 	mcpH := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		c, ok := r.Context().Value(ctxKey{}).(caller)
@@ -347,7 +347,7 @@ func securityHeaders(h http.Handler) http.Handler {
 	})
 }
 
-// handleSignout (POST, bearer token) ends the person's bifrost session:
+// handleSignout (POST, bearer token) ends the person's clusterwand session:
 // deletes their Google refresh token, their stored SSH key (also from their
 // OS Login profile) and every refresh token is invalidated on next use.
 func (s *Server) handleSignout(w http.ResponseWriter, r *http.Request) {
@@ -417,7 +417,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 		defer cancel()
 		_ = hs.Shutdown(sctx)
 	}()
-	s.logf("ursa-bifrost %s serving %s on %s", version.Version, s.base, addr)
+	s.logf("clusterwand %s serving %s on %s", version.Version, s.base, addr)
 	err := hs.ListenAndServe()
 	if err == http.ErrServerClosed {
 		return nil

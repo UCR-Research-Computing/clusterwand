@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // SPEC section 23: the plain-text accounting rows must give the list readers

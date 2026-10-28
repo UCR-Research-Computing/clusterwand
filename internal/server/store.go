@@ -18,14 +18,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"gopkg.in/yaml.v3"
 )
 
 // ---- users: who may sign in -------------------------------------------------------
 
 // User is one allowed person. Access to the cluster itself is still decided by
-// Google (IAP + OS Login); this list decides who may use bifrost and with
+// Google (IAP + OS Login); this list decides who may use clusterwand and with
 // which tiers and caps.
 type User struct {
 	Email string   `yaml:"email"`
@@ -56,7 +56,7 @@ var labIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}$`)
 
 // ProgramClient is a pre-registered OAuth client for a program (Ultra, a
 // dashboard, a batch job) rather than a person's chat client. It signs in as a
-// person like any client, but bifrost narrows what it may do: its tools are
+// person like any client, but clusterwand narrows what it may do: its tools are
 // the person's tiers intersected with Tiers (a ceiling, never a grant), and it
 // gets its own call budget, so a busy program neither starves nor is starved
 // by the person's chat clients. Its audit records say "program:<id>".

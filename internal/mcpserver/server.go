@@ -10,12 +10,12 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/version"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/version"
 )
 
 // Instructions are sent to every client at initialize.
-const Instructions = `ursa-bifrost gives read-only, structured access to the Ursa Major Slurm cluster (UCR Research Computing, Google Cloud).
+const Instructions = `clusterwand gives read-only, structured access to the Ursa Major Slurm cluster (UCR Research Computing, Google Cloud).
 
 - Start with cluster_status (nodes, queue, what is billing) or jobs_list (the user's jobs).
 - For a failed job: job_explain gives deterministic findings with evidence; job_log_tail shows the log.
@@ -242,7 +242,7 @@ var envelopeSchema = &jsonschema.Schema{
 
 // New builds the MCP server over a core.Service.
 func New(s *core.Service) *mcp.Server {
-	srv := mcp.NewServer(&mcp.Implementation{Name: "ursa-bifrost", Title: "Ursa Major HPC (read-only)", Version: version.Version},
+	srv := mcp.NewServer(&mcp.Implementation{Name: "clusterwand", Title: "Ursa Major HPC (read-only)", Version: version.Version},
 		&mcp.ServerOptions{Instructions: Instructions})
 
 	addR1 := func(name, title, desc string) *mcp.Tool {
@@ -405,7 +405,7 @@ func New(s *core.Service) *mcp.Server {
 
 	if s.Staging != nil {
 		mcp.AddTool(srv, addR1("results_link", "Download links for job outputs",
-			"Signed download links (valid about an hour) for chosen files in one of the caller's job folders. bifrost copies the files, as the caller, to its private staging bucket; nothing changes in the job folder. Up to 20 files and the configured size per call. Anyone holding a link can download that file until it expires."),
+			"Signed download links (valid about an hour) for chosen files in one of the caller's job folders. clusterwand copies the files, as the caller, to its private staging bucket; nothing changes in the job folder. Up to 20 files and the configured size per call. Anyone holding a link can download that file until it expires."),
 			func(ctx context.Context, req *mcp.CallToolRequest, in resultsLinkIn) (*mcp.CallToolResult, envelope, error) {
 				r, err := core.Call(ctx, s, clientName(req), "results_link", "R1", argsOf(in), true, func(ctx context.Context) (*core.ResultLinks, error) {
 					return s.ResultsLink(ctx, in.JobID, in.Files)
@@ -445,7 +445,7 @@ func New(s *core.Service) *mcp.Server {
 			return nil, toEnvelope(r), err
 		})
 	mcp.AddTool(srv, addR1("interactive_help", "Interactive session command",
-		"Writes the exact commands for an interactive session (connect to the login node, then srun --pty or salloc) with its hourly cost and warnings. Runs nothing: bifrost never opens a shell."),
+		"Writes the exact commands for an interactive session (connect to the login node, then srun --pty or salloc) with its hourly cost and warnings. Runs nothing: clusterwand never opens a shell."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in interactiveIn) (*mcp.CallToolResult, envelope, error) {
 			r, err := core.Call(ctx, s, clientName(req), "interactive_help", "R1", argsOf(in), true, func(ctx context.Context) (*core.InteractiveHelp, error) {
 				return s.InteractiveHelp(ctx, core.InteractiveInput{Partition: in.Partition, Nodes: in.Nodes, CPUs: in.CPUs, GPUs: in.GPUs, Time: in.Time, Memory: in.Memory})

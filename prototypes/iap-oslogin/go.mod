@@ -1,4 +1,4 @@
-module iapproto // prototype; not part of the bifrost build
+module iapproto // prototype; not part of the clusterwand build
 
 go 1.26.8
 

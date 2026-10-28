@@ -296,9 +296,9 @@ mutate "v095 store before login"   internal/backend/iap.go '	_ = b.keys().Put(b.
 mutate "v095 wait for fresh key"   internal/backend/iap.go '				fresh := time.Since(k.Imported) < keyPropagation' '				fresh := false'
 mutate "v095 gone fresh key replaced" internal/backend/iap.go '	return err != nil || code != 404' '	return true'
 mutate "v095 fresh key retries"    internal/backend/iap.go '						client, err = b.handshake(ctx, k.User, signer, 13)' '						client, err = b.handshake(ctx, k.User, signer, 0)'
-mutate "v096 env in a job"         internal/backend/files.go '	argv := append(EnvJobArgs(partition), "bash", "-lc", envTemplate, "bifrost", strconv.Itoa(len(modules)))' '	argv := []string{"bash", "-lc", envTemplate, "bifrost", strconv.Itoa(len(modules))}'
+mutate "v096 env in a job"         internal/backend/files.go '	argv := append(EnvJobArgs(partition), "bash", "-lc", envTemplate, "clusterwand", strconv.Itoa(len(modules)))' '	argv := []string{"bash", "-lc", envTemplate, "clusterwand", strconv.Itoa(len(modules))}'
 mutate "v096 env one core"         internal/backend/files.go '"-N", "1", "-n", "1", "-c", "1", "-t", "3",' '"-N", "1", "-n", "1", "-t", "3",'
-mutate "v096 env gives up"         internal/backend/files.go '		"--immediate=120", "--quiet", "-J", "bifrost-env-check"}' '		"--quiet", "-J", "bifrost-env-check"}'
+mutate "v096 env gives up"         internal/backend/files.go '		"--immediate=120", "--quiet", "-J", "clusterwand-env-check"}' '		"--quiet", "-J", "clusterwand-env-check"}'
 mutate "v096 env partition checked" internal/backend/files.go '	if !rePartition.MatchString(partition) {
 		return Command{}, fmt.Errorf("env_check partition' '	if false {
 		return Command{}, fmt.Errorf("env_check partition'

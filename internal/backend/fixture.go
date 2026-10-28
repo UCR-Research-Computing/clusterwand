@@ -51,7 +51,7 @@ type Fixture struct {
 	// Out answers a bash template exactly (env_check, du ...): template -> output.
 	Out map[string]string
 	// IgnoreJobFilter answers `squeue/sacct -j` with every recorded job, as a
-	// Slurm that ignored the list would (tests bifrost's own job_ids filter).
+	// Slurm that ignored the list would (tests clusterwand's own job_ids filter).
 	IgnoreJobFilter bool
 	// Sharing answers `sinfo -h -o %R|%h` (partition|OverSubscribe lines); empty
 	// means every partition is EXCLUSIVE, as on the real cluster in 2026-10.
@@ -134,7 +134,7 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		if strings.Contains(a[2], "module -t show") {
 			// emulate the site's hierarchical Lmod: MPI-built packages are only
 			// in the module path after an MPI is loaded (Lmod prints a warning
-			// and exits 1 otherwise; bifrost runs it with 2>&1)
+			// and exits 1 otherwise; clusterwand runs it with 2>&1)
 			if f.MPIOnly != nil {
 				for _, m := range f.MPIOnly {
 					if strings.Contains(a[2], "show "+m) && !strings.Contains(a[2], "module load ") {

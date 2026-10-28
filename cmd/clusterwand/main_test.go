@@ -103,7 +103,7 @@ func TestCLIStaffWithR2(t *testing.T) {
 
 func TestCLIHelpAndVersion(t *testing.T) {
 	out, _, code := runCLI(t, "--help")
-	if code != 0 || !strings.Contains(out, "bifrost mcp") {
+	if code != 0 || !strings.Contains(out, "clusterwand mcp") {
 		t.Fatal(out)
 	}
 	out, _, _ = runCLI(t, "version", "--json")
@@ -195,7 +195,7 @@ func TestConfirmRaceAcrossProcesses(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the binary")
 	}
-	bin := filepath.Join(t.TempDir(), "bifrost")
+	bin := filepath.Join(t.TempDir(), "clusterwand")
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, out)
 	}

@@ -2,7 +2,7 @@
 """Make trimmed, anonymized test fixtures from a read-only probe of Ursa Major.
 
 Real usernames, uids and internal IPs are replaced; batch scripts are dropped
-except for one synthetic example. Input: /tmp/bifrost-probe/raw. Output: testdata/.
+except for one synthetic example. Input: /tmp/clusterwand-probe/raw. Output: testdata/.
 """
 
 import json
@@ -11,7 +11,7 @@ import shutil
 import sys
 from pathlib import Path
 
-RAW = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/bifrost-probe/raw")
+RAW = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/clusterwand-probe/raw")
 OUT = Path(__file__).resolve().parent.parent / "testdata"
 # The real cluster user and uid are read from the probe itself (squeue meta),
 # so no real identity is written into this public script.

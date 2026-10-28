@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 )
 
 // SSH runs commands on the login node over one multiplexed ssh connection.
@@ -84,7 +84,7 @@ func (s *SSH) base(ctx context.Context) ([]string, string, error) {
 	}
 	argv = append(argv,
 		"-o", "ControlMaster=auto",
-		"-o", "ControlPath="+filepath.Join(dir, "bifrost-%C"),
+		"-o", "ControlPath="+filepath.Join(dir, "cw-%C"),
 		"-o", fmt.Sprintf("ControlPersist=%d", persist),
 		"-o", "BatchMode=yes",
 		"-o", "ServerAliveInterval=30",

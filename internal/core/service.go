@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
 )
 
 // Service is the core: one per process.
@@ -96,7 +96,7 @@ func New(cfg config.Config) (*Service, error) {
 		}
 		be = &backend.IAP{Project: ic.Project, Zone: ic.Zone, Instance: ic.Instance, Email: email,
 			Token: backend.CommandToken(tc), HostKeys: ic.HostKeys, Idle: time.Duration(ic.IdleMinutes) * time.Minute,
-			Keys: backend.FileKeyStore{Dir: config.Expand("~/.local/share/ursa-bifrost/iap-keys")}}
+			Keys: backend.FileKeyStore{Dir: config.Expand("~/.local/share/clusterwand/iap-keys")}}
 	default:
 		be = backend.NewSSH(cfg.SSH)
 	}

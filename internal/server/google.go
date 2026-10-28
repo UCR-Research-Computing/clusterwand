@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// Google is the Google OAuth client bifrost uses for sign-in. Endpoints are
+// Google is the Google OAuth client clusterwand uses for sign-in. Endpoints are
 // fields so tests can point them at a fake.
 type Google struct {
 	ClientID     string
@@ -87,7 +87,7 @@ func (g *Google) Refresh(ctx context.Context, refresh string) (*TokenResponse, e
 	return g.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}})
 }
 
-// IDClaims are the parts of a Google ID token bifrost uses.
+// IDClaims are the parts of a Google ID token clusterwand uses.
 type IDClaims struct {
 	Iss           string `json:"iss"`
 	Aud           string `json:"aud"`

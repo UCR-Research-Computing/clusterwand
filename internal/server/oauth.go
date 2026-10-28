@@ -16,11 +16,11 @@ import (
 	"time"
 )
 
-// This file is bifrost's OAuth 2.1 authorization server for MCP clients
+// This file is clusterwand's OAuth 2.1 authorization server for MCP clients
 // (MCP authorization spec 2025-06-18): protected-resource metadata,
 // authorization-server metadata, dynamic client registration (RFC 7591),
 // authorization code + PKCE S256, refresh tokens, revocation. The person signs
-// in with Google (hd = the configured domain); bifrost then issues its OWN
+// in with Google (hd = the configured domain); clusterwand then issues its OWN
 // tokens. Google tokens never leave the server and client tokens are never sent
 // to Google (no token passthrough).
 
@@ -65,14 +65,14 @@ type session struct {
 	Created            time.Time `json:"created"`
 }
 
-// refreshRec maps a bifrost refresh token (by hash) to a client + person.
+// refreshRec maps a clusterwand refresh token (by hash) to a client + person.
 type refreshRec struct {
 	ClientID string    `json:"client_id"`
 	Email    string    `json:"email"`
 	Expires  time.Time `json:"expires"`
 }
 
-// accessRec is a live bifrost access token. It is cached in memory and also
+// accessRec is a live clusterwand access token. It is cached in memory and also
 // sealed in the store, so tokens survive Cloud Run restarts and scale-to-zero
 // (some MCP clients ask for a new browser sign-in on a 401 instead of refreshing).
 type accessRec struct {
@@ -190,9 +190,9 @@ func (s *Server) handleResourceMeta(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"resource":                 s.base + "/mcp",
 		"authorization_servers":    []string{s.base},
-		"scopes_supported":         []string{"bifrost"},
+		"scopes_supported":         []string{"clusterwand"},
 		"bearer_methods_supported": []string{"header"},
-		"resource_name":            "ursa-bifrost (Ursa Major HPC)",
+		"resource_name":            "clusterwand (Ursa Major HPC)",
 	})
 }
 
@@ -207,7 +207,7 @@ func (s *Server) handleASMeta(w http.ResponseWriter, r *http.Request) {
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"token_endpoint_auth_methods_supported": []string{"none"},
-		"scopes_supported":                      []string{"bifrost"},
+		"scopes_supported":                      []string{"clusterwand"},
 	})
 }
 
@@ -336,7 +336,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 // seenCookie marks a browser that has seen the explanation page. It holds no
 // identity and grants nothing; it only skips a page.
-const seenCookie = "bifrost_seen"
+const seenCookie = "clusterwand_seen"
 
 // googleURL registers a pending Google sign-in for p and returns its URL.
 // Normally prompt=select_account: Google shows only the account picker once
@@ -435,12 +435,12 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.users.Lookup(id.Email) == nil {
-		back(url.Values{"error": {"access_denied"}, "error_description": {id.Email + " is not on the ursa-bifrost user list; ask Research Computing"}})
+		back(url.Values{"error": {"access_denied"}, "error_description": {id.Email + " is not on the clusterwand user list; ask Research Computing"}})
 		s.audit("signin", id.Email, "denied", "not on user list")
 		return
 	}
 	if !strings.Contains(tok.Scope, "https://www.googleapis.com/auth/cloud-platform") {
-		back(url.Values{"error": {"access_denied"}, "error_description": {"Google Cloud access was not granted; bifrost needs it to reach the cluster as you"}})
+		back(url.Values{"error": {"access_denied"}, "error_description": {"Google Cloud access was not granted; clusterwand needs it to reach the cluster as you"}})
 		return
 	}
 	if tok.RefreshToken != "" {
@@ -456,7 +456,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, s.googleURL(p, true), http.StatusFound)
 			return
 		}
-		back(url.Values{"error": {"server_error"}, "error_description": {"Google returned no refresh token; remove ursa-bifrost from your Google account permissions and sign in again"}})
+		back(url.Values{"error": {"server_error"}, "error_description": {"Google returned no refresh token; remove clusterwand from your Google account permissions and sign in again"}})
 		return
 	}
 	s.tokens.seed(id.Email, tok.AccessToken, time.Now().Add(time.Duration(tok.ExpiresIn)*time.Second))
@@ -570,7 +570,7 @@ func (s *Server) issue(w http.ResponseWriter, clientID, email string) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"access_token": at, "token_type": "Bearer", "expires_in": int(ttl.Seconds()),
-		"refresh_token": rt, "scope": "bifrost"})
+		"refresh_token": rt, "scope": "clusterwand"})
 }
 
 // ---- revocation and sign-out -----------------------------------------------------
@@ -591,7 +591,7 @@ func (s *Server) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200) // RFC 7009: always 200
 }
 
-// verifyAccess checks a bifrost access token and the user list (re-checked on
+// verifyAccess checks a clusterwand access token and the user list (re-checked on
 // every request so removing someone takes effect immediately).
 func (s *Server) verifyAccess(tok string) (*accessRec, *User, error) {
 	a, ok := s.lookupAccess(tok)

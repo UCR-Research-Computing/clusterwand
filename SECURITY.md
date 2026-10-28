@@ -1,12 +1,12 @@
 # Security policy
 
-bifrost gives AI assistants access to a shared research cluster, so we take reports
+ClusterWand gives AI assistants access to shared research clusters, so we take reports
 seriously and answer quickly.
 
 ## Reporting a vulnerability
 
 Please **do not open a public issue**. Use GitHub's private reporting:
-[Report a vulnerability](https://github.com/UCR-Research-Computing/ursa-bifrost/security/advisories/new).
+[Report a vulnerability](https://github.com/UCR-Research-Computing/clusterwand/security/advisories/new).
 If that is not possible, email the maintainers through
 [UCR Research Computing](https://github.com/UCR-Research-Computing).
 
@@ -29,7 +29,7 @@ two working days and to ship a fix for confirmed issues within a week.
 ## Design notes for reviewers
 
 - No tool runs arbitrary shell; `TestAllowListIsClosed` pins the command list.
-- `scripts/mutation_check.sh` disables each of 215 guards in turn and requires a test
+- `scripts/mutation_check.sh` disables each of 219 guards in turn and requires a test
   to fail.
 - Text from users and programs is returned in `untrusted` blocks.
 - The hosted server is deployed `--allow-unauthenticated` on Cloud Run: all access
@@ -45,4 +45,9 @@ two working days and to ship a fix for confirmed issues within a week.
 
 ## Supported versions
 
-Only the latest release is supported. The hosted server always runs the latest tag.
+Only the latest release is supported.
+
+## Lineage
+
+ClusterWand is forked from ursa-bifrost (v0.10.1). Fixes to shared code are carried across
+by hand; report to whichever project you use.

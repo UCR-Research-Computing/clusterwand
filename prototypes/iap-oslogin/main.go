@@ -55,7 +55,7 @@ type loginProfile struct {
 
 func osLogin(ctx context.Context, token, email string, pub ssh.PublicKey) (user, fingerprint string, err error) {
 	body, _ := json.Marshal(map[string]any{
-		"key":                strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " bifrost-ephemeral",
+		"key":                strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " clusterwand-ephemeral",
 		"expirationTimeUsec": fmt.Sprint(time.Now().Add(5 * time.Minute).UnixMicro()),
 	})
 	u := fmt.Sprintf("https://oslogin.googleapis.com/v1/users/%s:importSshPublicKey?projectId=%s", url.PathEscape(email), project)
@@ -92,7 +92,7 @@ func deleteKey(token, email string, pub ssh.PublicKey) error {
 	// OS Login names a key by sha256 of the exact authorized_keys line that was
 	// imported (comment included), not of the key blob. Found by testing: the
 	// blob hash returns 200 on a non-existent key and deletes nothing.
-	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " bifrost-ephemeral"
+	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " clusterwand-ephemeral"
 	fp := fmt.Sprintf("%x", sha256.Sum256([]byte(line)))
 	u := fmt.Sprintf("https://oslogin.googleapis.com/v1/users/%s/sshPublicKeys/%s", url.PathEscape(email), fp)
 	req, _ := http.NewRequest("DELETE", u, nil)
@@ -128,7 +128,7 @@ func dialIAP(ctx context.Context, token string) (*iapConn, error) {
 	h := http.Header{}
 	h.Set("Authorization", "Bearer "+token)
 	h.Set("Origin", "bot:iap-tunneler")
-	h.Set("User-Agent", "ursa-bifrost-iap-prototype")
+	h.Set("User-Agent", "clusterwand-iap-prototype")
 	ws, resp, err := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPHeader: h, Subprotocols: []string{"relay.tunnel.cloudproxy.app"}})
 	if err != nil {
 		if resp != nil {

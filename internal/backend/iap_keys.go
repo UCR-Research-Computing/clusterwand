@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// StoredKey is one user's bifrost SSH key: the private half, the exact line
+// StoredKey is one user's clusterwand SSH key: the private half, the exact line
 // imported to OS Login (its sha256 is the key id), the POSIX user and expiry.
 type StoredKey struct {
 	PrivateKey []byte    `json:"private_key"` // OpenSSH PEM

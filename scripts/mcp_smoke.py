@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Drive `bifrost mcp` over stdio like a real MCP client (initialize, list, call)."""
+"""Drive `clusterwand mcp` over stdio like a real MCP client (initialize, list, call)."""
 
 import json
 import subprocess
 import sys
 
-BIN = sys.argv[1] if len(sys.argv) > 1 else "bifrost"
+BIN = sys.argv[1] if len(sys.argv) > 1 else "clusterwand"
 p = subprocess.Popen([BIN, "mcp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
 

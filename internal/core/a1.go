@@ -19,10 +19,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // The A1 tier changes cluster state. Every action is two-step:
@@ -56,7 +56,7 @@ type SubmitPlan struct {
 	DayCapUSD    float64           `json:"day_cap_usd"`
 	Scheduler    string            `json:"scheduler_test"` // sbatch --test-only answer
 	Warnings     []string          `json:"warnings"`
-	Overrides    []string          `json:"overrides"`        // #SBATCH values bifrost replaced
+	Overrides    []string          `json:"overrides"`        // #SBATCH values clusterwand replaced
 	Inputs       []SubmitInputFile `json:"inputs,omitempty"` // staged files the job fetches into inputs/
 	Next         string            `json:"next"`
 	Allocation   *PlanAllocation   `json:"allocation"`
@@ -308,15 +308,15 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	timeStr := firstNonEmpty(in.Time, req["time"])
 	mins, ok := slurmMinutes(timeStr)
 	if !ok || mins <= 0 {
-		return nil, errors.New("a time limit is required (#SBATCH -t or the time argument): bifrost will not start a job that can run without end")
+		return nil, errors.New("a time limit is required (#SBATCH -t or the time argument): clusterwand will not start a job that can run without end")
 	}
-	name := firstNonEmpty(in.JobName, req["job-name"], "bifrost-job")
+	name := firstNonEmpty(in.JobName, req["job-name"], "clusterwand-job")
 	name = regexp.MustCompile(`[^A-Za-z0-9._-]`).ReplaceAllString(name, "-")
 	if len(name) > 60 {
 		name = name[:60]
 	}
 	if name == "" || !regexp.MustCompile(`^[A-Za-z0-9]`).MatchString(name) {
-		name = "bifrost-" + name
+		name = "clusterwand-" + name
 	}
 	for k, v := range map[string]string{"partition": part, "nodes": strconv.Itoa(nodes), "time": strconv.Itoa(mins) + " min"} {
 		if orig := req[k]; orig != "" && ((k == "partition" && orig != part) || (k == "nodes" && atoiDefault(orig, 1) != nodes) || (k == "time" && !sameMinutes(orig, mins))) {
@@ -430,7 +430,7 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	dir := s.Cfg.JobsRoot + "/" + stamp + "-" + slug
 	opts := subOpts{Partition: slurmPart, Nodes: nodes, TimeMin: mins, JobName: name}
 	planHash := submitHash(dir, opts, scriptHash, inputsHash(inputs))
-	opts.Comment = "bifrost:" + planHash[:12]
+	opts.Comment = "clusterwand:" + planHash[:12]
 
 	// ask the scheduler (no submission)
 	tc, err := backend.SbatchTestOnly(backend.SubmitOpts(opts), []byte(in.Script))

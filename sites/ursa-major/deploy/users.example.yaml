@@ -1,4 +1,4 @@
-# Who may use the hosted ursa-bifrost, and with which tiers.
+# Who may use the hosted clusterwand, and with which tiers.
 #
 # Being listed here is necessary but not sufficient: each person must ALSO be
 # allowed onto the cluster by Google (IAP tunnel + OS Login on the login node,
@@ -26,12 +26,12 @@ users:
 # clients (0 or absent = the global limit, max 600). The id is the OAuth
 # client_id the program uses; it cannot be registered by anyone else.
 # clients:
-#   - id: bifrost-ultra
+#   - id: clusterwand-ultra
 #     name: Ultra
 #     tiers: [R1, R2]          # read-only: no submit/cancel even for an A1 person
 #     calls_per_min: 120
 #     redirect_uris: ["http://127.0.0.1/callback"]
-#   - id: bifrost-retired
+#   - id: clusterwand-retired
 #     name: Old dashboard
 #     tiers: [R1]
 #     redirect_uris: ["http://127.0.0.1/callback"]

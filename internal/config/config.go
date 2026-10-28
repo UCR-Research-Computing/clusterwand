@@ -1,4 +1,4 @@
-// Package config loads ~/.config/ursa-bifrost/config.yaml.
+// Package config loads ~/.config/clusterwand/config.yaml.
 package config
 
 import (
@@ -33,10 +33,10 @@ type IAPConfig struct {
 	IdleMinutes  int      `yaml:"idle_minutes,omitempty"`
 }
 
-// ServerConfig is used only by `bifrost serve` (the hosted MCP server).
+// ServerConfig is used only by `clusterwand serve` (the hosted MCP server).
 type ServerConfig struct {
 	Listen    string `yaml:"listen"`     // default :8080 (PORT env wins on Cloud Run)
-	BaseURL   string `yaml:"base_url"`   // public https URL, e.g. https://bifrost-xyz.run.app
+	BaseURL   string `yaml:"base_url"`   // public https URL, e.g. https://clusterwand-xyz.run.app
 	DataDir   string `yaml:"data_dir"`   // sessions, keys, per-user ledgers
 	UsersFile string `yaml:"users_file"` // who may sign in and with which tiers
 	// Google OAuth client (Web application) used for sign-in.
@@ -45,7 +45,7 @@ type ServerConfig struct {
 	// SecretKeyEnv names an env var with 32 random bytes (base64) used to
 	// encrypt stored Google refresh tokens and SSH keys at rest.
 	SecretKeyEnv string `yaml:"secret_key_env"`
-	// AccessTokenMinutes is the lifetime of bifrost access tokens (default 60).
+	// AccessTokenMinutes is the lifetime of clusterwand access tokens (default 60).
 	AccessTokenMinutes int `yaml:"access_token_minutes"`
 }
 
@@ -187,10 +187,10 @@ func Default() Config {
 			UntrustedCh: 16000,
 			CallsPerMin: 60,
 		},
-		AuditPath:    "~/.local/share/ursa-bifrost/audit.jsonl",
-		StatePath:    "~/.local/share/ursa-bifrost/a1.json",
-		ResultsDir:   "~/ursa-results",
-		JobsRoot:     "bifrost-jobs",
+		AuditPath:    "~/.local/share/clusterwand/audit.jsonl",
+		StatePath:    "~/.local/share/clusterwand/a1.json",
+		ResultsDir:   "~/clusterwand-results",
+		JobsRoot:     "clusterwand-jobs",
 		EnvPartition: "check",
 		Caps: Caps{MaxNodes: 4, MaxHours: 24, MaxCostPerJobUSD: 25, MaxCostPerDayUSD: 50,
 			MaxSubmitsPerDay: 20, ConfirmTTLMinutes: 10},
@@ -199,14 +199,14 @@ func Default() Config {
 	}
 }
 
-// DefaultPath is ~/.config/ursa-bifrost/config.yaml (XDG_CONFIG_HOME honoured).
+// DefaultPath is ~/.config/clusterwand/config.yaml (XDG_CONFIG_HOME honoured).
 func DefaultPath() string {
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "ursa-bifrost", "config.yaml")
+	return filepath.Join(base, "clusterwand", "config.yaml")
 }
 
 // ErrNoConfig means the config file does not exist yet.
@@ -221,7 +221,7 @@ func Load(path string) (Config, error) {
 	c.Path = path
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return c, fmt.Errorf("%w at %s (run `bifrost config init`)", ErrNoConfig, path)
+		return c, fmt.Errorf("%w at %s (run `clusterwand config init`)", ErrNoConfig, path)
 	}
 	if err != nil {
 		return c, err
@@ -256,8 +256,8 @@ func (c Config) Validate() error {
 	if !rePartitionName.MatchString(c.EnvPartition) {
 		return errors.New("config: env_check_partition must be a partition name (default check)")
 	}
-	if c.JobsRoot != "bifrost-jobs" {
-		return errors.New("config: jobs_root must be bifrost-jobs (other folders are not supported yet)")
+	if c.JobsRoot != "clusterwand-jobs" {
+		return errors.New("config: jobs_root must be clusterwand-jobs (other folders are not supported yet)")
 	}
 	if c.Caps.MaxNodes < 1 || c.Caps.MaxHours <= 0 || c.Caps.MaxCostPerJobUSD <= 0 || c.Caps.MaxCostPerDayUSD <= 0 || c.Caps.ConfirmTTLMinutes < 1 {
 		return errors.New("config: caps must all be positive")
@@ -291,8 +291,8 @@ func Expand(p string) string {
 	return p
 }
 
-// Example is the file `bifrost config init` writes.
-const Example = `# ursa-bifrost configuration
+// Example is the file `clusterwand config init` writes.
+const Example = `# clusterwand configuration
 cluster: ursa-major
 backend: ssh              # ssh | fixture
 
@@ -324,11 +324,11 @@ tiers: [R1]
 # A1 caps: a plan over any of these is refused (worst case = nodes x hours x price)
 caps: {max_nodes: 4, max_hours: 24, max_cost_usd_per_job: 25, max_cost_usd_per_day: 50,
        max_submits_per_day: 20, confirm_ttl_minutes: 10}
-results_dir: ~/ursa-results          # bifrost job results <id> downloads here
-jobs_root: bifrost-jobs              # submitted jobs run in ~/bifrost-jobs/<stamp>-<name> on the cluster
-state_path: ~/.local/share/ursa-bifrost/a1.json
+results_dir: ~/clusterwand-results   # clusterwand job results <id> downloads here
+jobs_root: clusterwand-jobs           # submitted jobs run in ~/clusterwand-jobs/<stamp>-<name> on the cluster
+state_path: ~/.local/share/clusterwand/a1.json
 
 cache_ttl: {queue: 20s, nodes: 30s, acct: 60s, catalog: 1h, modules: 1h}
 limits: {log_lines: 200, list_rows: 200, script_bytes: 65536, untrusted_chars: 16000, calls_per_min: 60}
-audit_path: ~/.local/share/ursa-bifrost/audit.jsonl
+audit_path: ~/.local/share/clusterwand/audit.jsonl
 `

@@ -29,7 +29,7 @@ func ListTree(dir string) (Command, error) {
 	if err := validDir(dir); err != nil {
 		return Command{}, err
 	}
-	return Command{argv: []string{"bash", "-c", treeTemplate, "bifrost", dir}, kind: KindNoCache}, nil
+	return Command{argv: []string{"bash", "-c", treeTemplate, "clusterwand", dir}, kind: KindNoCache}, nil
 }
 
 const readRangeTemplate = `set -e; [ -f "$1" ] || { echo "$1: not a regular file" >&2; exit 4; }; stat -L --printf '%s\n' -- "$1"; dd if="$1" iflag=skip_bytes,count_bytes skip="$2" count="$3" bs=65536 status=none`
@@ -49,7 +49,7 @@ func ReadRange(p string, offset int64, n int) (Command, error) {
 	if n < 1 || n > MaxReadBytes {
 		return Command{}, fmt.Errorf("bytes must be 1-%d", MaxReadBytes)
 	}
-	return Command{argv: []string{"bash", "-c", readRangeTemplate, "bifrost", p, strconv.FormatInt(offset, 10), strconv.Itoa(n)}, kind: KindNoCache}, nil
+	return Command{argv: []string{"bash", "-c", readRangeTemplate, "clusterwand", p, strconv.FormatInt(offset, 10), strconv.Itoa(n)}, kind: KindNoCache}, nil
 }
 
 const grepTemplate = `set -e; [ -f "$1" ] || { echo "$1: not a regular file" >&2; exit 4; }; grep -c '' < "$1" || true; grep -n -I -E -m "$3" -C "$4" -e "$2" -- "$1" || [ $? -eq 1 ]`
@@ -77,7 +77,7 @@ func GrepFile(p, pattern string, max, context int) (Command, error) {
 	if max < 1 || max > MaxGrepMatches || context < 0 || context > 5 {
 		return Command{}, fmt.Errorf("matches must be 1-%d and context 0-5", MaxGrepMatches)
 	}
-	return Command{argv: []string{"bash", "-c", grepTemplate, "bifrost", p, pattern, strconv.Itoa(max), strconv.Itoa(context)}, kind: KindNoCache}, nil
+	return Command{argv: []string{"bash", "-c", grepTemplate, "clusterwand", p, pattern, strconv.Itoa(max), strconv.Itoa(context)}, kind: KindNoCache}, nil
 }
 
 const logWindowTemplate = `set -e; [ -f "$1" ] || { echo "$1: not a regular file" >&2; exit 4; }; n=$(grep -c '' < "$1" || true); if [ "$2" -le 0 ]; then s=$(( n - $3 + 1 )); else s=$2; fi; if [ "$s" -lt 1 ]; then s=1; fi; e=$(( s + $3 - 1 )); printf '%s %s\n' "$n" "$s"; sed -n "${s},${e}p;${e}q" -- "$1"`
@@ -94,7 +94,7 @@ func LogWindow(p string, start, n int) (Command, error) {
 	if n < 1 || n > MaxWindowLines || start < 0 || start > 1<<40 {
 		return Command{}, fmt.Errorf("lines must be 1-%d", MaxWindowLines)
 	}
-	return Command{argv: []string{"bash", "-c", logWindowTemplate, "bifrost", p, strconv.Itoa(start), strconv.Itoa(n)}, kind: KindNoCache}, nil
+	return Command{argv: []string{"bash", "-c", logWindowTemplate, "clusterwand", p, strconv.Itoa(start), strconv.Itoa(n)}, kind: KindNoCache}, nil
 }
 
 // Realpath resolves symlinks (the result is checked against the allowed roots
@@ -116,7 +116,7 @@ func ListDir(dir string) (Command, error) {
 	if err := validDir(dir); err != nil {
 		return Command{}, err
 	}
-	return Command{argv: []string{"bash", "-c", listDirTemplate, "bifrost", dir}, kind: KindNoCache}, nil
+	return Command{argv: []string{"bash", "-c", listDirTemplate, "clusterwand", dir}, kind: KindNoCache}, nil
 }
 
 // DiskFree is `df -P -B1` on the given folders (exit 1 still has output when
@@ -140,14 +140,14 @@ func DiskFree(dirs ...string) (Command, error) {
 // home unknown). Each entry gets at most 30 s, and none starts once the 40 s
 // overall budget is spent. Entries it could not size print "?". Paths reach
 // the inner shell only as positional parameters, NUL-separated.
-const duTemplate = `end=$(( $(date +%s) + 40 )); for root in "$@"; do [ -d "$root" ] || continue; for d in "$root"/* "$root"/.[!.]* "$root"/..?*; do [ -e "$d" ] || continue; [ -L "$d" ] && continue; printf '%s\0' "$d"; done; done | xargs -0 -r -P 8 -n 1 sh -c 'left=$(( $1 - $(date +%s) )); if [ "$left" -le 1 ]; then printf '\''?\t%s\n'\'' "$2"; exit 0; fi; t=$(( left < 30 ? left : 30 )); s=$(timeout "$t" du -x -s -B1 -- "$2" 2>/dev/null | cut -f1); if [ -n "$s" ]; then printf '\''%s\t%s\n'\'' "$s" "$2"; else printf '\''?\t%s\n'\'' "$2"; fi' bifrost-du "$end"`
+const duTemplate = `end=$(( $(date +%s) + 40 )); for root in "$@"; do [ -d "$root" ] || continue; for d in "$root"/* "$root"/.[!.]* "$root"/..?*; do [ -e "$d" ] || continue; [ -L "$d" ] && continue; printf '%s\0' "$d"; done; done | xargs -0 -r -P 8 -n 1 sh -c 'left=$(( $1 - $(date +%s) )); if [ "$left" -le 1 ]; then printf '\''?\t%s\n'\'' "$2"; exit 0; fi; t=$(( left < 30 ? left : 30 )); s=$(timeout "$t" du -x -s -B1 -- "$2" 2>/dev/null | cut -f1); if [ -n "$s" ]; then printf '\''%s\t%s\n'\'' "$s" "$2"; else printf '\''?\t%s\n'\'' "$2"; fi' clusterwand-du "$end"`
 
 // DuTop sizes the top-level entries of the given folders ("bytes<TAB>path").
 func DuTop(dirs ...string) (Command, error) {
 	if len(dirs) == 0 || len(dirs) > 4 {
 		return Command{}, fmt.Errorf("1-4 folders")
 	}
-	argv := []string{"bash", "-c", duTemplate, "bifrost"}
+	argv := []string{"bash", "-c", duTemplate, "clusterwand"}
 	for _, d := range dirs {
 		if err := validDir(d); err != nil {
 			return Command{}, err
@@ -178,7 +178,7 @@ const envTemplate = `[ -n "${SLURM_JOB_ID:-}" ] && printf 'J\t%s\t%s\n' "$SLURM_
 // minutes (a powered-down node booting counts as allocated).
 func EnvJobArgs(partition string) []string {
 	return []string{"srun", "-p", partition, "-N", "1", "-n", "1", "-c", "1", "-t", "3",
-		"--immediate=120", "--quiet", "-J", "bifrost-env-check"}
+		"--immediate=120", "--quiet", "-J", "clusterwand-env-check"}
 }
 
 // EnvCheck loads modules and resolves commands inside a tiny Slurm job on
@@ -191,7 +191,7 @@ func EnvCheck(partition string, modules, commands []string, withVersion map[stri
 	if len(modules) > 10 || len(commands) > 15 {
 		return Command{}, fmt.Errorf("at most 10 modules and 15 commands")
 	}
-	argv := append(EnvJobArgs(partition), "bash", "-lc", envTemplate, "bifrost", strconv.Itoa(len(modules)))
+	argv := append(EnvJobArgs(partition), "bash", "-lc", envTemplate, "clusterwand", strconv.Itoa(len(modules)))
 	for _, m := range modules {
 		if !reModule.MatchString(m) {
 			return Command{}, fmt.Errorf("module name %q has unexpected characters", m)
@@ -213,7 +213,7 @@ func EnvCheck(partition string, modules, commands []string, withVersion map[stri
 
 var reSignedURL = regexp.MustCompile(`^https://storage\.googleapis\.com/[A-Za-z0-9._~%/?&=+-]+$`)
 
-// ValidSignedURL checks a Cloud Storage signed URL made by bifrost.
+// ValidSignedURL checks a Cloud Storage signed URL made by clusterwand.
 func ValidSignedURL(u string) error {
 	if len(u) > 4000 || !reSignedURL.MatchString(u) || !strings.Contains(u, "X-Goog-Signature=") {
 		return fmt.Errorf("not a Cloud Storage signed URL")

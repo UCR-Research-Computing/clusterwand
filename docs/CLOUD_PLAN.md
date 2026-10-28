@@ -1,5 +1,8 @@
 # ursa-bifrost on Cloud Run: a real MCP server and a Gemini agent
 
+> Historical: an ursa-bifrost planning document (pre-fork), kept for design context. Names are
+> ursa-bifrost's (`bifrost`, `bifrost-mcp`).
+
 | | |
 |---|---|
 | Status | Plan for approval, 2026-10-01. Nothing deployed, no API enabled. |

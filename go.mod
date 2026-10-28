@@ -1,4 +1,4 @@
-module github.com/UCR-Research-Computing/ursa-bifrost
+module github.com/UCR-Research-Computing/clusterwand
 
 go 1.26.0
 

@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 )
 
 // ---- storage_usage ---------------------------------------------------------------
@@ -329,10 +329,10 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 		r.Warnings = append(r.Warnings, "Spot nodes can be taken back by Google at any time; do not use them for work you cannot lose.")
 	}
 	if float64(mins) > s.Cfg.Caps.MaxHours*60 {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("That is longer than the %.0f h bifrost cap for batch jobs; an idle interactive session still bills what it holds.", s.Cfg.Caps.MaxHours))
+		r.Warnings = append(r.Warnings, fmt.Sprintf("That is longer than the %.0f h clusterwand cap for batch jobs; an idle interactive session still bills what it holds.", s.Cfg.Caps.MaxHours))
 	}
 	r.Notes = append(r.Notes,
-		"bifrost does not open shells. Run these yourself: first connect to the login node, then start the session.",
+		"clusterwand does not open shells. Run these yourself: first connect to the login node, then start the session.",
 		"Nodes power up on demand, so the first session can take a few minutes to start.",
 		"The session is billed until it ends: exit as soon as you are done.",
 		"Do not run heavy work on the login node itself; that is what the interactive session is for.")

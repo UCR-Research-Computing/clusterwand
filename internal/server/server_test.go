@@ -25,16 +25,16 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/config"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/staging"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
 )
 
 // fakeGoogle is a fake Google OAuth server: it "signs in" whichever email the
 // test sets in next, issues RS256 ID tokens signed with a test key, and
 // supports refresh. It records every request so tests can prove that no
-// bifrost token ever reaches Google.
+// clusterwand token ever reaches Google.
 type fakeGoogle struct {
 	t       *testing.T
 	key     *rsa.PrivateKey
@@ -140,7 +140,7 @@ func (f *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// harness: a bifrost server with fixture backends per user (the fixture's
+// harness: a clusterwand server with fixture backends per user (the fixture's
 // cluster user is derived from the email, so we can see who a call ran as).
 type harness struct {
 	t      *testing.T
@@ -154,7 +154,7 @@ type harness struct {
 	stopAtCode bool   // signIn returns the auth code instead of exchanging it
 	clientID   string // signIn uses this client (a program) instead of registering one
 	jar        http.CookieJar
-	sawPage    bool // the last signIn showed bifrost's explanation page
+	sawPage    bool // the last signIn showed clusterwand's explanation page
 }
 
 func newHarness(t *testing.T, usersYAML string) *harness {
@@ -210,7 +210,7 @@ func (f *tokenCheckingFixture) Run(ctx context.Context, c backend.Command) ([]by
 }
 
 // signIn runs the whole OAuth flow as an MCP client would: register, authorize
-// with PKCE, Google sign-in, code exchange. Returns the bifrost token response.
+// with PKCE, Google sign-in, code exchange. Returns the clusterwand token response.
 func (h *harness) signIn(email, hd string) (map[string]any, error) {
 	h.g.mu.Lock()
 	h.g.next.email, h.g.next.hd = email, hd
@@ -237,7 +237,7 @@ func (h *harness) signIn(email, hd string) (map[string]any, error) {
 	q := url.Values{"response_type": {"code"}, "client_id": {c["client_id"].(string)}, "redirect_uri": {"http://127.0.0.1:33418/callback"},
 		"code_challenge": {s256(verifier)}, "code_challenge_method": {"S256"}, "state": {"st123"}, "resource": {base + "/mcp"}}
 	noFollow := &http.Client{Jar: h.jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	// bifrost: explanation page (first time in this browser) or straight to Google
+	// clusterwand: explanation page (first time in this browser) or straight to Google
 	resp, err = noFollow.Get(base + "/authorize?" + q.Encode())
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func (h *harness) signIn(email, hd string) (map[string]any, error) {
 		i += len(mark)
 		next = html.UnescapeString(string(page[i : i+strings.Index(string(page[i:]), `"`)]))
 	}
-	// follow Google <-> bifrost hops until the redirect back to the client
+	// follow Google <-> clusterwand hops until the redirect back to the client
 	var final *url.URL
 	for hop := 0; hop < 6 && final == nil; hop++ {
 		if next == "" {
@@ -422,17 +422,17 @@ func TestUsersAreSeparate(t *testing.T) {
 	if m, isErr := callJSON(t, ca, "job_results", map[string]any{"job_id": "236", "download": true}); !isErr || !strings.Contains(fmt.Sprint(m), "hosted server") {
 		t.Errorf("download on server: %v", m)
 	}
-	// no bifrost token ever reached Google
+	// no clusterwand token ever reached Google
 	for _, v := range h.g.seen {
 		if strings.HasPrefix(v, "bfx_") || strings.HasPrefix(v, "bfr_") {
-			t.Errorf("bifrost token sent to Google: %s", v[:8])
+			t.Errorf("clusterwand token sent to Google: %s", v[:8])
 		}
 	}
 }
 
 func TestSignInRefused(t *testing.T) {
 	h := newHarness(t, twoUsers)
-	if _, err := h.signIn("mallory@ucr.edu", "ucr.edu"); err == nil || !strings.Contains(err.Error(), "not on the ursa-bifrost user list") {
+	if _, err := h.signIn("mallory@ucr.edu", "ucr.edu"); err == nil || !strings.Contains(err.Error(), "not on the clusterwand user list") {
 		t.Errorf("unlisted user: %v", err)
 	}
 	if _, err := h.signIn("alice@gmail.com", ""); err == nil || !strings.Contains(err.Error(), "only verified ucr.edu") {
@@ -549,7 +549,7 @@ func TestSignoutAndGoogleRevocation(t *testing.T) {
 	a, _ := h.signIn("alice@ucr.edu", "ucr.edu")
 	ca, _ := h.mcp(a["access_token"].(string))
 	callJSON(t, ca, "jobs_list", nil)
-	// person revokes bifrost in their Google account: next token refresh fails, session ends
+	// person revokes clusterwand in their Google account: next token refresh fails, session ends
 	h.g.mu.Lock()
 	h.g.revoked["alice@ucr.edu"] = true
 	h.g.mu.Unlock()
@@ -692,10 +692,10 @@ func TestTokensSurviveRestart(t *testing.T) {
 	}
 }
 
-// TestRepeatSignInIsOneClick: the first sign-in shows bifrost's page and
+// TestRepeatSignInIsOneClick: the first sign-in shows clusterwand's page and
 // Google's consent; later ones go straight to Google's account picker, with no
 // consent screen, and the person stays signed in. After sign-out (session and
-// refresh token gone) bifrost goes back to Google once with consent to get a
+// refresh token gone) clusterwand goes back to Google once with consent to get a
 // new refresh token, automatically.
 func TestRepeatSignInIsOneClick(t *testing.T) {
 	h := newHarness(t, twoUsers)
@@ -863,12 +863,12 @@ users:
   - email: bob@ucr.edu
     tiers: [R1]
 clients:
-  - id: bifrost-ultra
+  - id: clusterwand-ultra
     name: Ultra
     tiers: [R1, R2]
     calls_per_min: 5
     redirect_uris: ["http://127.0.0.1/callback"]
-  - id: bifrost-off
+  - id: clusterwand-off
     name: Retired
     tiers: [R1]
     redirect_uris: ["http://127.0.0.1/callback"]
@@ -894,7 +894,7 @@ func (h *harness) whoami(tok string) (int, map[string]any) {
 // chat client still has A1.
 func TestProgramTierCeiling(t *testing.T) {
 	h := newHarness(t, withPrograms)
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, err := h.signIn("alice@ucr.edu", "ucr.edu")
 	if err != nil {
 		t.Fatal(err)
@@ -926,7 +926,7 @@ func TestProgramTierCeiling(t *testing.T) {
 		t.Error("alice's own client lost A1")
 	}
 	if code, got := h.whoami(a["access_token"].(string)); code != 200 || fmt.Sprint(got["tiers"]) != "[R1 R2]" ||
-		got["program"] != "bifrost-ultra" || got["calls_per_min"] != float64(5) {
+		got["program"] != "clusterwand-ultra" || got["calls_per_min"] != float64(5) {
 		t.Errorf("whoami via Ultra: %d %v", code, got)
 	}
 	if _, got := h.whoami(own["access_token"].(string)); got["program"] != nil || fmt.Sprint(got["tiers"]) != "[R1 R2 A1]" {
@@ -938,7 +938,7 @@ func TestProgramTierCeiling(t *testing.T) {
 // budget; spending it does not touch the person's own clients.
 func TestProgramBudgetIsSeparate(t *testing.T) {
 	h := newHarness(t, withPrograms)
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, _ := h.signIn("alice@ucr.edu", "ucr.edu")
 	h.clientID = ""
 	own, _ := h.signIn("alice@ucr.edu", "ucr.edu")
@@ -956,7 +956,7 @@ func TestProgramBudgetIsSeparate(t *testing.T) {
 		t.Error("the person's own client was starved by the program")
 	}
 	raw, _ := os.ReadFile(h.s.cfg.AuditPath)
-	if !strings.Contains(string(raw), `"client":"program:bifrost-ultra/mcp:test"`) {
+	if !strings.Contains(string(raw), `"client":"program:clusterwand-ultra/mcp:test"`) {
 		t.Error("audit does not name the program")
 	}
 }
@@ -968,7 +968,7 @@ func TestProgramSharesOneBackend(t *testing.T) {
 	built := 0
 	orig := h.s.newBackend
 	h.s.newBackend = func(email string) backend.Backend { built++; return orig(email) }
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, _ := h.signIn("alice@ucr.edu", "ucr.edu")
 	h.clientID = ""
 	own, _ := h.signIn("alice@ucr.edu", "ucr.edu")
@@ -987,24 +987,24 @@ func TestProgramSharesOneBackend(t *testing.T) {
 func TestProgramClientCannotBeRegisteredOrSpoofed(t *testing.T) {
 	h := newHarness(t, withPrograms)
 	noFollow0 := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	q0 := url.Values{"response_type": {"code"}, "client_id": {"bifrost-off"}, "redirect_uri": {"http://127.0.0.1:33418/callback"},
+	q0 := url.Values{"response_type": {"code"}, "client_id": {"clusterwand-off"}, "redirect_uri": {"http://127.0.0.1:33418/callback"},
 		"code_challenge": {"x"}, "code_challenge_method": {"S256"}}
 	if r, _ := noFollow0.Get(h.ts.URL + "/authorize?" + q0.Encode()); r.StatusCode != 400 {
 		t.Errorf("disabled program reached Google: /authorize returned %d", r.StatusCode)
 	}
-	h.clientID = "bifrost-off"
+	h.clientID = "clusterwand-off"
 	if _, err := h.signIn("alice@ucr.edu", "ucr.edu"); err == nil {
 		t.Error("disabled program signed in")
 	}
 	// an unregistered redirect for a program is refused before Google
-	q := url.Values{"response_type": {"code"}, "client_id": {"bifrost-ultra"}, "redirect_uri": {"https://evil.example/cb"},
+	q := url.Values{"response_type": {"code"}, "client_id": {"clusterwand-ultra"}, "redirect_uri": {"https://evil.example/cb"},
 		"code_challenge": {"x"}, "code_challenge_method": {"S256"}}
 	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	if r, _ := noFollow.Get(h.ts.URL + "/authorize?" + q.Encode()); r.StatusCode != 400 {
 		t.Errorf("program with foreign redirect: %d", r.StatusCode)
 	}
 	// disabling a program cuts off its live tokens and its refresh
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, err := h.signIn("alice@ucr.edu", "ucr.edu")
 	if err != nil {
 		t.Fatal(err)
@@ -1019,7 +1019,7 @@ func TestProgramClientCannotBeRegisteredOrSpoofed(t *testing.T) {
 	if _, err := h.mcp(a["access_token"].(string)); err == nil {
 		t.Error("disabled program's token still reaches /mcp")
 	}
-	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {a["refresh_token"].(string)}, "client_id": {"bifrost-ultra"}}
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {a["refresh_token"].(string)}, "client_id": {"clusterwand-ultra"}}
 	if r, _ := http.PostForm(h.ts.URL+"/token", form); r.StatusCode == 200 {
 		t.Error("disabled program refreshed")
 	}
@@ -1031,8 +1031,8 @@ func TestUsersFileRejectsBadPrograms(t *testing.T) {
 		"bad tier":     strings.Replace(withPrograms, "tiers: [R1, R2]", "tiers: [R1, R9]", 1),
 		"budget":       strings.Replace(withPrograms, "calls_per_min: 5", "calls_per_min: 601", 1),
 		"redirect":     strings.Replace(withPrograms, `["http://127.0.0.1/callback"]`, `["http://evil.example/cb"]`, 1),
-		"bad id":       strings.Replace(withPrograms, "id: bifrost-ultra", "id: Bad_ID", 1),
-		"duplicate id": strings.Replace(withPrograms, "id: bifrost-off", "id: bifrost-ultra", 1),
+		"bad id":       strings.Replace(withPrograms, "id: clusterwand-ultra", "id: Bad_ID", 1),
+		"duplicate id": strings.Replace(withPrograms, "id: clusterwand-off", "id: clusterwand-ultra", 1),
 		"no redirect":  strings.Replace(withPrograms, "    calls_per_min: 5\n    redirect_uris: [\"http://127.0.0.1/callback\"]\n", "    calls_per_min: 5\n", 1),
 	} {
 		if bad == withPrograms {
@@ -1056,7 +1056,7 @@ users:
   - email: alice@ucr.edu
     tiers: [R1, R2, A1]
 clients:
-  - id: bifrost-deep-research
+  - id: clusterwand-deep-research
     name: deep-research
     tiers: [R1, A1]
     calls_per_min: 120
@@ -1071,7 +1071,7 @@ clients:
 // is not charged for the program's jobs.
 func TestProgramOwnCaps(t *testing.T) {
 	h := newHarness(t, withLabProgram)
-	h.clientID = "bifrost-deep-research"
+	h.clientID = "clusterwand-deep-research"
 	a, err := h.signIn("alice@ucr.edu", "ucr.edu")
 	if err != nil {
 		t.Fatal(err)
@@ -1107,9 +1107,9 @@ func TestProgramOwnCaps(t *testing.T) {
 		t.Errorf("own day cap: %v", d2["day_cap_usd"])
 	}
 	// separate ledgers: different state files
-	pa := programConfig(h.s.userConfig(h.s.users.Lookup("alice@ucr.edu")), h.s.users.Program("bifrost-deep-research"))
+	pa := programConfig(h.s.userConfig(h.s.users.Lookup("alice@ucr.edu")), h.s.users.Program("clusterwand-deep-research"))
 	po := h.s.userConfig(h.s.users.Lookup("alice@ucr.edu"))
-	if pa.StatePath == po.StatePath || !strings.HasSuffix(pa.StatePath, "-bifrost-deep-research.json") {
+	if pa.StatePath == po.StatePath || !strings.HasSuffix(pa.StatePath, "-clusterwand-deep-research.json") {
 		t.Errorf("ledger paths: program %s person %s", pa.StatePath, po.StatePath)
 	}
 	if pa.Caps.MaxSubmitsPerDay != 3 || pa.Caps.MaxCostPerJobUSD != 3 || pa.Caps.MaxCostPerDayUSD != 7 {
@@ -1119,7 +1119,7 @@ func TestProgramOwnCaps(t *testing.T) {
 		t.Errorf("whoami own_caps: %d %v", code, got)
 	}
 	// a program without own caps keeps the person's ledger (v0.9.0 behaviour)
-	plain := programConfig(po, &ProgramClient{ID: "bifrost-ultra", Tiers: []string{"R1"}})
+	plain := programConfig(po, &ProgramClient{ID: "clusterwand-ultra", Tiers: []string{"R1"}})
 	if plain.StatePath != po.StatePath || plain.Caps != po.Caps {
 		t.Error("a program without own caps changed the person's ledger or caps")
 	}
@@ -1212,7 +1212,7 @@ users:
 // shared connection slot would flip tiers or reset the budget on every call).
 func TestProgramAndPersonInterleaved(t *testing.T) {
 	h := newHarness(t, withPrograms)
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, _ := h.signIn("alice@ucr.edu", "ucr.edu")
 	h.clientID = ""
 	own, _ := h.signIn("alice@ucr.edu", "ucr.edu")
@@ -1238,7 +1238,7 @@ func TestProgramAndPersonInterleaved(t *testing.T) {
 // gets no tokens for the code it was issued.
 func TestProgramDisabledMidSignIn(t *testing.T) {
 	h := newHarness(t, withPrograms)
-	h.clientID, h.stopAtCode = "bifrost-ultra", true
+	h.clientID, h.stopAtCode = "clusterwand-ultra", true
 	got, err := h.signIn("alice@ucr.edu", "ucr.edu")
 	if err != nil {
 		t.Fatal(err)
@@ -1247,7 +1247,7 @@ func TestProgramDisabledMidSignIn(t *testing.T) {
 	_ = os.WriteFile(h.users, []byte(strings.Replace(withPrograms, "    calls_per_min: 5\n", "    calls_per_min: 5\n    disabled: true\n", 1)), 0o600)
 	future := time.Now().Add(2 * time.Second)
 	_ = os.Chtimes(h.users, future, future)
-	form := url.Values{"grant_type": {"authorization_code"}, "code": {got["code"].(string)}, "client_id": {"bifrost-ultra"},
+	form := url.Values{"grant_type": {"authorization_code"}, "code": {got["code"].(string)}, "client_id": {"clusterwand-ultra"},
 		"redirect_uri": {"http://127.0.0.1:33418/callback"}, "code_verifier": {got["verifier"].(string)}}
 	if r, _ := http.PostForm(h.ts.URL+"/token", form); r.StatusCode == 200 {
 		t.Error("disabled program exchanged its code for tokens")
@@ -1259,7 +1259,7 @@ func TestProgramDisabledMidSignIn(t *testing.T) {
 // accounting gate (scaling phase 2).
 func TestHostedServicesShareGateAndCapInFlight(t *testing.T) {
 	h := newHarness(t, withPrograms)
-	h.clientID = "bifrost-ultra"
+	h.clientID = "clusterwand-ultra"
 	a, _ := h.signIn("alice@ucr.edu", "ucr.edu")
 	h.clientID = ""
 	b, _ := h.signIn("bob@ucr.edu", "ucr.edu")

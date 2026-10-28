@@ -16,7 +16,7 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
-      - run: go build ./cmd/bifrost
+      - run: go build ./cmd/clusterwand
       - name: fixtures use only the fake user
         run: |
           # every *_ucr_edu name in testdata must be the fake user
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: agent
+        working-directory: sites/ursa-major/agent
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

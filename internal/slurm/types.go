@@ -1,7 +1,7 @@
 // Package slurm parses the JSON that Slurm 25.11 prints with --json
 // (data_parser v0.0.44): squeue, sacct, sinfo and scontrol show nodes.
 //
-// Only the fields ursa-bifrost uses are declared; unknown fields are ignored, so
+// Only the fields clusterwand uses are declared; unknown fields are ignored, so
 // newer Slurm versions keep parsing as long as these names stay.
 package slurm
 

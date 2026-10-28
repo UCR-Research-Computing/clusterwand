@@ -281,7 +281,7 @@ func sacctSummary(who []string, since, until string) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	argv := append([]string{"bash", "-c", sacctSummaryTemplate, "bifrost"}, r.argv[2:]...)
+	argv := append([]string{"bash", "-c", sacctSummaryTemplate, "clusterwand"}, r.argv[2:]...)
 	return Command{argv: argv, kind: KindAcct}, nil
 }
 
@@ -397,12 +397,12 @@ var (
 	// a Slurm partition list for sbatch -p: 1-4 valid names joined by commas, nothing else
 	rePartitionList = regexp.MustCompile(`^[a-z0-9_-]{1,32}(,[a-z0-9_-]{1,32}){0,3}$`)
 	reJobName       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
-	reJobsDir       = regexp.MustCompile(`^bifrost-jobs/\d{8}-\d{6}-[a-z0-9-]{1,40}$`)
-	reComment       = regexp.MustCompile(`^bifrost:[0-9a-f]{12}$`)
+	reJobsDir       = regexp.MustCompile(`^clusterwand-jobs/\d{8}-\d{6}-[a-z0-9-]{1,40}$`)
+	reComment       = regexp.MustCompile(`^clusterwand:[0-9a-f]{12}$`)
 	reRelPath       = regexp.MustCompile(`^[A-Za-z0-9._+][A-Za-z0-9._+/ -]{0,250}$`) // no leading "-" (option injection)
 )
 
-// SubmitOpts are the resources bifrost enforces on the sbatch command line.
+// SubmitOpts are the resources clusterwand enforces on the sbatch command line.
 // Command-line options override #SBATCH directives in the script, so these are
 // the limits that actually apply, whatever the script says.
 type SubmitOpts struct {
@@ -410,7 +410,7 @@ type SubmitOpts struct {
 	Nodes     int
 	TimeMin   int
 	JobName   string
-	Comment   string // bifrost:<plan hash prefix>
+	Comment   string // clusterwand:<plan hash prefix>
 }
 
 func (o SubmitOpts) validate() error {
@@ -427,7 +427,7 @@ func (o SubmitOpts) validate() error {
 		return fmt.Errorf("job name %q has unexpected characters", o.JobName)
 	}
 	if !reComment.MatchString(o.Comment) {
-		return fmt.Errorf("comment %q is not a bifrost plan tag", o.Comment)
+		return fmt.Errorf("comment %q is not a clusterwand plan tag", o.Comment)
 	}
 	return nil
 }
@@ -453,13 +453,13 @@ func SbatchTestOnly(o SubmitOpts, script []byte) (Command, error) {
 
 // submitTemplate is fixed text: the job folder and sbatch flags arrive as
 // positional parameters, never spliced into the shell code.
-const submitTemplate = `set -e; d="$HOME/$1"; shift; if [ -e "$d" ]; then echo "bifrost: $d already exists" >&2; exit 3; fi; mkdir -p "$d"; cat > "$d/job.sbatch"; cd "$d"; exec sbatch --parsable --chdir="$d" "$@" job.sbatch`
+const submitTemplate = `set -e; d="$HOME/$1"; shift; if [ -e "$d" ]; then echo "clusterwand: $d already exists" >&2; exit 3; fi; mkdir -p "$d"; cat > "$d/job.sbatch"; cd "$d"; exec sbatch --parsable --chdir="$d" "$@" job.sbatch`
 
-// SubmitBatch writes the script into a new ~/bifrost-jobs/<dir> folder and
+// SubmitBatch writes the script into a new ~/clusterwand-jobs/<dir> folder and
 // submits it with the enforced options. Returns the job id on stdout.
 func SubmitBatch(dir string, o SubmitOpts, script []byte) (Command, error) {
 	if !reJobsDir.MatchString(dir) {
-		return Command{}, fmt.Errorf("job folder %q is not a bifrost-jobs path", dir)
+		return Command{}, fmt.Errorf("job folder %q is not a clusterwand-jobs path", dir)
 	}
 	if err := o.validate(); err != nil {
 		return Command{}, err
@@ -467,7 +467,7 @@ func SubmitBatch(dir string, o SubmitOpts, script []byte) (Command, error) {
 	if len(script) == 0 {
 		return Command{}, fmt.Errorf("empty script")
 	}
-	argv := append([]string{"bash", "-c", submitTemplate, "bifrost", dir}, o.flags()...)
+	argv := append([]string{"bash", "-c", submitTemplate, "clusterwand", dir}, o.flags()...)
 	return Command{argv: argv, kind: KindNoCache, stdin: script, write: true}, nil
 }
 

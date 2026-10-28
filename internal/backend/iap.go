@@ -50,7 +50,7 @@ type IAP struct {
 	// list: a NEW key is rejected for ~5-30 s and sometimes over a minute
 	// (live 2026-10-01 and the 2026-10-03 outage), while an extended key keeps
 	// working with no gap (measured 2026-10-03). OS Login removes it at expiry
-	// even if bifrost never runs again.
+	// even if clusterwand never runs again.
 	KeyTTL time.Duration
 	// Keys stores the per-user key between connections and processes
 	// (laptop: FileKeyStore; server: encrypted store). Nil = in-memory only.
@@ -148,7 +148,7 @@ func (b *IAP) importKey(ctx context.Context, pub ssh.PublicKey) (user, line stri
 		ttl = 8 * time.Hour
 	}
 	expires = time.Now().Add(ttl)
-	line = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " ursa-bifrost"
+	line = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))) + " clusterwand"
 	// regions=<zone's region> makes the call return only after the key is
 	// written where the node reads it (gcloud does the same). Without it, the
 	// node did not see the key for 30 s+ in live tests.
@@ -304,7 +304,7 @@ func dialIAPRelay(ctx context.Context, rawURL, token string) (*iapConn, error) {
 	h := http.Header{}
 	h.Set("Authorization", "Bearer "+token)
 	h.Set("Origin", "bot:iap-tunneler")
-	h.Set("User-Agent", "ursa-bifrost")
+	h.Set("User-Agent", "clusterwand")
 	ws, resp, err := websocket.Dial(ctx, rawURL, &websocket.DialOptions{HTTPHeader: h, Subprotocols: []string{"relay.tunnel.cloudproxy.app"}})
 	if err != nil {
 		msg := err.Error()
@@ -521,7 +521,7 @@ func (b *IAP) connect(ctx context.Context) (*ssh.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	pemBlock, err := ssh.MarshalPrivateKey(priv, "ursa-bifrost")
+	pemBlock, err := ssh.MarshalPrivateKey(priv, "clusterwand")
 	if err != nil {
 		_ = b.deleteKeyLine(context.Background(), line)
 		return nil, err
@@ -641,7 +641,7 @@ func (b *IAP) Close() error {
 	return nil
 }
 
-// Revoke closes the connection and deletes the user's bifrost key from their
+// Revoke closes the connection and deletes the user's clusterwand key from their
 // OS Login profile and from the key store (sign-out, user removed).
 func (b *IAP) Revoke(ctx context.Context) error {
 	_ = b.Close()
@@ -674,7 +674,7 @@ func (b *IAP) drop(c *ssh.Client) {
 	b.mu.Unlock()
 }
 
-// MaxSessionsPerConn is how many commands bifrost runs at once over one SSH
+// MaxSessionsPerConn is how many commands clusterwand runs at once over one SSH
 // connection; the rest wait their turn. Below the server's MaxSessions (10).
 const MaxSessionsPerConn = 8
 
@@ -765,9 +765,9 @@ func (b *IAP) Run(ctx context.Context, c Command) ([]byte, error) {
 	return nil, fmt.Errorf("%w: %v", ErrUnreachable, lastErr)
 }
 
-// traceStep prints a timing line to stderr when BIFROST_TRACE is set.
+// traceStep prints a timing line to stderr when CLUSTERWAND_TRACE is set.
 func traceStep(what string, since time.Time) {
-	if os.Getenv("BIFROST_TRACE") != "" {
+	if os.Getenv("CLUSTERWAND_TRACE") != "" {
 		fmt.Fprintf(os.Stderr, "trace: %-16s %v\n", what, time.Since(since).Round(time.Millisecond))
 	}
 }

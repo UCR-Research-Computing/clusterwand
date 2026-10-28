@@ -9,8 +9,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/core"
 )
 
 func tw(w io.Writer) *tabwriter.Writer { return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0) }
@@ -178,7 +178,7 @@ func printExplain(w io.Writer, e *core.Explanation) {
 	if e.LogError != "" {
 		fmt.Fprintf(w, "\nlog: %s\n", e.LogError)
 	} else if e.LogPath != "" {
-		fmt.Fprintf(w, "\nlog: %s (bifrost job log %s)\n", e.LogPath, e.Job.JobID)
+		fmt.Fprintf(w, "\nlog: %s (clusterwand job log %s)\n", e.LogPath, e.Job.JobID)
 	}
 }
 

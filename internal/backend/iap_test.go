@@ -315,7 +315,7 @@ func TestIAPRunsAsTheUser(t *testing.T) {
 		t.Errorf("exit error: %v", err)
 	}
 	// stdin reaches the remote command
-	s, err := SbatchTestOnly(SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 10, Comment: "bifrost:0123456789ab"}, []byte("#!/bin/bash\necho hi\n"))
+	s, err := SbatchTestOnly(SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 10, Comment: "clusterwand:0123456789ab"}, []byte("#!/bin/bash\necho hi\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +493,7 @@ func TestIAPIdleCloseReconnectsWithSameKey(t *testing.T) {
 
 func TestKeyIDIsHashOfImportedLine(t *testing.T) {
 	// regression for the live finding: the id is sha256(line), not sha256(blob)
-	line := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample ursa-bifrost"
+	line := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample clusterwand"
 	if got := keyID(line); len(got) != 64 || got == keyID("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample") {
 		t.Errorf("keyID must cover the comment: %s", got)
 	}
@@ -544,7 +544,7 @@ func TestIAPNeverRetriesAWriteWithUnknownOutcome(t *testing.T) {
 }
 
 func TestIAPRefusesUnknownKeyIDScheme(t *testing.T) {
-	// if OS Login stops naming keys sha256(line), bifrost could no longer delete
+	// if OS Login stops naming keys sha256(line), clusterwand could no longer delete
 	// them; it must refuse and not leave a key it cannot clean up
 	f := newFakeGoogle(t)
 	f.renameKeys = true

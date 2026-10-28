@@ -1,5 +1,8 @@
 # ursa-bifrost: scaling plan
 
+> Historical: an ursa-bifrost planning document (pre-fork), kept for design context. Names are
+> ursa-bifrost's (`bifrost`, `bifrost-mcp`).
+
 | | |
 |---|---|
 | Status | Draft 1, 2026-10-02. Phase 1 live (v0.9.1); phase 2 caps and min 1 live (v0.9.2). |

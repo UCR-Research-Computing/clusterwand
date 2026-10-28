@@ -15,8 +15,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 )
 
 // pageChars caps the text of one page (a read chunk, a log window, a search).
@@ -187,7 +187,7 @@ func checkUserPath(p string, roots []string) error {
 		if strings.HasPrefix(p, r+"/") {
 			for _, part := range strings.Split(strings.TrimPrefix(p, r+"/"), "/") {
 				if hiddenOrSensitive(part) {
-					return fmt.Errorf("%w: %q is hidden or looks like a credential; bifrost does not read those", policy.ErrDenied, part)
+					return fmt.Errorf("%w: %q is hidden or looks like a credential; clusterwand does not read those", policy.ErrDenied, part)
 				}
 			}
 			return nil
@@ -328,7 +328,7 @@ func (s *Service) FilesList(ctx context.Context, in FilesListInput) (*DirListing
 		l.Entries = []DirEntry{}
 	}
 	if l.Hidden > 0 {
-		l.Notes = append(l.Notes, fmt.Sprintf("%d hidden or credential-like entries are not shown (bifrost never reads those).", l.Hidden))
+		l.Notes = append(l.Notes, fmt.Sprintf("%d hidden or credential-like entries are not shown (clusterwand never reads those).", l.Hidden))
 	}
 	markUntrusted(ctx) // names are written by people and programs
 	return l, nil

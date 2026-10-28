@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/policy"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/rules"
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/slurm"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/rules"
+	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // ---- waste report ------------------------------------------------------------------
@@ -510,7 +510,7 @@ func (s *Service) TicketDraft(ctx context.Context, in TicketDraftInput) (*Ticket
 		t.Summary = fmt.Sprintf("Job %s: %s.", j.JobID, strings.ToLower(errs[0].Title[:1])+errs[0].Title[1:])
 	}
 	t.Reply = replyText(t, errs, ex)
-	t.InternalNote = fmt.Sprintf("bifrost ticket_draft, %d finding(s), confidence %s. Commands: see source in the envelope.", len(ex.Findings), t.Confidence)
+	t.InternalNote = fmt.Sprintf("clusterwand ticket_draft, %d finding(s), confidence %s. Commands: see source in the envelope.", len(ex.Findings), t.Confidence)
 	if ex.LogError != "" {
 		t.InternalNote += " Log not readable: " + ex.LogError
 		if t.Confidence == "high" {

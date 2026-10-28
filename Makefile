@@ -15,7 +15,7 @@ test:
 	go test -race -count=1 ./...
 
 build:
-	go build -o /dev/null ./cmd/bifrost
+	go build -o /dev/null ./cmd/clusterwand
 
 install:
 	scripts/install.sh

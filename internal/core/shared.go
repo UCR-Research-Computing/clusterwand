@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/UCR-Research-Computing/ursa-bifrost/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 )
 
 // Shared partitions (v0.8.0).
@@ -16,7 +16,7 @@ import (
 // will let several jobs share a node (Slurm OverSubscribe no longer EXCLUSIVE).
 // On a shared partition a job gets only the cores and memory it asks for, and the
 // cgroup holds it there; a job that asks for nothing gets one core. So on a shared
-// partition bifrost:
+// partition clusterwand:
 //   - refuses a script that does not ask for cores (script_check error, which
 //     blocks job_submit): --cpus-per-task, --ntasks(-per-node), or --exclusive;
 //   - prices the share of the node the job holds, max(cores share, memory share),

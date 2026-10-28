@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal script client for a hosted bifrost (or any MCP server with OAuth 2.1 +
+"""Minimal script client for a hosted clusterwand (or any MCP server with OAuth 2.1 +
 dynamic client registration, like the Nexus MCP server).
 
   python3 mcp_client.py login                 # once: browser sign-in, tokens saved (0600)
@@ -8,7 +8,7 @@ dynamic client registration, like the Nexus MCP server).
   python3 mcp_client.py call job_explain '{"job_id": "236"}'
 
 Environment:
-  MCP_URL     server base URL (default: the Ursa Major bifrost)
+  MCP_URL     server base URL (default: http://localhost:8080, a local `clusterwand serve`)
   MCP_TOKENS  token file (default: ~/.config/mcp-client/<host>.json)
 
 Needs only the Python standard library. It speaks JSON-RPC over Streamable HTTP
@@ -32,7 +32,7 @@ import urllib.request
 import webbrowser
 
 BASE = os.environ.get(
-    "MCP_URL", "https://bifrost-mcp-125853442225.us-central1.run.app"
+    "MCP_URL", "http://localhost:8080"
 ).rstrip("/")
 HOST = urllib.parse.urlparse(BASE).hostname or "server"
 TOKENS = os.path.expanduser(
