@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 )
@@ -28,9 +27,6 @@ func NewSSH(cfg config.SSH) *SSH { return &SSH{cfg: cfg} }
 
 // Name is the backend label used in `source`.
 func (s *SSH) Name() string {
-	if s.cfg.GCloud != nil {
-		return "ssh-iap:" + s.cfg.GCloud.Instance
-	}
 	return "ssh:" + s.cfg.Host
 }
 
@@ -40,36 +36,10 @@ func (s *SSH) base(ctx context.Context) ([]string, string, error) {
 	if s.argv != nil {
 		return s.argv, s.dest, nil
 	}
-	var argv []string
-	var dest string
-	if g := s.cfg.GCloud; g != nil {
-		// gcloud prints the exact ssh command it would run (key, IAP proxy, known hosts).
-		cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		defer cancel()
-		out, err := exec.CommandContext(cctx, "gcloud", "compute", "ssh", g.Instance,
-			"--zone="+g.Zone, "--project="+g.Project, "--tunnel-through-iap", "--dry-run").Output()
-		if err != nil {
-			var ee *exec.ExitError
-			msg := err.Error()
-			if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-				msg = lastLine(string(ee.Stderr))
-			}
-			return nil, "", fmt.Errorf("%w: gcloud: %s (try `gcloud auth login`)", ErrUnreachable, msg)
-		}
-		parts, err := splitShell(strings.TrimSpace(string(out)))
-		if err != nil || len(parts) < 2 {
-			return nil, "", fmt.Errorf("%w: cannot parse gcloud ssh command", ErrUnreachable)
-		}
-		for _, p := range parts[:len(parts)-1] {
-			if p != "-t" {
-				argv = append(argv, p)
-			}
-		}
-		dest = parts[len(parts)-1]
-	} else {
-		argv = []string{"ssh"}
-		dest = s.cfg.Host
+	if s.cfg.Host == "" {
+		return nil, "", fmt.Errorf("%w: ssh.host is not set", ErrUnreachable)
 	}
+	argv, dest := []string{"ssh"}, s.cfg.Host
 	dir := os.Getenv("XDG_RUNTIME_DIR")
 	if dir == "" {
 		dir = os.TempDir()
@@ -151,42 +121,4 @@ func lastLine(s string) string {
 		return "no error text"
 	}
 	return l
-}
-
-// splitShell splits a command line printed by gcloud (double/single quotes, no
-// variables). It is used only on gcloud's own output.
-func splitShell(s string) ([]string, error) {
-	var out []string
-	var cur strings.Builder
-	inArg := false
-	var quote rune
-	for _, r := range s {
-		switch {
-		case quote != 0:
-			if r == quote {
-				quote = 0
-			} else {
-				cur.WriteRune(r)
-			}
-		case r == '"' || r == '\'':
-			quote = r
-			inArg = true
-		case r == ' ' || r == '\t' || r == '\n':
-			if inArg {
-				out = append(out, cur.String())
-				cur.Reset()
-				inArg = false
-			}
-		default:
-			cur.WriteRune(r)
-			inArg = true
-		}
-	}
-	if quote != 0 {
-		return nil, errors.New("unterminated quote")
-	}
-	if inArg {
-		out = append(out, cur.String())
-	}
-	return out, nil
 }

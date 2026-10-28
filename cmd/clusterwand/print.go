@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -385,7 +384,7 @@ func printResults(w io.Writer, r *core.Results) {
 	}
 }
 
-// doctor checks config, gcloud/ssh, the cluster user and the catalog.
+// doctor checks config, ssh, the cluster user and the catalog.
 func doctor(ctx context.Context, svc *core.Service, w io.Writer, g globals) int {
 	type check struct {
 		Name   string `json:"name"`
@@ -396,10 +395,6 @@ func doctor(ctx context.Context, svc *core.Service, w io.Writer, g globals) int 
 	add := func(name string, ok bool, detail string) { cs = append(cs, check{name, ok, detail}) }
 	add("config", true, svc.Cfg.Path)
 	add("backend", true, svc.Backend.Name())
-	if svc.Cfg.SSH.GCloud != nil {
-		_, err := exec.LookPath("gcloud")
-		add("gcloud on PATH", err == nil, errText(err))
-	}
 	t0 := time.Now()
 	u, err := svc.User(ctx)
 	add("cluster login", err == nil, firstOf(err, fmt.Sprintf("user %s (%s)", u, time.Since(t0).Round(time.Millisecond))))

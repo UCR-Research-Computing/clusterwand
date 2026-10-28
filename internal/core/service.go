@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
-	"github.com/UCR-Research-Computing/clusterwand/internal/staging"
 )
 
 // Service is the core: one per process.
@@ -32,8 +30,6 @@ type Service struct {
 	// Remote is set by the HTTP server: results cannot be downloaded to the
 	// server's own disk.
 	Remote bool
-	// Staging is the private Cloud Storage staging area (nil = file tools off).
-	Staging staging.Client
 	// Shared is the cache for output that is the same for every user, shared
 	// by every person's Service on the hosted server (nil = per-service only).
 	Shared *SharedCache
@@ -80,23 +76,6 @@ func New(cfg config.Config) (*Service, error) {
 	switch cfg.Backend {
 	case "fixture":
 		be = &backend.Fixture{Dir: cfg.FixturesDir, User: firstNonEmpty(cfg.ClusterUser, "alice_ucr_edu"), Logs: map[string]string{}}
-	case "iap":
-		ic := cfg.IAP
-		tc := ic.TokenCommand
-		if len(tc) == 0 {
-			tc = []string{"gcloud", "auth", "print-access-token"}
-		}
-		email := ic.Email
-		if email == "" {
-			out, err := exec.Command("gcloud", "config", "get-value", "account").Output()
-			if err != nil {
-				return nil, fmt.Errorf("iap backend: set iap.email (gcloud not available: %v)", err)
-			}
-			email = strings.TrimSpace(string(out))
-		}
-		be = &backend.IAP{Project: ic.Project, Zone: ic.Zone, Instance: ic.Instance, Email: email,
-			Token: backend.CommandToken(tc), HostKeys: ic.HostKeys, Idle: time.Duration(ic.IdleMinutes) * time.Minute,
-			Keys: backend.FileKeyStore{Dir: config.Expand("~/.local/share/clusterwand/iap-keys")}}
 	default:
 		be = backend.NewSSH(cfg.SSH)
 	}
@@ -108,33 +87,10 @@ func New(cfg config.Config) (*Service, error) {
 		Cfg: cfg, Backend: be, Audit: audit,
 		Limiter: policy.NewLimiter(cfg.Limits.CallsPerMin),
 		Now:     time.Now, cache: map[string]cacheEntry{},
-		Staging: NewStaging(cfg.Staging, false),
 	}, nil
 }
 
-// NewStaging builds the staging client from config (nil when no bucket).
-// onCloud selects the metadata-server token (Cloud Run) unless the config says.
-func NewStaging(sc config.Staging, onCloud bool) staging.Client {
-	if sc.Bucket == "" {
-		return nil
-	}
-	tok := sc.Token
-	if tok == "" {
-		tok = "gcloud"
-		if onCloud {
-			tok = "metadata"
-		}
-	}
-	g := &staging.GCS{BucketName: sc.Bucket, SignAs: sc.SignAs}
-	if tok == "metadata" {
-		g.Token = staging.MetadataToken()
-	} else {
-		g.Token = staging.CommandToken([]string{"gcloud", "auth", "print-access-token"})
-	}
-	return g
-}
-
-// Close releases backend resources (the IAP backend deletes its OS Login key).
+// Close releases backend resources.
 func (s *Service) Close() error {
 	if c, ok := s.Backend.(interface{ Close() error }); ok {
 		return c.Close()

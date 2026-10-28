@@ -69,7 +69,7 @@ func TestAllowListIsClosed(t *testing.T) {
 	// Every constructor's program must be one of these. If you add a command,
 	// add it here deliberately.
 	allowed := map[string]bool{"id": true, "squeue": true, "sacct": true, "sinfo": true, "scontrol": true, "cat": true, "tail": true, "bash": true,
-		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "curl": true, "srun": true}
+		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "srun": true}
 	u, _ := SqueueUser("alice")
 	j, _ := SqueueJob("1")
 	st, _ := SqueueStart("1")
@@ -116,17 +116,6 @@ func TestAllowListIsClosed(t *testing.T) {
 		if c.argv[0] == "sbatch" && c.argv[1] != "--test-only" {
 			t.Errorf("bare sbatch must be --test-only: %v", c.argv)
 		}
-	}
-}
-
-func TestSplitShell(t *testing.T) {
-	in := `/usr/bin/ssh -t -i /k -o "ProxyCommand /py gcloud.py start-iap-tunnel x %p --listen-on-stdin" -o ProxyUseFdpass=no u@compute.1`
-	got, err := splitShell(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 9 || got[5] != "ProxyCommand /py gcloud.py start-iap-tunnel x %p --listen-on-stdin" || got[8] != "u@compute.1" {
-		t.Fatalf("%q", got)
 	}
 }
 
@@ -238,13 +227,6 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 		func() (Command, error) { return EnvCheck("check", nil, []string{"-c"}, nil) },
 		func() (Command, error) { return EnvCheck("check --uid=0", nil, nil, nil) },
 		func() (Command, error) { return EnvCheck("", nil, nil, nil) },
-		func() (Command, error) {
-			return PutFile("/home/alice/x", "https://evil.example.com/?X-Goog-Signature=00")
-		},
-		func() (Command, error) { return PutFile("/home/alice/x", "https://storage.googleapis.com/b/o") },
-		func() (Command, error) {
-			return PutFile("/home/alice/x", "https://storage.googleapis.com/b/o?X-Goog-Signature=00 -o /tmp/x")
-		},
 	} {
 		if _, err := bad(); err == nil {
 			t.Errorf("case %d: accepted a bad argument", i)
@@ -253,10 +235,6 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 	if _, err := GrepFile("/home/alice/x", "a\nb", 10, 2); err == nil {
 		// "\\n" in a Go string is a backslash-n regex, which is fine
 		_ = err
-	}
-	pf, err := PutFile("/home/alice/x", "https://storage.googleapis.com/b/o?X-Goog-Signature=00ff")
-	if err != nil || pf.argv[0] != "curl" || pf.Write() {
-		t.Errorf("put: %v %v", pf.argv, err)
 	}
 }
 

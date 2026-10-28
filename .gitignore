@@ -7,11 +7,6 @@
 local/
 .vscode/
 .idea/
-sites/ursa-major/deploy/env
-sites/ursa-major/agent/.venv/
-sites/ursa-major/agent/**/__pycache__/
-sites/ursa-major/agent/.pytest_cache/
-sites/ursa-major/agent/.ruff_cache/
 __pycache__/
 *.pyc
 .worktrees/

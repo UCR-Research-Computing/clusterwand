@@ -21,19 +21,16 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/core"
 	"github.com/UCR-Research-Computing/clusterwand/internal/mcpserver"
-	"github.com/UCR-Research-Computing/clusterwand/internal/server"
 	"github.com/UCR-Research-Computing/clusterwand/internal/version"
 )
 
@@ -58,18 +55,14 @@ Usage:
   clusterwand ticket <id> [--text FILE|-]      draft a ticket reply (R2; never sent)
   clusterwand results <id> [--prefix DIR] [--pattern GLOB] [--offset N] [--limit N]
                   [--read FILE [--read-offset N] [--bytes N] [--grep RE]] [--download] [--files a,b]
-  clusterwand link <id> FILE [FILE...]         signed download links for job outputs (staging)
-  clusterwand upload FILE                      stage an input file; then submit --input <id> (A1)
-  clusterwand uploads                          your staged uploads (A1)
   clusterwand storage                          space used in your home and scratch folders
   clusterwand ls [PATH] [--pattern GLOB] [--offset N]   a folder under your home or scratch
   clusterwand cat PATH [--offset N] [--bytes N] [--grep RE]   a text file under home or scratch
   clusterwand env [--module M]... [CMD...]     what modules load and which tools you get
   clusterwand interactive [--partition P] [--nodes N] [--cpus N] [--gpus N] [--time T] [--mem M]
-  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--input ID,...] [--yes]   (A1)
+  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]   (A1)
   clusterwand cancel|hold|release <id> [--yes]                      (A1)
   clusterwand confirm <token>                  confirm a prepared action (A1)
-  clusterwand serve                       hosted MCP server (HTTP + Google sign-in; see docs/CLOUD_PLAN.md)
   clusterwand config init|show|path
   clusterwand doctor                           check config, SSH and the catalog
   clusterwand version
@@ -140,14 +133,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stdout, stderr, g, err)
 	}
-	if cmd == "serve" {
-		return serveCmd(cfg, stderr)
-	}
 	svc, err := core.New(cfg)
 	if err != nil {
 		return fail(stdout, stderr, g, err)
 	}
-	defer func() { _ = svc.Close() }() // iap backend: delete the OS Login key
+	defer func() { _ = svc.Close() }()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -350,49 +340,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		r, err := core.Call(ctx, svc, "cli", "job_results", "R1", map[string]any{"job_id": id, "read": *read, "download": in.Download}, false,
 			func(ctx context.Context) (*core.Results, error) { return svc.JobResults(ctx, in) })
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printResults(w, r.Data) })
-	case "link":
-		if len(rest) < 2 {
-			return fail(stdout, stderr, g, errors.New("usage: clusterwand link <job id> FILE [FILE...]"))
-		}
-		id, files := rest[0], rest[1:]
-		r, err := core.Call(ctx, svc, "cli", "results_link", "R1", map[string]any{"job_id": id, "files": files}, false,
-			func(ctx context.Context) (*core.ResultLinks, error) { return svc.ResultsLink(ctx, id, files) })
-		return out(stdout, stderr, g, r, err, func(w io.Writer) {
-			for _, l := range r.Data.Links {
-				fmt.Fprintf(w, "%s (%d bytes, until %s)\n  %s\n", l.File, l.Bytes, l.ExpiresAt, l.URL)
-			}
-			for _, n := range r.Data.Notes {
-				fmt.Fprintln(w, "note:", n)
-			}
-		})
-	case "upload":
-		if len(rest) != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: clusterwand upload FILE"))
-		}
-		fi, err := os.Stat(rest[0])
-		if err != nil {
-			return fail(stdout, stderr, g, err)
-		}
-		name := filepathBase(rest[0])
-		r, err := core.Call(ctx, svc, "cli", "upload_prepare", "A1", map[string]any{"filename": name, "bytes": fi.Size()}, false,
-			func(ctx context.Context) (*core.UploadTicket, error) { return svc.UploadPrepare(ctx, name, fi.Size()) })
-		if err != nil {
-			return fail(stdout, stderr, g, err)
-		}
-		if err := putFile(ctx, rest[0], r.Data); err != nil {
-			return fail(stdout, stderr, g, fmt.Errorf("upload failed: %w", err))
-		}
-		return out(stdout, stderr, g, r, nil, func(w io.Writer) {
-			fmt.Fprintf(w, "Staged %s as %s. Submit with: clusterwand submit job.sh --input %s\n", name, r.Data.UploadID, r.Data.UploadID)
-		})
-	case "uploads":
-		r, err := core.Call(ctx, svc, "cli", "uploads_list", "A1", nil, false, svc.UploadsList)
-		return out(stdout, stderr, g, r, err, func(w io.Writer) {
-			for _, u := range r.Data.Uploads {
-				fmt.Fprintf(w, "%s  %-30s %12d  deleted after %s\n", u.UploadID, u.Filename, u.Bytes, u.ExpiresAt)
-			}
-			fmt.Fprintf(w, "%d upload(s), %d of %d bytes\n", len(r.Data.Uploads), r.Data.TotalBytes, r.Data.LimitBytes)
-		})
 	case "storage":
 		r, err := core.Call(ctx, svc, "cli", "storage_usage", "R1", nil, false, svc.StorageUsage)
 		return out(stdout, stderr, g, r, err, func(w io.Writer) {
@@ -521,7 +468,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		})
 	case "submit":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--input ID,...] [--yes]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]"))
 		}
 		src := rest[0]
 		fs := newFlags("submit")
@@ -529,7 +476,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		nodes := fs.Int("nodes", 0, "nodes")
 		tl := fs.String("time", "", "time limit")
 		name := fs.String("name", "", "job name")
-		inputs := fs.String("input", "", "comma-separated staged upload ids (clusterwand upload)")
 		yes := fs.Bool("yes", false, "confirm without asking (still within caps)")
 		if err := fs.Parse(rest[1:]); err != nil {
 			return fail(stdout, stderr, g, err)
@@ -546,9 +492,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		r, err := core.Call(ctx, svc, "cli", "job_submit", "A1", map[string]any{"file": src, "partition": *part, "nodes": *nodes, "time": *tl}, false,
 			func(ctx context.Context) (*core.SubmitPlan, error) {
 				in := core.SubmitInput{Script: string(b), Partition: *part, Nodes: *nodes, Time: *tl, JobName: *name}
-				if *inputs != "" {
-					in.Inputs = strings.Split(*inputs, ",")
-				}
 				return svc.PrepareSubmit(ctx, in)
 			})
 		if err != nil {
@@ -773,41 +716,6 @@ func fail(stdout, stderr io.Writer, g globals, err error) int {
 	return 1
 }
 
-// serveCmd runs the hosted MCP server. Secrets come from environment variables
-// named in the config (Cloud Run: Secret Manager), never from the file.
-func serveCmd(cfg config.Config, stderr io.Writer) int {
-	sc := cfg.Server
-	secret := os.Getenv(firstNonEmptyStr(sc.SecretKeyEnv, "CLUSTERWAND_SECRET_KEY"))
-	gsecret := os.Getenv(firstNonEmptyStr(sc.GoogleClientSecretEnv, "CLUSTERWAND_GOOGLE_CLIENT_SECRET"))
-	if secret == "" || gsecret == "" || sc.GoogleClientID == "" {
-		fmt.Fprintln(stderr, "clusterwand serve: needs server.google_client_id plus the secret key and Google client secret in the environment")
-		return 2
-	}
-	if cfg.Backend != "iap" {
-		fmt.Fprintln(stderr, "clusterwand serve: backend must be iap (each user reaches the cluster with their own Google identity)")
-		return 2
-	}
-	srv, err := server.New(cfg, server.NewGoogle(sc.GoogleClientID, gsecret), secret)
-	if err != nil {
-		fmt.Fprintln(stderr, "clusterwand serve:", err)
-		return 1
-	}
-	addr := sc.Listen
-	if p := os.Getenv("PORT"); p != "" {
-		addr = ":" + p
-	}
-	if addr == "" {
-		addr = ":8080"
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if err := srv.Run(ctx, addr); err != nil {
-		fmt.Fprintln(stderr, "clusterwand serve:", err)
-		return 1
-	}
-	return 0
-}
-
 func firstNonEmptyStr(v ...string) string {
 	for _, s := range v {
 		if s != "" {
@@ -827,31 +735,4 @@ func filepathBase(p string) string {
 		return p[i+1:]
 	}
 	return p
-}
-
-// putFile sends a local file to a signed upload link (clusterwand upload).
-func putFile(ctx context.Context, p string, t *core.UploadTicket) error {
-	f, err := os.Open(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	req, err := http.NewRequestWithContext(ctx, t.Method, t.URL, f)
-	if err != nil {
-		return err
-	}
-	req.ContentLength = t.MaxBytes
-	for k, v := range t.Headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := (&http.Client{Timeout: 2 * time.Hour}).Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2000))
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
-	}
-	return nil
 }

@@ -298,9 +298,7 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 	a := strings.Join(args, " ")
 	r.Command = "srun " + a + " --pty bash -l"
 	r.Alternative = "salloc " + a + "   # then: srun --pty bash -l   (exit twice to release the node)"
-	ic := s.Cfg.IAP
-	inst, zone, proj := firstNonEmpty(ic.Instance, "ucrslurmcl-slurm-login-001"), firstNonEmpty(ic.Zone, "us-central1-a"), firstNonEmpty(ic.Project, "ucr-ursa-major-hpc-cluster")
-	r.Connect = fmt.Sprintf("gcloud compute ssh %s --zone %s --project %s --tunnel-through-iap", inst, zone, proj)
+	r.Connect = "ssh " + firstNonEmpty(s.Cfg.SSH.Host, "<your cluster login host>")
 	// shared partitions bill the share of the node the session holds (v0.8.0)
 	shared := s.partitionShared(ctx, part)
 	share := 1.0

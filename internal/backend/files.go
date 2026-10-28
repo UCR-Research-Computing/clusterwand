@@ -211,28 +211,6 @@ func EnvCheck(partition string, modules, commands []string, withVersion map[stri
 	return Command{argv: argv, kind: KindNoCache, timeout: 200 * time.Second}, nil
 }
 
-var reSignedURL = regexp.MustCompile(`^https://storage\.googleapis\.com/[A-Za-z0-9._~%/?&=+-]+$`)
-
-// ValidSignedURL checks a Cloud Storage signed URL made by clusterwand.
-func ValidSignedURL(u string) error {
-	if len(u) > 4000 || !reSignedURL.MatchString(u) || !strings.Contains(u, "X-Goog-Signature=") {
-		return fmt.Errorf("not a Cloud Storage signed URL")
-	}
-	return nil
-}
-
-// PutFile uploads one file to a signed Cloud Storage URL (results_link). It
-// changes nothing on the cluster; re-running it is harmless.
-func PutFile(p, signedURL string) (Command, error) {
-	if err := validDir(p); err != nil {
-		return Command{}, err
-	}
-	if err := ValidSignedURL(signedURL); err != nil {
-		return Command{}, err
-	}
-	return Command{argv: []string{"curl", "-sS", "-f", "--retry", "2", "--max-time", "840", "-T", p, signedURL}, kind: KindNoCache, big: true}, nil
-}
-
 // DuTemplateForTest and EnvTemplateForTest let fixtures answer these templates.
 func DuTemplateForTest() string { return duTemplate }
 

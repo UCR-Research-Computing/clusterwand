@@ -46,8 +46,6 @@ type Fixture struct {
 	// the path realpath resolves it to.
 	Paths map[string]string
 	Links map[string]string
-	// Puts records signed-URL uploads (results_link): URL -> local file path.
-	Puts map[string]string
 	// Out answers a bash template exactly (env_check, du ...): template -> output.
 	Out map[string]string
 	// IgnoreJobFilter answers `squeue/sacct -j` with every recorded job, as a
@@ -242,12 +240,6 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 			return []byte(out), nil
 		}
 		return nil, fmt.Errorf("fixture backend: no df recording")
-	case "curl":
-		if f.Puts == nil {
-			f.Puts = map[string]string{}
-		}
-		f.Puts[a[len(a)-1]] = a[len(a)-2]
-		return nil, nil
 	case "head":
 		p := a[len(a)-1]
 		for dir, files := range f.Files {

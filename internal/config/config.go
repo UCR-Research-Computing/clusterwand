@@ -13,48 +13,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// GCloud describes a login node reached through `gcloud compute ssh --tunnel-through-iap`.
-type GCloud struct {
-	Instance string `yaml:"instance"`
-	Zone     string `yaml:"zone"`
-	Project  string `yaml:"project"`
-}
-
-// IAPConfig is the login node reached with per-user IAP + OS Login (no gcloud
-// binary). Token comes from TokenCommand (laptop: `gcloud auth
-// print-access-token`) or, in the HTTP server, from the signed-in user.
-type IAPConfig struct {
-	Project      string   `yaml:"project"`
-	Zone         string   `yaml:"zone"`
-	Instance     string   `yaml:"instance"`
-	Email        string   `yaml:"email,omitempty"`         // laptop mode: whose token; default `gcloud config get-value account`
-	TokenCommand []string `yaml:"token_command,omitempty"` // laptop mode
-	HostKeys     []string `yaml:"host_keys,omitempty"`     // pinned login-node host keys (authorized_keys format)
-	IdleMinutes  int      `yaml:"idle_minutes,omitempty"`
-}
-
-// ServerConfig is used only by `clusterwand serve` (the hosted MCP server).
-type ServerConfig struct {
-	Listen    string `yaml:"listen"`     // default :8080 (PORT env wins on Cloud Run)
-	BaseURL   string `yaml:"base_url"`   // public https URL, e.g. https://clusterwand-xyz.run.app
-	DataDir   string `yaml:"data_dir"`   // sessions, keys, per-user ledgers
-	UsersFile string `yaml:"users_file"` // who may sign in and with which tiers
-	// Google OAuth client (Web application) used for sign-in.
-	GoogleClientID        string `yaml:"google_client_id"`
-	GoogleClientSecretEnv string `yaml:"google_client_secret_env"` // env var holding the secret
-	// SecretKeyEnv names an env var with 32 random bytes (base64) used to
-	// encrypt stored Google refresh tokens and SSH keys at rest.
-	SecretKeyEnv string `yaml:"secret_key_env"`
-	// AccessTokenMinutes is the lifetime of clusterwand access tokens (default 60).
-	AccessTokenMinutes int `yaml:"access_token_minutes"`
-}
-
-// SSH says how to reach the login node. Exactly one of GCloud or Host is used.
+// SSH says how to reach the login node: any host or alias your own OpenSSH
+// config understands (keys, agent, ProxyJump and MFA stay in ~/.ssh/config).
 type SSH struct {
-	GCloud         *GCloud `yaml:"gcloud,omitempty"`
-	Host           string  `yaml:"host,omitempty"` // plain ssh host or alias from ~/.ssh/config
-	ControlPersist int     `yaml:"control_persist"`
-	ConnectTimeout int     `yaml:"connect_timeout"`
+	Host           string `yaml:"host"`
+	ControlPersist int    `yaml:"control_persist"`
+	ConnectTimeout int    `yaml:"connect_timeout"`
 }
 
 // TTL holds cache lifetimes per data kind.
@@ -85,29 +49,13 @@ type Caps struct {
 	ConfirmTTLMinutes int     `yaml:"confirm_ttl_minutes"`
 }
 
-// Staging is the private Cloud Storage staging area for file uploads and
-// download links (SPEC section 18). Empty Bucket = the file tools are off.
-type Staging struct {
-	Bucket         string `yaml:"bucket"`
-	SignAs         string `yaml:"sign_as,omitempty"` // service account that signs links (Cloud Run: discovered)
-	Token          string `yaml:"token,omitempty"`   // metadata | gcloud (default: metadata on Cloud Run, else gcloud)
-	UploadMinutes  int    `yaml:"upload_minutes"`
-	LinkMinutes    int    `yaml:"link_minutes"`
-	MaxUploadBytes int64  `yaml:"max_upload_bytes"`
-	MaxUserBytes   int64  `yaml:"max_user_bytes"`
-	MaxLinkBytes   int64  `yaml:"max_link_bytes"`
-	RetainDays     int    `yaml:"retain_days"` // must match the bucket's delete rule
-}
-
 // Config is the whole file.
 type Config struct {
 	Cluster       string             `yaml:"cluster"`
 	ClusterUser   string             `yaml:"cluster_user,omitempty"` // default: `id -un` on the login node
-	Backend       string             `yaml:"backend"`                // ssh | iap | fixture
+	Backend       string             `yaml:"backend"`                // ssh | fixture
 	FixturesDir   string             `yaml:"fixtures_dir,omitempty"`
 	SSH           SSH                `yaml:"ssh"`
-	IAP           IAPConfig          `yaml:"iap"`
-	Server        ServerConfig       `yaml:"server"`
 	CatalogPath   string             `yaml:"catalog_path"`
 	LogRoots      []string           `yaml:"log_roots"` // allowed log prefixes; {user} expands
 	Costs         map[string]float64 `yaml:"usd_per_node_hour,omitempty"`
@@ -122,8 +70,7 @@ type Config struct {
 	ResultsDir    string             `yaml:"results_dir"` // local folder for downloaded results
 	JobsRoot      string             `yaml:"jobs_root"`   // remote folder under $HOME for submitted jobs
 	// EnvPartition is where env_check runs its one-core job (never the login node).
-	EnvPartition string  `yaml:"env_check_partition"`
-	Staging      Staging `yaml:"staging"`
+	EnvPartition string `yaml:"env_check_partition"`
 	// Allocation configures optional Ursa Major allocations (local single-user CLI path).
 	Allocation *AllocationConfig `yaml:"allocation,omitempty"`
 	Path       string            `yaml:"-"`
@@ -194,8 +141,6 @@ func Default() Config {
 		EnvPartition: "check",
 		Caps: Caps{MaxNodes: 4, MaxHours: 24, MaxCostPerJobUSD: 25, MaxCostPerDayUSD: 50,
 			MaxSubmitsPerDay: 20, ConfirmTTLMinutes: 10},
-		Staging: Staging{UploadMinutes: 15, LinkMinutes: 60, MaxUploadBytes: 5 << 30,
-			MaxUserBytes: 20 << 30, MaxLinkBytes: 2 << 30, RetainDays: 7},
 	}
 }
 
@@ -236,22 +181,15 @@ func Load(path string) (Config, error) {
 func (c Config) Validate() error {
 	switch c.Backend {
 	case "ssh":
-		if c.SSH.GCloud == nil && c.SSH.Host == "" {
-			return errors.New("config: ssh backend needs ssh.gcloud or ssh.host")
-		}
-		if g := c.SSH.GCloud; g != nil && (g.Instance == "" || g.Zone == "" || g.Project == "") {
-			return errors.New("config: ssh.gcloud needs instance, zone and project")
+		if c.SSH.Host == "" {
+			return errors.New("config: ssh backend needs ssh.host (a host or alias from your ~/.ssh/config)")
 		}
 	case "fixture":
 		if c.FixturesDir == "" {
 			return errors.New("config: fixture backend needs fixtures_dir")
 		}
-	case "iap":
-		if c.IAP.Project == "" || c.IAP.Zone == "" || c.IAP.Instance == "" {
-			return errors.New("config: iap backend needs iap.project, iap.zone and iap.instance")
-		}
 	default:
-		return fmt.Errorf("config: unknown backend %q (ssh, iap or fixture)", c.Backend)
+		return fmt.Errorf("config: unknown backend %q (ssh or fixture)", c.Backend)
 	}
 	if !rePartitionName.MatchString(c.EnvPartition) {
 		return errors.New("config: env_check_partition must be a partition name (default check)")
@@ -297,12 +235,9 @@ cluster: ursa-major
 backend: ssh              # ssh | fixture
 
 ssh:
-  # Login node through Google IAP (same route deep-research uses)
-  gcloud:
-    instance: ucrslurmcl-slurm-login-001
-    zone: us-central1-a
-    project: ucr-ursa-major-hpc-cluster
-  # host: ursa-login      # or a plain ssh host / ~/.ssh/config alias instead of gcloud
+  # Any host or alias your own OpenSSH config reaches without a prompt
+  # (keys, agent, ProxyJump, MFA: see docs/SSH.md)
+  host: mycluster
   control_persist: 900
   connect_timeout: 30
 
