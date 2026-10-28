@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -388,4 +389,53 @@ func (u unreachable) Run(ctx context.Context, c backend.Command) ([]byte, error)
 		return nil, fmt.Errorf("%w: connection reset", backend.ErrUnreachable)
 	}
 	return u.Fixture.Run(ctx, c)
+}
+
+// Guards whose tests lived in the removed hosted server and staging packages
+// (F0, SSH only); the code they protect is still in core.
+
+func TestRemoteServiceRefusesDownload(t *testing.T) {
+	s, fx := a1Service(t)
+	resultsFixture(s, fx, "/home/alice_ucr_edu/deep-research-lab/run_76")
+	s.Remote = true
+	if _, err := s.JobResults(context.Background(), ResultsInput{JobID: "236", Download: true}); err == nil || !strings.Contains(err.Error(), "not available") {
+		t.Fatalf("a remote service must refuse downloads: %v", err)
+	}
+}
+
+func TestTraceCommandsRedacted(t *testing.T) {
+	s, fx := a1Service(t)
+	resultsFixture(s, fx, "/home/alice_ucr_edu/deep-research-lab/run_76")
+	res, err := Call(context.Background(), s, "test", "job_results", "R1", nil, false, func(ctx context.Context) (*Results, error) {
+		return s.JobResults(ctx, ResultsInput{JobID: "236", Read: "log.txt", Grep: "API_TOKEN=supersecret123"})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Source.Commands) == 0 {
+		t.Fatal("no commands in source")
+	}
+	for _, c := range res.Source.Commands {
+		if strings.Contains(c, "supersecret123") {
+			t.Fatalf("secret leaked into source commands: %s", c)
+		}
+	}
+	b, _ := os.ReadFile(s.Audit.Path())
+	if strings.Contains(string(b), "supersecret123") {
+		t.Fatal("secret leaked into the audit log")
+	}
+}
+
+func TestAuditNamesProgram(t *testing.T) {
+	s, _ := newTestService(t)
+	s.Program = "dash"
+	if _, err := Call(context.Background(), s, "mcp:test", "jobs_list", "R1", nil, false, func(ctx context.Context) ([]JobSummary, error) {
+		return s.JobsList(ctx, JobsListInput{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(s.Audit.Path())
+	if !strings.Contains(string(b), `"client":"program:dash/mcp:test"`) {
+		t.Fatalf("audit should name the program client: %s", b)
+	}
 }

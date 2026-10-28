@@ -22,6 +22,7 @@ func TestRedact(t *testing.T) {
 		"-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----": "MIIE",
 		`{"private_key": "-----BEGIN"}`:                                        "-----BEGIN",
 		"OPENAI_API_KEY: sk-abc":                                               "sk-abc",
+		"https://storage.googleapis.com/b/o?X-Goog-Signature=0123456789abcdef0123": "0123456789abcdef0123",
 	}
 	for in, secret := range cases {
 		out := Redact(in)
