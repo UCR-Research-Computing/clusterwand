@@ -1,0 +1,43 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "cores": {
+        "cores_asked": true,
+        "cores_per_node": 16,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 126976,
+        "node_share": 1
+      },
+      "est_max_cost_usd": 0.97,
+      "issues": [
+        {
+          "message": "multi-node MPI on standard (e2 nodes, standard networking, any zone): fine for loosely coupled work; tightly coupled codes (GROMACS, LAMMPS, CFD) scale better on computehigh (Tier_1 networking, fast cores)",
+          "severity": "info"
+        },
+        {
+          "message": "-march=native compiles for AVX-512 or for the build host (-march=native), but standard nodes (e2) have AVX2 only: the program can die with 'Illegal instruction'. Use -march=x86-64-v3 (what the site software uses), or run on computehigh (Intel, AVX-512)",
+          "severity": "warning"
+        }
+      ],
+      "modules": [],
+      "note": "Static check only; nothing was submitted. standard gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": true,
+      "partition": "standard",
+      "request": {
+        "nodes": "2",
+        "ntasks-per-node": "16",
+        "partition": "standard",
+        "time": "20:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}
