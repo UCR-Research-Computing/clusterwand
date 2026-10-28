@@ -6,6 +6,13 @@
 > they are `clusterwand` (alias `wand`), `~/.config/clusterwand`, `~/clusterwand-jobs`,
 > `~/.local/share/clusterwand` and `~/clusterwand-results`. ClusterWand changes are logged
 > in the change log at the end, starting with v0.1.0.
+>
+> **SSH only.** ClusterWand runs on the user's own machine (CLI and stdio MCP) and reaches
+> clusters only through the user's own OpenSSH config, keys and agent (docs/SSH.md). The
+> sections below that describe the hosted server (`bifrost serve`, Google sign-in, OAuth,
+> `users.yaml`, program clients), the IAP/OS Login backend, Cloud Storage staging
+> (`results_link`, `upload_prepare`, `uploads_list`, `job_submit` inputs), ursa-agent and
+> the Cloud Run deploy are ursa-bifrost history: none of that code is in ClusterWand.
 
 | | |
 |---|---|
@@ -1238,7 +1245,7 @@ why"; "uses the whole node / the share it holds"; the worst case is quoted only 
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-10-28 | ClusterWand v0.1.0 | Forked from ursa-bifrost v0.10.1 (77cb4cd) as ClusterWand. Module `github.com/UCR-Research-Computing/clusterwand`, binary `clusterwand` (+ `wand` alias in installers and release archives), config `~/.config/clusterwand`, state `~/.local/share/clusterwand`, results `~/clusterwand-results`, env prefix `CLUSTERWAND_`, MCP server name `clusterwand`, remote job folder `clusterwand-jobs`, sbatch comment `clusterwand:<hash>`, env_check job `clusterwand-env-check`, OAuth scope `clusterwand`. Ursa-only deploy and ursa-agent moved to `sites/ursa-major/`; `scripts/onboard_lab.py` and `agent/deploy.sh` removed. No tool behaviour change |
+| 2026-10-28 | ClusterWand v0.1.0 | Forked from ursa-bifrost v0.10.1 (77cb4cd) as ClusterWand. Module `github.com/UCR-Research-Computing/clusterwand`, binary `clusterwand` (+ `wand` alias in installers and release archives), config `~/.config/clusterwand`, state `~/.local/share/clusterwand`, results `~/clusterwand-results`, env prefix `CLUSTERWAND_`, MCP server name `clusterwand`, remote job folder `clusterwand-jobs`, sbatch comment `clusterwand:<hash>`, env_check job `clusterwand-env-check`. SSH only: removed the hosted server (`serve`, internal/server, OAuth, Google sign-in), the IAP/OS Login backend and `ssh.gcloud` mode, Cloud Storage staging (`results_link`, `upload_prepare`, `uploads_list`, `job_submit` inputs), ursa-agent, the Cloud Run deploy, prototypes, the Dockerfile and `scripts/onboard_lab.py`; 71 mutation guards for removed code dropped (148 remain). Local tools otherwise unchanged. New docs/SSH.md |
 | 2026-10-27 | v0.10.1 | `my_allocation` notes always `[]`, never null (first live call). Live: hosted RC pilot lab `rc` $500/month, forsythc $300/month; `show_cost_tiers: [R2]` |
 | 2026-10-27 | agent 0.5.0 | Section 24: allocation framing (dashboard part). Researcher views lead with work; dollars moved to staff (R2); My allocation panel fed by my_allocation; daily safety limit and allocation impact on plan cards |
 | 2026-10-27 | v0.10.0 | Section 24: allocation framing (phases F4 and F5). `show_cost_tiers` hides dollar fields for callers without staff tiers (default unset keeps today's output for all callers); new R1 tool `my_allocation` reports list-price spend against person and lab allocations (warn-only); `job_submit` plan adds allocation impact and warn-only warning. 4 new mutation guards |

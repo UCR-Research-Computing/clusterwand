@@ -5,12 +5,13 @@
 **The Bifrost between AI and your HPC cluster.**
 
 Safe, typed MCP tools that let AI assistants do real work on a Slurm cluster over SSH.
-One Go binary, both an MCP server and a CLI. No language model inside, and no shell, ever.
+One Go binary on your own machine, both a stdio MCP server and a CLI. No language model
+inside, no hosted server, and no shell, ever.
 
 [![CI](https://github.com/UCR-Research-Computing/clusterwand/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/UCR-Research-Computing/clusterwand/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/UCR-Research-Computing/clusterwand?sort=semver)](https://github.com/UCR-Research-Computing/clusterwand/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/UCR-Research-Computing/clusterwand)](go.mod)
-[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20Streamable%20HTTP-blue)](https://modelcontextprotocol.io)
+[![MCP](https://img.shields.io/badge/MCP-stdio-blue)](https://modelcontextprotocol.io)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-informational)](https://ucr-research-computing.github.io/clusterwand/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -54,8 +55,11 @@ checkable part. Nothing a model sends is ever run as a shell command.
 
 ClusterWand is a fork of [ursa-bifrost](https://github.com/UCR-Research-Computing/ursa-bifrost)
 v0.10.1, UCR Research Computing's MCP server for its Ursa Major cluster, on its way to
-working with any Slurm cluster. v0.1.0 is the renamed fork with identical behaviour; site
-profiles and text-format Slurm parsing come next (see [Roadmap](#roadmap)).
+working with any Slurm cluster. v0.1.0 is the renamed fork, cut down to SSH only: it runs
+on your machine and reaches the cluster through your own OpenSSH login. The fork's hosted
+mode (HTTP server, Google sign-in, IAP backend, Cloud Storage staging) is gone; the local
+tools behave as before. Site profiles and text-format Slurm parsing come next (see
+[Roadmap](#roadmap)).
 
 ## 60-second demo
 
@@ -110,13 +114,14 @@ hold `clusterwand`, the `wand` symlink, the license and the client guide. Window
 ClusterWand reaches the login node the way you already do: OpenSSH, your own account. If
 `ssh mycluster` works without a prompt (a key or an agent; ClusterWand runs ssh with
 `BatchMode=yes`), ClusterWand works too. It keeps one multiplexed connection open and
-reuses it: about 0.3 s per command once warm.
+reuses it: about 0.3 s per command once warm. Keys, agents, jump hosts, ControlMaster and
+MFA: [docs/SSH.md](docs/SSH.md).
 
 ```bash
 clusterwand config init          # writes ~/.config/clusterwand/config.yaml
 ```
 
-Edit the file: remove the `ssh.gcloud` block and set your host alias.
+Edit the file and set your host alias.
 
 ```yaml
 backend: ssh
@@ -157,9 +162,8 @@ the tools appear as `cluster_status`, `job_explain`, and so on.
 | **Claude Desktop, any JSON config** | `{"mcpServers": {"cluster": {"command": "clusterwand", "args": ["mcp"]}}}` |
 
 Read tools carry `readOnlyHint: true` and acting tools need a second confirm call, so it is
-reasonable to let your client run reads without asking. Remote use (a hosted server with
-sign-in, `clusterwand serve`), per-client details and troubleshooting:
-[docs/CLIENTS.md](docs/CLIENTS.md).
+reasonable to let your client run reads without asking. Per-client details and
+troubleshooting: [docs/CLIENTS.md](docs/CLIENTS.md).
 
 Things to ask:
 
@@ -175,11 +179,11 @@ Things to ask:
 
 | Tier | Who | Tools |
 |---|---|---|
-| **R1** read | everyone | `cluster_status`, `partitions`, `jobs_list`, `job_show`, `job_explain`, `job_log_tail`, `job_results`, `modules_search`, `module_show`, `recipes`, `script_check`, `my_usage`, `waste_report`, `storage_usage`, `files_list`, `files_read`, `env_check`, `interactive_help`, `my_allocation`, `results_link`* |
-| **A1** act | opt-in per person | `job_submit` + `job_submit_confirm`, `job_cancel` / `job_hold` / `job_release` + `_confirm`, `upload_prepare`*, `uploads_list`* |
+| **R1** read | everyone | `cluster_status`, `partitions`, `jobs_list`, `job_show`, `job_explain`, `job_log_tail`, `job_results`, `modules_search`, `module_show`, `recipes`, `script_check`, `my_usage`, `waste_report`, `storage_usage`, `files_list`, `files_read`, `env_check`, `interactive_help`, `my_allocation` |
+| **A1** act | opt-in per person | `job_submit` + `job_submit_confirm`, `job_cancel` / `job_hold` / `job_release` + `_confirm` |
 | **R2** staff | cluster administrators | `jobs_list_all`, `job_show_any`, `job_explain_any`, `usage_report`, `waste_report_all`, `health`, `ticket_draft` |
 
-\* with a staging bucket configured. Also resources `hpc://catalog`, `hpc://policies` and
+Also resources `hpc://catalog`, `hpc://policies` and
 prompts `diagnose_job`, `write_batch_script`, `monthly_usage_summary`, `triage_ticket`.
 A caller only sees, and can only call, the tiers granted to them. Every result is an
 envelope with the data, the evidence, and the scheduler commands that produced it, so an
@@ -193,11 +197,12 @@ clusterwand modules <query> | module <name> | recipes | check <script.sh>
 clusterwand usage | waste | storage | ls | cat | env | interactive | allocation
 clusterwand submit <script.sh> | cancel|hold|release <id> | confirm <token>   (tier A1)
 clusterwand health | ticket <id>                                              (tier R2)
-clusterwand mcp | serve | config init|show|path | doctor | version
+clusterwand mcp | config init|show|path | doctor | version
 ```
 
 Submitted jobs run in their own `~/clusterwand-jobs/<stamp>-<name>` folder on the cluster,
-so a job's results are exactly that folder.
+so a job's results are exactly that folder; `clusterwand results <id> --download` copies
+it to your machine over the same SSH connection.
 
 ## Safety model
 
@@ -208,7 +213,7 @@ occasionally be manipulated by text it reads.
   `internal/backend/command.go` and `files.go`, each validating its arguments; shell
   templates are fixed text and caller values arrive only as positional parameters.
   `TestAllowListIsClosed` pins the allow-list, and `scripts/mutation_check.sh` disables
-  each of 219 guards in turn and requires a test to fail.
+  each of 148 guards in turn and requires a test to fail.
 - **Read-only by default; acting takes two steps.** State changes exist only in tier A1. A
   prepare call stores the exact action under a random single-use token (10-minute expiry,
   bound to the plan hash); the confirm call accepts nothing but the token. Caps on nodes,
@@ -222,8 +227,8 @@ occasionally be manipulated by text it reads.
   from every output and from the audit log.
 - **Everything is audited.** Every call, CLI or MCP, appends a JSON line (mode 600) under
   `~/.local/share/clusterwand/`.
-- **Gentle on the login node.** Short-TTL caches, per-user rate limits, at most 8 SSH
-  sessions per connection, no background polling, and no compute on the login node.
+- **Gentle on the login node.** Short-TTL caches, per-user rate limits, one shared SSH
+  connection, no background polling, and no compute on the login node.
 - **Other users' jobs** are denied without tier R2.
 
 Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
@@ -232,7 +237,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 
 ```text
  Claude / Copilot / Gemini / Hermes / Codex / OpenCode / your scripts
-        |  MCP over stdio (local)   or   Streamable HTTP + OAuth 2.1 (hosted)
+        |  MCP over stdio, on your machine
         v
  +--------------------------- clusterwand ----------------------------+
  | mcpserver    tools, resources, prompts                             |
@@ -249,13 +254,12 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 | Path | What |
 |---|---|
 | `cmd/clusterwand/` | CLI entry and text renderers |
-| `internal/backend/` | the command allow-list; SSH, IAP and fixture backends |
+| `internal/backend/` | the command allow-list; SSH and fixture backends |
 | `internal/core/` | typed operations, caching, the result envelope, `Call` |
 | `internal/rules/` | deterministic diagnosis rules for `job_explain` |
 | `internal/policy/` | redaction, untrusted wrapping, tiers, rate limit, audit |
 | `internal/mcpserver/` | MCP tools, resources, prompts |
-| `internal/server/` | the hosted server (`clusterwand serve`, Google sign-in) |
-| `sites/ursa-major/` | Ursa Major only: Cloud Run deploy notes and the ursa-agent dashboard |
+| `sites/ursa-major/` | Ursa Major's site notes (its site profile lands in F1) |
 
 ## Roadmap
 
@@ -266,7 +270,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 | F2 | Slurm adapter: text-format parsers for older Slurm, JSON behind a flag; lab-locked partitions | planned, v0.3.0 |
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey | planned, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |
-| Later | Hosted credential modes (registered keys, OIDC), multi-cluster, SFTP staging | not started |
+| Later | Multi-cluster configs | not started |
 
 ## Development
 

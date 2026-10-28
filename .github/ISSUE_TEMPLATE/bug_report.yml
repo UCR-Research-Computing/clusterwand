@@ -6,14 +6,14 @@ body:
     id: version
     attributes:
       label: ClusterWand version
-      description: Output of `clusterwand version`, or the hosted server's /health
+      description: Output of `clusterwand version`
     validations:
       required: true
   - type: dropdown
     id: mode
     attributes:
       label: How you ran it
-      options: [CLI, MCP stdio (local), Hosted server (clusterwand serve), Other]
+      options: [CLI, MCP stdio, Other]
     validations:
       required: true
   - type: input

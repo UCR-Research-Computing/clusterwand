@@ -8,33 +8,42 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 ## v0.1.0 - 2026-10-28
 
 ClusterWand: the Bifrost between AI and your HPC cluster. First release, forked from
-ursa-bifrost v0.10.1 (77cb4cd) with full history. Tool behaviour is identical to
-ursa-bifrost v0.10.1; what changed is names, layout and docs.
+ursa-bifrost v0.10.1 (77cb4cd) with full history, then cut down to SSH only. The local
+tools (CLI and stdio MCP) behave as in ursa-bifrost v0.10.1; what changed is names,
+layout, docs, and the removal of everything hosted.
 
+- **SSH only.** ClusterWand runs on your own machine and reaches clusters through your own
+  OpenSSH config, keys and agent. Removed, with their tests and mutation guards: the hosted
+  server (`serve`, `internal/server`: Streamable HTTP, OAuth 2.1, Google sign-in,
+  `users.yaml`, program clients), the IAP/OS Login backend (`backend: iap`) and the
+  `ssh.gcloud` connect mode, Cloud Storage staging (`internal/staging`; the tools
+  `results_link`, `upload_prepare`, `uploads_list` and `job_submit` inputs), the ursa-agent
+  dashboard, the Cloud Run deploy, `prototypes/`, the Dockerfile and
+  `scripts/onboard_lab.py`. `interactive_help` now gives `ssh <ssh.host>` as the way in.
+  Job results still come to your machine with `clusterwand results <id> --download` over
+  the same SSH connection.
 - **Renamed.** Go module `github.com/UCR-Research-Computing/clusterwand`; binary
   `clusterwand`, with a `wand` alias installed by `scripts/get.sh`, `scripts/install.sh`
   and shipped in release archives (`clusterwand_<version>_<os>_<arch>.tar.gz`).
 - **New default paths (upgrade note for ursa-bifrost users).** Config
   `~/.config/clusterwand/config.yaml`, audit and A1 state under `~/.local/share/clusterwand/`,
-  downloads in `~/clusterwand-results`, IAP keys in `~/.local/share/clusterwand/iap-keys`.
-  Nothing is migrated: copy your old config if you want it. Environment variables use the
-  `CLUSTERWAND_` prefix (`CLUSTERWAND_TRACE`, `CLUSTERWAND_SECRET_KEY`,
-  `CLUSTERWAND_GOOGLE_CLIENT_SECRET`, installer `CLUSTERWAND_VERSION`/`CLUSTERWAND_DIR`).
+  downloads in `~/clusterwand-results`. Nothing is migrated: copy your old config if you
+  want it, and drop any `ssh.gcloud` block (set `ssh.host` to an alias instead). Installer
+  variables are `CLUSTERWAND_VERSION` and `CLUSTERWAND_DIR`.
 - **On the cluster.** Submitted jobs run in `~/clusterwand-jobs/<stamp>-<name>` (config
   `jobs_root: clusterwand-jobs`), carry the sbatch comment `clusterwand:<plan hash>`, and the
   env_check job is named `clusterwand-env-check`. The MCP server name is `clusterwand`, the
-  OAuth scope `clusterwand`, the SSH control socket `cw-%C`.
-- **Layout.** Ursa Major-only parts moved to `sites/ursa-major/`: the Cloud Run deploy
-  (`deploy/`, `DEPLOY.md`, kept as a historical example) and the ursa-agent dashboard
-  (`agent/`, still tested in CI). Removed: `scripts/onboard_lab.py` and `agent/deploy.sh`,
-  which act on the live ursa-bifrost service. `examples/mcp_client.py` defaults to
-  `http://localhost:8080` instead of the live Ursa server.
+  SSH control socket `cw-%C`.
 - **Docs.** New README (60-second fixture demo, laptop + any cluster over SSH, client
-  setup for Claude Code, Hermes, Gemini CLI, GitHub Copilot, Codex, OpenCode), GitHub Pages
-  site published from `docs/` by a new `pages` workflow, Copilot section in
-  docs/CLIENTS.md, `sites/ursa-major/README.md`, SPEC fork note.
+  setup for Claude Code, Hermes, Gemini CLI, GitHub Copilot, Codex, OpenCode), new
+  docs/SSH.md (keys, agent, ProxyJump, ControlMaster, MFA once per ControlPersist window),
+  docs/CLIENTS.md rewritten for stdio, GitHub Pages site published from `docs/` by a new
+  `pages` workflow, `sites/ursa-major/README.md`, SPEC fork and SSH-only notes.
+  `examples/mcp_client.py` is now a stdio client.
 - **Repo hygiene.** Dependabot for Go modules and GitHub Actions; issue forms ask for the
-  Slurm version; CONTRIBUTING adds "nothing site-specific in the core".
+  Slurm version; CONTRIBUTING adds "nothing site-specific in the core". The CI `agent`
+  check (required by the ruleset) now checks the Python helper scripts.
+- **Mutation check:** 148 guards (219 minus 71 for removed code), all killed.
 
 ## ursa-bifrost history
 

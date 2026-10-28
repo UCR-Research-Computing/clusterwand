@@ -19,29 +19,25 @@ two working days and to ship a fix for confirmed issues within a week.
   (`internal/backend/command.go`, `files.go`): shell injection, argument smuggling.
 - Reading another user's jobs, logs or files without tier R2, or reading hidden or
   credential files.
-- Acting (submit, cancel, hold, release, upload) without the two-step confirm, or beyond
-  the caps.
-- Bypassing sign-in, the Workspace domain restriction, `users.yaml`, token rotation or expiry on
-  the hosted server.
+- Acting (submit, cancel, hold, release) without the two-step confirm, or beyond the caps.
+- Calling a tool from a tier the local config does not grant.
 - Secrets leaking through tool output or the audit log.
 - Prompt injection that makes the server, not the model, do something it should not.
 
 ## Design notes for reviewers
 
 - No tool runs arbitrary shell; `TestAllowListIsClosed` pins the command list.
-- `scripts/mutation_check.sh` disables each of 219 guards in turn and requires a test
+- `scripts/mutation_check.sh` disables each of 148 guards in turn and requires a test
   to fail.
 - Text from users and programs is returned in `untrusted` blocks.
-- The hosted server is deployed `--allow-unauthenticated` on Cloud Run: all access
-  control is in `internal/server` (OAuth 2.1, PKCE, Google ID token checks, users file
-  re-read per request). See [docs/CLOUD_PLAN.md](docs/CLOUD_PLAN.md).
-- Sessions, OS Login keys and the A1 state (plans, tokens, spend ledger) are sealed with
-  AES-256-GCM in the data bucket. The hosted server requires pinned login-node host keys.
-- Known and accepted: the hosted server asks each user for the Google `cloud-platform`
-  scope, because the IAP tunnel and OS Login key APIs need it; there is no narrower scope
-  for them. The refresh token is sealed and used only for those two calls, but it carries
-  whatever GCP rights the user has, so a compromise of the server's sealing key would expose
-  them. Project admins can keep their own accounts off the hosted server and use the CLI.
+- SSH only: ClusterWand runs on the user's own machine (CLI and stdio MCP) and reaches the
+  cluster through the user's own OpenSSH config, keys and agent (see
+  [docs/SSH.md](docs/SSH.md)). It has no network listener, no sign-in and no credentials of
+  its own, and it never sees the user's private keys. It can do on the cluster only what the
+  user's login can, and less: only the allow-listed commands.
+- Tiers come from the local config file. They protect against a misbehaving model, not
+  against the user who owns the config; the cluster's own permissions are the real boundary.
+- The audit log and A1 state (plans, tokens, spend ledger) are local files, mode 600.
 
 ## Supported versions
 
