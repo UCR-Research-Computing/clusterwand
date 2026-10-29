@@ -576,15 +576,16 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 		why = fmt.Sprintf(s.Site.Text("stockout", "the provider has no capacity for %s right now (%d node(s) failed to start); the job may wait a long time"), part, bad)
 	}
 	alt := ""
+	acc := s.partitionAccess(ctx)
 	for _, p := range s.Site.Partitions.FallbackIdle {
-		if p != part && upIdle[p] {
+		if p != part && upIdle[p] && acc.allowed(p) {
 			alt = p + " (a node is already up and idle)"
 			break
 		}
 	}
 	if alt == "" {
 		for _, p := range s.Site.Partitions.FallbackCold {
-			if p != part && !troubled[p] {
+			if p != part && !troubled[p] && acc.allowed(p) {
 				alt = p
 				break
 			}

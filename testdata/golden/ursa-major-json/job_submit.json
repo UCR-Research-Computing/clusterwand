@@ -30,6 +30,7 @@
       "cached": true,
       "commands": [
         "cat -- /apps/docs/catalog.json",
+        "scontrol -o show partition",
         "sinfo -h -o '%R|%h'",
         "cat -- /apps/docs/catalog.json",
         "sinfo -h -o '%R|%h'",

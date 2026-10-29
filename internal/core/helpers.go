@@ -273,6 +273,12 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 		}
 		return nil, fmt.Errorf("partition %q does not exist (choose one of %s)", part, strings.Join(names, ", "))
 	}
+	if why, fix := s.partitionAccess(ctx).check(part, ""); why != "" {
+		if fix == "" {
+			return nil, fmt.Errorf("%s; Slurm would refuse the session, pick another partition", why)
+		}
+		return nil, fmt.Errorf("%s; add --account=%s to the srun/salloc line", why, fix)
+	}
 	mins, ok := slurmMinutes(firstNonEmpty(in.Time, "60"))
 	if !ok || mins <= 0 {
 		return nil, errors.New("time must be a Slurm time limit like 60, 2:00:00 or 1-00:00")

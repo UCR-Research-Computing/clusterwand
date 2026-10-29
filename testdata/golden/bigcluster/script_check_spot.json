@@ -37,6 +37,7 @@
       "backend": "fixture:bigcluster",
       "commands": [
         "cat -- /opt/site/catalog.json",
+        "scontrol -o show partition",
         "sinfo -h -o '%R|%h'"
       ]
     }

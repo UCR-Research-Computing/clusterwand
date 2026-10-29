@@ -1,0 +1,4 @@
+1212N/AalicelabxdebugRUNNING11cpu=1,mem=500M,node=1,billing=110:001793244203179324420317932448030Nonec3/home/alice/home/alice/slurm-12.out/home/alice/slurm-12.outwrap
+1414N/AalicegeneralnormalPENDING11cpu=1,mem=500M,node=1,billing=11:001793244203179324450317932445630Resources/home/alice/home/alice/slurm-14.out/home/alice/slurm-14.outlongone
+15130alicegeneralnormalRUNNING11cpu=1,mem=500M,node=1,billing=15:001793244203179324420317932445030Nonec2/home/alice/home/alice/slurm-15.out/home/alice/slurm-15.outwrap
+13131alicegeneralnormalRUNNING11cpu=1,mem=500M,node=1,billing=15:001793244203179324420317932445030Nonec1/home/alice/home/alice/slurm-13.out/home/alice/slurm-13.outwrap

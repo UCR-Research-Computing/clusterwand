@@ -344,8 +344,9 @@ func TestInteractiveHelp(t *testing.T) {
 		t.Errorf("connect: %s", r.Connect)
 	}
 	for _, c := range fx.Calls[n:] {
-		// only the catalog and the partitions' sharing mode are read (v0.8.0)
-		if !strings.HasPrefix(c, "cat ") && c != "sinfo -h -o '%R|%h'" {
+		// only the catalog, the partitions' sharing mode (v0.8.0) and their
+		// account limits (F2) are read
+		if !strings.HasPrefix(c, "cat ") && c != "sinfo -h -o '%R|%h'" && c != "scontrol -o show partition" {
 			t.Errorf("interactive_help ran %s", c)
 		}
 	}

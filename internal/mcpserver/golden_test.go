@@ -331,10 +331,11 @@ func TestGoldenUrsaMajor(t *testing.T) {
 	runGolden(t, ursaGolden)
 }
 
-// F2: the same site read through --json (slurm.json: true) answers
-// byte-identically to the pre-F2 code: testdata/golden/ursa-major-json holds the
-// v0.2.0 goldens unchanged. The text path (TestGoldenUrsaMajor) differs from them
-// only in source.commands (TestGoldenTextMatchesJSON).
+// F2: the same site read through --json (slurm.json: true). Its answers are the
+// v0.2.0 goldens; the files differ from v0.2.0 only where source.commands lists
+// the new partition-limits read (scontrol -o show partition, lab-locked
+// partitions). The text path (TestGoldenUrsaMajor) gives the same answers and
+// differs only in source.commands (TestGoldenTextMatchesJSON).
 func TestGoldenUrsaMajorJSON(t *testing.T) {
 	gs := ursaGolden
 	gs.name, gs.json = "ursa-major-json", true

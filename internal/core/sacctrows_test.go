@@ -135,3 +135,17 @@ func TestIncludeScriptMissingSaysWhy(t *testing.T) {
 		t.Errorf("stored script: %v note %q", d.Script, d.ScriptNote)
 	}
 }
+
+// F2: the backend prints the field lists the text parsers expect.
+func TestTextFieldsMatch(t *testing.T) {
+	sq, sa, legacy := backend.TextFieldsForTest()
+	if sq != strings.Join(slurm.SqueueFields, ",") {
+		t.Errorf("squeue fields: backend %q, parser %q", sq, strings.Join(slurm.SqueueFields, ","))
+	}
+	if sa != strings.Join(slurm.SacctJobFields, ",") {
+		t.Errorf("sacct fields: backend %q, parser %q", sa, strings.Join(slurm.SacctJobFields, ","))
+	}
+	if legacy != strings.Join(slurm.Without(slurm.SacctJobFields, slurm.LegacySacctFields), ",") {
+		t.Errorf("legacy sacct fields: %q", legacy)
+	}
+}

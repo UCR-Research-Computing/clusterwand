@@ -36,6 +36,7 @@
       "cached": true,
       "commands": [
         "cat -- /opt/site/catalog.json",
+        "scontrol -o show partition",
         "sinfo -h -o '%R|%h'",
         "cat -- /opt/site/catalog.json",
         "sinfo -h -o '%R|%h'",

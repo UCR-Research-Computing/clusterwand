@@ -62,6 +62,7 @@
       "backend": "fixture:testdata",
       "commands": [
         "cat -- /apps/docs/catalog.json",
+        "scontrol -o show partition",
         "sinfo -h -o '%R|%h'"
       ]
     }
