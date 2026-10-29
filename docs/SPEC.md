@@ -1344,10 +1344,80 @@ the caller's associations and groups (internal/core/access.go):
   still enforces its rule at submit time).
 - Mutation check: 30 new guards (f2*).
 
+## 27. Discover (ClusterWand v0.4.0)
+
+`clusterwand discover --site <name> --host <ssh alias> [--out sites] [--record DIR]
+[--compare <profile> [--compare-catalog FILE]] [--force]` drafts a site profile for a cluster
+the person can reach with their own SSH (internal/discover, cmd/clusterwand/discover.go).
+
+- Probes (read-only, login node only, one audited `core.Call` "discover", tier R1, generic
+  profile): `id -un`, `sinfo --version`, `scontrol -o show partition`, `scontrol --version;
+  scontrol -o show nodes`, `scontrol show config` (kept: 15 keys in `discover.ConfigKeys`,
+  the rest dropped before use or recording), a fixed `bash -lc` template that prints
+  `$HOME`, `$SCRATCH`, which of a fixed list of folders named after `$USER` exist (`test
+  -d` only) and the module system, and `bash -lc 'module -t avail 2>&1'`. New allow-list
+  constructors: `ShowConfig`, `DiscoverEnv`, `ModuleAvail` (in `TestAllowListIsClosed`).
+- Output: `sites/<name>/site.yaml` (`approved: false`, `catalog_file: catalog.json`,
+  `charge: none`, `host_keys`, `discovered:` provenance, review notes as comments) and
+  `catalog.json` (schema `clusterwand-catalog/1`, `"approved": false`, partitions with
+  cores/memory of the smallest node, GPUs, time limit, spot feature, `restricted`; modules
+  as `core`). Never overwrites an existing file; `--force` replaces only an unapproved
+  draft.
+- Inference (facts only, a role it cannot infer stays empty with a note): general = the
+  Default=YES partition; probe = the shortest open partition with MaxTime <= 1 h, else an
+  open one named check/debug/test/short/devel; gpu = open partition with GPUs and most
+  nodes; highmem = open partition with most memory per node, >= 1.5x general; avx2_only =
+  every node advertises avx2 and no avx512*; cloud_nodes = any node in state CLOUD;
+  python modules by name. "Open" = no AllowAccounts/DenyAccounts/AllowGroups limit (who
+  may use a locked partition is read live, section 26, and never copied).
+- Review gate: `site.Parse` refuses `approved: false` (since v0.2.0); the local catalog
+  (`catalog_file`, resolved next to a `site_file` profile; refused in shipped profiles,
+  must stay inside the profile's folder, exclusive with `catalog`) is refused while it
+  says `"approved": false`.
+- Host keys: after the BatchMode probes succeed (ssh's own host-key check passed), discover
+  reads the keys the person's ssh trusts for that alias (`ssh -G`: HostKeyAlias or
+  HostName[:Port], known_hosts files; `ssh-keygen -F`; @revoked/@cert-authority lines and
+  malformed keys skipped). An approved profile with `host_keys` makes the SSH backend
+  write them to `<state dir>/known_hosts/<site>` under alias `clusterwand-<site>` and run
+  ssh with `StrictHostKeyChecking=yes`, that file as the only known_hosts file
+  (`GlobalKnownHostsFile=/dev/null`), `HostKeyAlias`, `UpdateHostKeys=no`, and its own
+  control socket prefix (`ck-`), so a pinned connection never reuses an unpinned master.
+  A changed key fails to connect; updating it is a person's edit of the profile.
+- `--record DIR`: the probe files with the user name replaced (`alice_ucr_edu`), private
+  IPv4 addresses `10.0.0.1`, every account/group/QOS in partition access lists `lab-a`...
+  (ALL kept), people in node reasons and `Owner=` replaced. `--from DIR` replays a recording
+  (no host keys then).
+- Ursa Major (recorded 2026-10-28/29 on the login node, `testdata/discover/ursa-25.11`):
+  the draft matches the hand-written profile on every inferred field (home `/home/{user}`,
+  scratch `/scratch/{user}`, cloud nodes, probe `check`, general `standard`, gpu `gpul4`,
+  highmem `highmem`, `slurm.json: false`); `TestBuildMatchesHandProfile` keeps it so.
+  Against the published catalog (`/apps/docs/catalog.json`) all 13 partitions, cores,
+  GPUs counts, node counts and time limits agree. Differences, and why:
+  - memory per node: Slurm's RealMemory rounds 1 GB lower than the catalog on 7
+    partitions (e.g. standard 123 vs 124 GB; the catalog rounds the machine type).
+  - gpu_type: nodes say `gpu:1` without a type; the catalog names the L4.
+  - spot: discover reads a `spot` node feature; Ursa marks spot as tpuspot's feature but
+    not the e2 `spot` partition's, so spot/tpuspot are swapped against the catalog.
+  - avx2_only: Ursa's nodes advertise no CPU features, so standard/spot/check (e2,
+    AVX2) cannot be inferred.
+  - modules.python: discover lists every python*/conda module (5); the hand profile
+    names the two meant for jobs.
+  - modules: 495 from `module -t avail` vs 524 in the catalog (491 in both): the catalog
+    adds MPI-dependent modules only visible after `module load <mpi>`.
+  - by hand only: charge model and prices, the published catalog itself, `fast`,
+    fallbacks, CPU notes, stockout reasons, help, 65 wording keys.
+  The live run against `ursa-login` on 2026-10-29 could not connect (the IAP tunnel's
+  gcloud credentials had expired on the laptop; ClusterWand does not run gcloud); the
+  recording was taken through the same read-only commands the evening before (F2/F3
+  session). Host-key discovery was checked against `ursa-login`'s entry in the user's own
+  known_hosts (1 ed25519 key).
+- Mutation check: 23 new guards (f3*).
+
 ## Change log
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-29 | ClusterWand v0.4.0 | Section 27: `clusterwand discover` drafts site.yaml + catalog.json (approved: false) from read-only login-node probes; host-key pinning (`host_keys`, strict, own known_hosts); local `catalog_file` with a draft gate; `--record` anonymised fixtures; `--compare` with a reviewed profile. Ursa draft matches the hand profile on every inferred field. 23 new mutation guards |
 | 2026-10-28 | ClusterWand v0.3.0 | Section 26: plain-text Slurm reads are the primary path (squeue -O, sacct -P with header, scontrol -o, sacct -B), JSON behind site `slurm.json`; text and JSON answers identical on the fixtures and live on Ursa; Slurm 21.08 field fallbacks; output-path pattern expansion. Lab-locked partitions (AllowAccounts/DenyAccounts/AllowGroups) read live: hidden from `partitions`, refused with a working `--account` in `script_check`/`job_submit`/`interactive_help`, skipped in fallback advice. Real 21.08 and 25.11 text fixtures; optional containerised Slurm 21.08 workflow. 30 new mutation guards |
 | 2026-10-28 | ClusterWand v0.2.0 | Site profiles (section 25): every Ursa constant moved from `internal/` to `sites/ursa-major/site.yaml`; charge models `usd_per_node_hour`, `su_per_core_hour` (SU caps), `none`; generic profile when none is set; Ursa golden tests byte-identical to v0.1.0; synthetic second site proves no Ursa strings or dollar figures leak. Fixed on the way: SU prices showing in `usd` fields of partitions, job cost, waste and allocation. Mutation guards: 12 repointed to moved code, 19 new (167) |
 | 2026-10-28 | ClusterWand v0.1.0 | Forked from ursa-bifrost v0.10.1 (77cb4cd) as ClusterWand. Module `github.com/UCR-Research-Computing/clusterwand`, binary `clusterwand` (+ `wand` alias in installers and release archives), config `~/.config/clusterwand`, state `~/.local/share/clusterwand`, results `~/clusterwand-results`, env prefix `CLUSTERWAND_`, MCP server name `clusterwand`, remote job folder `clusterwand-jobs`, sbatch comment `clusterwand:<hash>`, env_check job `clusterwand-env-check`. SSH only: removed the hosted server (`serve`, internal/server, OAuth, Google sign-in), the IAP/OS Login backend and `ssh.gcloud` mode, Cloud Storage staging (`results_link`, `upload_prepare`, `uploads_list`, `job_submit` inputs), ursa-agent, the Cloud Run deploy, prototypes, the Dockerfile and `scripts/onboard_lab.py`; 71 mutation guards for removed code dropped (148 remain). Local tools otherwise unchanged. New docs/SSH.md |

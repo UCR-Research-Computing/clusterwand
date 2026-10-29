@@ -61,7 +61,8 @@ mode (HTTP server, Google sign-in, IAP backend, Cloud Storage staging) is gone; 
 tools behave as before. Since v0.2.0 everything site-specific lives in a site profile, and
 since v0.3.0 Slurm is read as plain text (works on Slurm 21.08 to 25.11; `--json` is an
 opt-in per site) and partitions locked to some accounts or groups are only offered to
-people who may use them. Next: `clusterwand discover` (see [Roadmap](#roadmap)).
+people who may use them. Since v0.4.0 `clusterwand discover` drafts a profile for a new
+cluster from a read-only look at its login node (see below).
 
 ## 60-second demo
 
@@ -148,8 +149,17 @@ with no profile a generic one is used (home only, no catalog, no charges, no env
 partition). A profile of your own needs `approved: true`. Catalog-backed tools (partitions,
 modules, recipes, prices) still need a catalog JSON
 ([`testdata/catalog.json`](testdata/catalog.json) shows the shape), which can live in your
-own home folder; `clusterwand discover` (F3) will draft both. ClusterWand never needs
-anything installed or changed on the cluster.
+own home folder. ClusterWand never needs anything installed or changed on the cluster.
+
+**Discover a new cluster (v0.4.0).** `clusterwand discover --site mylab --host <ssh alias>`
+reads the login node only (Slurm release, `scontrol -o show partition|nodes`, a few
+`scontrol show config` keys, your `$HOME` and scratch folders, `module -t avail`) and
+writes `sites/mylab/site.yaml` plus a draft `catalog.json` (partitions and modules), both
+with `approved: false`. It pins the login node's host keys that your own ssh already
+trusts (`host_keys:`): once approved, ClusterWand connects only when the node shows one of
+them. Nothing is used until you review the draft and set `approved: true` in both files,
+then point `site_file:` at it. `--record DIR` also writes anonymised copies of the probes
+as test fixtures; `--compare <profile>` lists where the draft and a reviewed profile differ.
 
 ## Connect an AI assistant
 
@@ -273,7 +283,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 | F0 | Fork and polish: renamed module, binary and paths; docs; CI | v0.1.0 |
 | F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | done, v0.2.0 |
 | F2 | Slurm adapter: plain-text reads as the primary path (Slurm 21.08 to 25.11), JSON behind a site flag; lab-locked partitions (AllowAccounts/AllowGroups) | done, v0.3.0 |
-| F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey | planned, v0.4.0 |
+| F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey; host-key pin; review gate | done, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |
 | Later | Multi-cluster configs | not started |
 

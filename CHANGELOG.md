@@ -5,6 +5,27 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.4.0 - 2026-10-29
+
+- **`clusterwand discover --site <name> --host <ssh alias>`.** Read-only probes on the
+  login node (`sinfo --version`, `scontrol -o show partition`, `scontrol -o show nodes`,
+  `scontrol show config` filtered to 15 keys, `$HOME` and scratch folders named after you,
+  `module -t avail`) draft `sites/<name>/site.yaml` and `catalog.json`. Both carry
+  `approved: false` and are refused until a person approves them. Roles are inferred from
+  facts only (default partition, shortest open partition for env_check, open GPU and
+  high-memory partitions, CLOUD nodes, AVX2-only features); prices, fallbacks, wording and
+  help stay for a person to fill in. Never overwrites a profile; `--force` replaces only an
+  unapproved draft.
+- **Host-key pinning.** A profile's `host_keys` (discover records the keys your own ssh
+  already trusts) makes ClusterWand connect with `StrictHostKeyChecking=yes` against those
+  keys alone (own known_hosts file, own control socket).
+- **Local catalogs.** `catalog_file:` in your own profile reads a catalog kept next to it
+  instead of one on the cluster; a draft (`"approved": false`) is refused.
+- **`--record DIR`** writes anonymised probe fixtures (user, private IPs, account and group
+  names, people in node reasons replaced); `--compare` lists differences from a reviewed
+  profile. Recorded Ursa Major probe in `testdata/discover/ursa-25.11`.
+- **Mutation check:** 23 new guards (f3*).
+
 ## v0.3.0 - 2026-10-28
 
 - **Slurm text adapter.** Scheduler reads use plain-text formats by default (`squeue -O`,
