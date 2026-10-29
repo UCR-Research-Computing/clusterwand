@@ -1,5 +1,7 @@
-// Package slurm parses the JSON that Slurm 25.11 prints with --json
-// (data_parser v0.0.44): squeue, sacct, sinfo and scontrol show nodes.
+// Package slurm parses Slurm's output. The plain-text formats (text.go,
+// sacctrows.go) are the primary path and read the same on Slurm 20.11 to 25.11;
+// the JSON that Slurm 25.11 prints with --json (data_parser v0.0.44) is used
+// only on sites whose profile sets slurm.json.
 //
 // Only the fields clusterwand uses are declared; unknown fields are ignored, so
 // newer Slurm versions keep parsing as long as these names stay.
@@ -330,6 +332,7 @@ type Node struct {
 	ReasonSetBy  string   `json:"reason_set_by_user"`
 	ReasonAt     Num      `json:"reason_changed_at"`
 	InstanceType string   `json:"instance_type"`
+	version      string   // Slurm release (text path; --json has meta.slurm.release)
 }
 
 // HasState reports whether the node carries a state flag (IDLE, POWERED_DOWN, ...).
