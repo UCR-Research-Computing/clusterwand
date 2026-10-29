@@ -288,7 +288,7 @@ func flagValue(a []string, f string) string {
 	return ""
 }
 
-// SPEC 23: the plain-text accounting summary. Selection arguments are validated
+// SPEC 7.1: the plain-text accounting summary. Selection arguments are validated
 // and arrive only as positional parameters; an empty or odd user never widens
 // the query to every user.
 func TestSacctSummaryCommand(t *testing.T) {
@@ -299,8 +299,8 @@ func TestSacctSummaryCommand(t *testing.T) {
 	if got := strings.Join(c.argv[3:], " "); got != "clusterwand -u alice_ucr_edu -S now-7days" {
 		t.Errorf("user args: %q", got)
 	}
-	if c.Kind() != KindAcct || c.Write() || c.Public() {
-		t.Errorf("kind %v write %v public %v: per-person accounting, cached as acct", c.Kind(), c.Write(), c.Public())
+	if c.Kind() != KindAcct || c.Write() {
+		t.Errorf("kind %v write %v: per-person accounting, cached as acct", c.Kind(), c.Write())
 	}
 	a, err := SacctSummaryAll("now-1days", "2026-10-05")
 	if err != nil {
@@ -371,7 +371,7 @@ func TestSacctSummaryUsers(t *testing.T) {
 }
 
 // F2: the text reads take only validated selections, as positional parameters
-// of fixed templates; none writes; per-person reads are never public.
+// of fixed templates; none writes.
 func TestTextReadConstructors(t *testing.T) {
 	for _, bad := range []func() (Command, error){
 		func() (Command, error) { return SqueueUserText("") },
@@ -390,11 +390,11 @@ func TestTextReadConstructors(t *testing.T) {
 		}
 	}
 	u, _ := SqueueUserText("alice")
-	if got := strings.Join(u.argv[3:], " "); got != "clusterwand -u alice" || u.Public() || u.Write() {
-		t.Errorf("squeue user: %q public %v", got, u.Public())
+	if got := strings.Join(u.argv[3:], " "); got != "clusterwand -u alice" || u.Write() {
+		t.Errorf("squeue user: %q", got)
 	}
 	j, _ := SacctJobText("260_3")
-	if got := strings.Join(j.argv[3:], " "); got != "clusterwand -j 260_3" || j.Kind() != KindAcct || j.Public() {
+	if got := strings.Join(j.argv[3:], " "); got != "clusterwand -j 260_3" || j.Kind() != KindAcct {
 		t.Errorf("sacct job: %q", got)
 	}
 	js, _ := SqueueJobsText([]string{"1", "2"})
@@ -402,15 +402,12 @@ func TestTextReadConstructors(t *testing.T) {
 		t.Errorf("job_ids queue read must be uncached and tolerate exit 1")
 	}
 	a, _ := Assoc("alice")
-	if a.Public() || strings.Join(a.argv, " ") != "sacctmgr -n -P show user alice withassoc format=DefaultAccount,Account,Partition" {
-		t.Errorf("assoc: %v public %v", a.argv, a.Public())
-	}
-	if Groups().Public() {
-		t.Error("id -Gn is per person")
+	if strings.Join(a.argv, " ") != "sacctmgr -n -P show user alice withassoc format=DefaultAccount,Account,Partition" {
+		t.Errorf("assoc: %v", a.argv)
 	}
 	for _, c := range []Command{SqueueAllText(), NodesText(), PartitionsText()} {
-		if !c.Public() || c.Write() {
-			t.Errorf("%v: public cluster facts", c.argv)
+		if c.Write() {
+			t.Errorf("%v: read-only cluster facts", c.argv)
 		}
 	}
 	// every template reads epoch times and splits on \x1f, never "|"

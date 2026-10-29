@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go internal/backend/ssh.go internal/discover/discover.go internal/discover/record.go internal/discover/hostkeys.go cmd/clusterwand/discover.go"
+FILES="internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go internal/backend/ssh.go internal/discover/discover.go internal/discover/record.go internal/discover/hostkeys.go cmd/clusterwand/discover.go internal/mcpserver/server.go"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -72,7 +72,6 @@ mutate "A1 cross-process lock" internal/core/a1.go 'if err := syscall.Flock(int(
 mutate "redact whole assignment" internal/policy/redact.go 'for _, r := range redactRules {' 'for _, r := range append(append([]redactRule{}, redactRules[1:]...), redactRules[0]) {'
 mutate "booting is not broken" internal/slurm/types.go 'return n.HasState("NOT_RESPONDING") && !n.Booting()' 'return n.HasState("NOT_RESPONDING")'
 mutate "release only never-ran" internal/core/a1.go 'neverRan := d.State == "PENDING" && d.Started == ""' 'neverRan := true'
-mutate "srv remote download"  internal/core/results.go 'if in.Download && s.Remote {' 'if false {'
 mutate "rule cmd-not-found case" internal/rules/rules.go '(?mi)(\S+): command not found\s*$' '(?m)(\S+): command not found$'
 mutate "rule exit 127"           internal/rules/rules.go 'if st == "FAILED" && f.ExitCode == "127" && !hasRule(out, "command-not-found") {' 'if false {'
 mutate "v07 user root check"     internal/core/files.go 'if p == r {
@@ -158,17 +157,6 @@ mutate "v080 interactive share"          internal/core/helpers.go '		share = cr.
 mutate "v080 interactive no-cpu warning" internal/core/helpers.go '		if in.CPUs == 0 {
 			r.Warnings' '		if false {
 			r.Warnings'
-mutate "v090 audit names the program"     internal/core/service.go '		client = "program:" + s.Program + "/" + client' '		_ = client'
-mutate "v091 private output never shared" internal/core/service.go '	public := c.Public() && !c.Write()' '	public := !c.Write()'
-mutate "v091 per-person flight key"       internal/core/service.go '			fkey = "u:" + s.Principal + ":" + s.Program + ":" + key' '			fkey = key'
-mutate "v091 shared entry freshness"      internal/core/shared_cache.go '	if ok && c.now().Sub(e.at) < ttl {' '	if ok {'
-mutate "v091 errors not stored"           internal/core/shared_cache.go '	if store && f.err == nil {' '	if store {'
-mutate "v091 writes never coalesced"      internal/core/service.go '	if s.Shared != nil && ttl > 0 && !c.Write() {' '	if s.Shared != nil && !c.Write() || s.Shared != nil && c.Write() {'
-mutate "v092 in-flight cap enforced" internal/core/service.go '		if !s.flights.acquire(s.MaxInFlight) {' '		if false && !s.flights.acquire(s.MaxInFlight) {'
-mutate "v092 in-flight slot released" internal/core/service.go '		defer s.flights.release()' '		_ = 0'
-mutate "v092 in-flight cap exact" internal/core/inflight.go '	if f.n >= max {' '	if f.n > max {'
-mutate "v092 accounting gated" internal/core/service.go '	if c.Kind() == backend.KindAcct && s.Gate != nil {' '	if false && s.Gate != nil {'
-mutate "v092 accounting slot released" internal/core/inflight.go '		return func() { <-g.acct }, nil' '		return func() {}, nil'
 mutate "v093 job_ids filter applied" internal/core/jobs.go '			if want[strings.SplitN(j.JobID, "_", 2)[0]] {' '			if true {'
 mutate "v093 job_ids validated" internal/core/jobs.go '		if err := backend.ValidJobID(id); err != nil {
 			return nil, err
@@ -246,9 +234,6 @@ mutate "v0916 override full check"     internal/core/a1.go '	if in.Partition != 
 mutate "v0916 confirm submit count"    internal/core/a1.go '	if s.Cfg.Caps.MaxSubmitsPerDay > 0 && n >= s.Cfg.Caps.MaxSubmitsPerDay {' '	if false {'
 mutate "v0916 time refuses junk"       internal/core/cluster.go '			if c < '"'"'0'"'"' || c > '"'"'9'"'"' {' '			if false {'
 mutate "v0916 seconds round up"        internal/core/cluster.go '		return v[0] + up(v[1]), true' '		return v[0], true'
-mutate "v0916 state sealed"            internal/core/a1.go '	if s.StateSealer != nil {
-		b, err = s.StateSealer.Seal(stateLabel, st)' '	if false {
-		b, err = s.StateSealer.Seal(stateLabel, st)'
 # v0.10.0 allocation framing (F4 show_cost_tiers, F5 allocations)
 mutate "v010 R1 never sees per-member figures" internal/core/allocation.go 'if !hasTier(s.Cfg.Tiers, "R2") {' 'if false {'
 mutate "v010 show_cost_tiers stripping"    internal/core/service.go 'stripCostFields(s, data)' '// stripCostFields(s, data)'
@@ -292,7 +277,6 @@ mutate "f2 sacct job validated"         internal/backend/command.go 'func SacctJ
 mutate "f2 assoc user validated"        internal/backend/command.go 'func Assoc(user string) (Command, error) {
 	if err := ValidUser(user); err != nil {' 'func Assoc(user string) (Command, error) {
 	if err := ValidUser(user); err != nil && false {'
-mutate "f2 assoc not public"            internal/backend/command.go '"format=DefaultAccount,Account,Partition"}, kind: KindCatalog}' '"format=DefaultAccount,Account,Partition"}, kind: KindCatalog, public: true}'
 mutate "f2 job_ids uncached"            internal/backend/command.go 'squeueTextTemplate, "clusterwand", "-j", list}, kind: KindNoCache' 'squeueTextTemplate, "clusterwand", "-j", list}, kind: KindQueue'
 mutate "f2 legacy sacct fields"         internal/backend/command.go 'sacct --helpformat | grep -qw StdOut || f=' 'true || f='
 mutate "f2 summary restarts compat"     internal/backend/command.go "| sed 's/|/||/15'" "| cat"
@@ -385,6 +369,9 @@ mutate "v051 results hidden job dir"   internal/core/results.go '			if hiddenRel
 mutate "v051 results link roots"       internal/core/results.go '		if err := s.checkLogPath(real+"/x", d.User); err != nil {' '		if false {'
 mutate "v051 results link hidden"      internal/core/results.go '		if err := s.checkJobDir(real, d.User); err != nil {' '		if false {'
 mutate "v051 audit not stdout"         internal/policy/audit.go 'var auditStream io.Writer = os.Stderr' 'var auditStream io.Writer = os.Stdout'
+# v0.6.0 cleanup: tool descriptions never promise cost the caller cannot see
+mutate "v060 status desc cost gated"     internal/mcpserver/server.go '	if s.CanSeeCost() {' '	if true {'
+mutate "v060 partitions desc gated"      internal/mcpserver/server.go '	if s.CanSeeCharge() {' '	if true {'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

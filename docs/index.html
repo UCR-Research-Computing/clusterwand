@@ -256,7 +256,7 @@ Submitted job 265 ...  folder on the cluster: ~/clusterwand-jobs/&lt;stamp&gt;-h
         <p class="tier-note"><code>ticket_draft</code> writes a reply draft for a "my job failed" ticket. It is never sent.</p>
       </article>
     </div>
-    <p class="footnote">Also: resources <code>hpc://catalog</code> and <code>hpc://policies</code>; prompts <code>diagnose_job</code>, <code>write_batch_script</code>, <code>monthly_usage_summary</code>, <code>triage_ticket</code>. Full catalog: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#7-tool-catalog">SPEC section 7</a>.</p>
+    <p class="footnote">Also: resources <code>hpc://catalog</code> and <code>hpc://policies</code>; prompts <code>diagnose_job</code>, <code>write_batch_script</code>, <code>monthly_usage_summary</code>, <code>triage_ticket</code>. Full catalog: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#9-tool-catalog">SPEC section 9</a>.</p>
   </div>
 </section>
 
@@ -301,7 +301,7 @@ Submitted job 265 ...  folder on the cluster: ~/clusterwand-jobs/&lt;stamp&gt;-h
       <div class="kc"><i class="fa-solid fa-feather" aria-hidden="true"></i><h3>Low load</h3><p>Short-TTL cache, a per-user rate limit, one shared SSH connection, and no background polling.</p></div>
       <div class="kc"><i class="fa-solid fa-key" aria-hidden="true"></i><h3>Your login, nothing more</h3><p>ClusterWand runs as you over your own SSH connection and never sees your private keys. It can do only what your login can, and less: only the allow-listed commands.</p></div>
     </div>
-    <p class="safety-more">Shared partitions: a script must ask for its cores or <code>script_check</code> and <code>job_submit</code> refuse it, and costs are the share of the node the job holds. Details: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#9-security-and-governance">SPEC section 9</a>.</p>
+    <p class="safety-more">Shared partitions: a script must ask for its cores or <code>script_check</code> and <code>job_submit</code> refuse it, and costs are the share of the node the job holds. Details: <a href="https://github.com/UCR-Research-Computing/clusterwand/blob/main/docs/SPEC.md#72-shared-partitions">SPEC section 7.2</a>.</p>
   </div>
 </section>
 

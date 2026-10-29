@@ -1,6 +1,6 @@
 package slurm
 
-// Plain-text accounting rows (SPEC section 23). `sacct --json` spends nearly all
+// Plain-text accounting rows (SPEC section 7.1). `sacct --json` spends nearly all
 // of its time serializing: a week of one person's jobs took 19.6 s as JSON and
 // 0.2 s as `sacct -n -P --noconvert -o <SacctFields>`. List-type reads (job
 // lists, usage, waste, the failure rate) use these rows; per-job reads keep

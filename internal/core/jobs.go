@@ -367,7 +367,7 @@ func (s *Service) JobShow(ctx context.Context, in JobShowInput) (*JobDetail, err
 				d.Script = policy.Wrap(j.Script, s.Cfg.Limits.ScriptBytes)
 				markUntrusted(ctx)
 			} else {
-				// SPEC 23: when AccountingStoreFlags has no job_script, an empty
+				// SPEC 7.1: when AccountingStoreFlags has no job_script, an empty
 				// script is the cluster's setting, not a lookup miss
 				d.ScriptNote = s.Site.Text("script_not_stored", "Slurm did not store this job's batch script (the cluster's AccountingStoreFlags may not include job_script). Read the script from the job's working directory instead.")
 			}
@@ -520,7 +520,7 @@ func (s *Service) JobLogTail(ctx context.Context, jobID, stream string, lines in
 }
 
 // JobLog returns a window of a job's log (the tail, or from a line) or the
-// lines matching a pattern, with line numbers for paging (SPEC 18.3).
+// lines matching a pattern, with line numbers for paging (SPEC 11.5).
 func (s *Service) JobLog(ctx context.Context, in LogInput) (*LogTail, error) {
 	stream := in.Stream
 	if stream == "" {

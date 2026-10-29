@@ -11,7 +11,7 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
-// SPEC section 23: the plain-text accounting rows must give the list readers
+// SPEC section 7.1: the plain-text accounting rows must give the list readers
 // exactly what --json gave them for the same jobs. The fixture prints both from
 // one recording, so any field the parser drops or misreads shows up here.
 func TestSacctRowsMatchJSON(t *testing.T) {

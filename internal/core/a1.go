@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -221,9 +220,6 @@ func (l *stateLock) unlock() {
 	stateMu.Unlock()
 }
 
-// stateLabel binds the sealed A1 state so it cannot be swapped with another record kind.
-const stateLabel = "a1-state"
-
 func (s *Service) statePath() string { return config.Expand(s.Cfg.StatePath) }
 
 func (s *Service) loadState() (*a1State, error) {
@@ -235,11 +231,7 @@ func (s *Service) loadState() (*a1State, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.StateSealer != nil && !bytes.HasPrefix(bytes.TrimSpace(b), []byte("{")) {
-		if err := s.StateSealer.Open(stateLabel, b, st); err != nil {
-			return nil, fmt.Errorf("A1 state file %s: %w", s.statePath(), err)
-		}
-	} else if err := json.Unmarshal(b, st); err != nil { // plaintext: CLI, or a pre-0.9.16 server file
+	if err := json.Unmarshal(b, st); err != nil {
 		return nil, fmt.Errorf("A1 state file %s is corrupt: %w", s.statePath(), err)
 	}
 	if st.Pending == nil {
@@ -263,13 +255,7 @@ func (s *Service) saveState(st *a1State) error {
 		}
 	}
 	st.Ledger = keep
-	var b []byte
-	var err error
-	if s.StateSealer != nil {
-		b, err = s.StateSealer.Seal(stateLabel, st)
-	} else {
-		b, err = json.MarshalIndent(st, "", " ")
-	}
+	b, err := json.MarshalIndent(st, "", " ")
 	if err != nil {
 		return err
 	}

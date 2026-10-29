@@ -30,42 +30,13 @@ type Service struct {
 	Limiter *policy.Limiter
 	Now     func() time.Time
 
-	// Principal is who the audit log names as the caller (server: the
-	// signed-in Google email). Empty = the local OS user.
-	Principal string
-	// Remote is set by the HTTP server: results cannot be downloaded to the
-	// server's own disk.
-	Remote bool
-	// Shared is the cache for output that is the same for every user, shared
-	// by every person's Service on the hosted server (nil = per-service only).
-	Shared *SharedCache
-	// Program is the program client (users.yaml clients[].id) this service
-	// acts for, or empty for a person's own clients. Audit records then read
-	// "program:<id>/<mcp client>".
-	Program string
-	// ProgramOwnCaps is true when the Service acts for a program client with
-	// its own A1 caps (ProgramClient.MaxCostPerDayUSD > 0). Such programs always
-	// get cost figures even if show_cost_tiers would otherwise hide them.
-	ProgramOwnCaps bool
-	// Gate caps work across everyone on the hosted server (accounting runs);
-	// nil = no cap (CLI, local).
-	Gate *Gate
-	// StateSealer, when set (hosted server), encrypts the A1 state file (plans,
-	// tokens, spend ledger) at rest like sessions and keys (v0.9.16). Older
-	// plaintext files are still read and are sealed on the next save.
-	StateSealer StateSealer
-	// MaxInFlight caps this Service's calls running at once (0 = no cap; the
-	// hosted server sets core.MaxInFlight).
-	MaxInFlight int
-
-	flights inFlight
-	mu      sync.Mutex
-	cache   map[string]cacheEntry
-	user    string
+	mu    sync.Mutex
+	cache map[string]cacheEntry
+	user  string
 }
 
-// NewService builds a Service around an existing backend and audit log (the
-// HTTP server makes one per signed-in user and shares one audit log).
+// NewService builds a Service around an existing backend and audit log (tests
+// and callers that bring their own backend).
 // It panics on a broken site profile; New returns the error instead.
 func NewService(cfg config.Config, be backend.Backend, audit *policy.Audit) *Service {
 	cfg, sp, err := ResolveSite(cfg)
@@ -245,8 +216,8 @@ func (s *Service) run(ctx context.Context, c backend.Command) ([]byte, error) {
 	t := traceOf(ctx)
 	if t != nil {
 		t.mu.Lock()
-		// commands can carry signed URLs; the trace feeds the audit log and the
-		// answer's source, so it is redacted (the cache key is not)
+		// commands can carry secrets (a grep pattern); the trace feeds the audit
+		// log and the answer's source, so it is redacted (the cache key is not)
 		t.cmds = append(t.cmds, policy.Redact(key))
 		t.mu.Unlock()
 	}
@@ -266,29 +237,7 @@ func (s *Service) run(ctx context.Context, c backend.Command) ([]byte, error) {
 			return e.data, nil
 		}
 	}
-	public := c.Public() && !c.Write()
-	if s.Shared != nil && public {
-		if b, ok := s.Shared.get(key, ttl); ok {
-			markCached()
-			return b, nil
-		}
-	}
-	var b []byte
-	var err error
-	if s.Shared != nil && ttl > 0 && !c.Write() {
-		// Single-flight: identical commands in flight run once. Public output
-		// is keyed for everyone; anything else only for this person (their
-		// own identity runs it, so two people never share an answer).
-		fkey := key
-		if !public {
-			fkey = "u:" + s.Principal + ":" + s.Program + ":" + key
-		}
-		b, err = s.Shared.do(ctx, fkey, public, func(ctx context.Context) ([]byte, error) {
-			return s.runGated(ctx, c)
-		})
-	} else {
-		b, err = s.runGated(ctx, c)
-	}
+	b, err := s.Backend.Run(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -429,10 +378,7 @@ func Call[T any](ctx context.Context, s *Service, client, tool, tier string, arg
 	fn func(ctx context.Context) (T, error)) (Result[T], error) {
 	start := s.Now()
 	ctx, t := withTrace(ctx)
-	if s.Program != "" {
-		client = "program:" + s.Program + "/" + client
-	}
-	rec := policy.Record{Time: start, Caller: firstNonEmpty(s.Principal, localUser()), Client: client, Tool: tool, Args: args}
+	rec := policy.Record{Time: start, Caller: localUser(), Client: client, Tool: tool, Args: args}
 	finish := func(decision string, err error, n int) {
 		rec.Decision = decision
 		if err != nil {
@@ -447,14 +393,6 @@ func Call[T any](ctx context.Context, s *Service, client, tool, tier string, arg
 	if err := policy.Require(s.Cfg.Tiers, tier, tool); err != nil {
 		finish("denied", err, 0)
 		return zero, err
-	}
-	if s.MaxInFlight > 0 {
-		if !s.flights.acquire(s.MaxInFlight) {
-			err := fmt.Errorf("%w: %d of your calls are still running; wait for one to finish", ErrBusy, s.MaxInFlight)
-			finish("busy", err, 0)
-			return zero, err
-		}
-		defer s.flights.release()
 	}
 	if limit {
 		if err := s.Limiter.Allow(); err != nil {
@@ -477,6 +415,13 @@ func Call[T any](ctx context.Context, s *Service, client, tool, tier string, arg
 	return res, nil
 }
 
+// CanSeeCost reports whether answers carry dollar figures for this caller
+// (tool descriptions use it so they never advertise what is stripped).
+func (s *Service) CanSeeCost() bool { return s.canSeeCost() }
+
+// CanSeeCharge reports whether answers carry charge figures in any unit.
+func (s *Service) CanSeeCharge() bool { return s.canSeeCharge() }
+
 // canSeeCost reports whether this Service caller should see dollar figures.
 func (s *Service) canSeeCost() bool { return s.chargedInUSD() && s.canSeeCharge() }
 
@@ -485,9 +430,6 @@ func (s *Service) canSeeCost() bool { return s.chargedInUSD() && s.canSeeCharge(
 func (s *Service) canSeeCharge() bool {
 	if !s.Cfg.ShowCost || s.Site.Model() == site.ChargeNone {
 		return false
-	}
-	if s.ProgramOwnCaps {
-		return true
 	}
 	if len(s.Cfg.ShowCostTiers) == 0 {
 		return true
@@ -562,28 +504,13 @@ func stripCostFields(s *Service, data any) {
 }
 
 // acctRows runs a plain-text accounting summary (backend.SacctSummary*) and
-// parses it (SPEC section 23: same jobs as --json, about 100x faster).
+// parses it (SPEC section 7.1: same jobs as --json, about 100x faster).
 func (s *Service) acctRows(ctx context.Context, c backend.Command) ([]slurm.AcctJob, error) {
 	b, err := s.run(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 	return slurm.ParseSacctRows(b)
-}
-
-// runGated runs c on the backend, taking a server-wide accounting slot first
-// for sacct (Gate). The wait is bounded by the command's own timeout.
-func (s *Service) runGated(ctx context.Context, c backend.Command) ([]byte, error) {
-	if c.Kind() == backend.KindAcct && s.Gate != nil {
-		wctx, cancel := context.WithTimeout(ctx, backend.Timeout(c))
-		release, err := s.Gate.acquireAcct(wctx)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		defer release()
-	}
-	return s.Backend.Run(ctx, c)
 }
 
 // ---- helpers ---------------------------------------------------------------------
@@ -653,10 +580,4 @@ func round(v float64, places int) float64 {
 		return float64(int64(v*p+0.5)) / p
 	}
 	return float64(int64(v*p-0.5)) / p
-}
-
-// StateSealer encrypts small records bound to a label (server.Sealer).
-type StateSealer interface {
-	Seal(label string, v any) ([]byte, error)
-	Open(label string, b []byte, v any) error
 }

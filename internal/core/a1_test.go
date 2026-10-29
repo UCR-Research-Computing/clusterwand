@@ -334,7 +334,7 @@ func TestJobResults(t *testing.T) {
 }
 
 // Found live in F4: a job folder holding .gitignore, macOS ._* files and
-// credential-like names must not list, read or download them (SPEC 18.4).
+// credential-like names must not list, read or download them (SPEC 11.4).
 func TestResultsHideHiddenAndCredentialFiles(t *testing.T) {
 	s, fx := a1Service(t)
 	ctx := context.Background()
@@ -715,50 +715,6 @@ func TestSubmitCountRecheckedAtConfirm(t *testing.T) {
 		if i == 2 && (err == nil || !errors.Is(err, ErrCapExceeded) || !strings.Contains(err.Error(), "submissions today")) {
 			t.Fatalf("third confirm past a cap of 2: %v", err)
 		}
-	}
-}
-
-type testSealer struct{ seals int }
-
-func (ts *testSealer) Seal(label string, v any) ([]byte, error) {
-	ts.seals++
-	b, err := json.Marshal(v)
-	return append([]byte("SEALED:"+label+":"), b...), err
-}
-func (ts *testSealer) Open(label string, b []byte, v any) error {
-	p := "SEALED:" + label + ":"
-	if !strings.HasPrefix(string(b), p) {
-		return errors.New("bad seal")
-	}
-	return json.Unmarshal(b[len(p):], v)
-}
-
-// v0.9.16: with a sealer the A1 state is never written as plaintext, and an
-// older plaintext file is still read (then sealed on the next save).
-func TestA1StateSealed(t *testing.T) {
-	s, _ := a1Service(t)
-	ctx := context.Background()
-	// an old plaintext ledger with one entry
-	old := `{"pending":{},"ledger":[{"time":"` + s.Now().Format(time.RFC3339) + `","job_id":"1","worst_usd":5}]}`
-	if err := os.WriteFile(s.statePath(), []byte(old), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	ts := &testSealer{}
-	s.StateSealer = ts
-	p, err := s.PrepareSubmit(ctx, SubmitInput{Script: goodScript})
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, _ := os.ReadFile(s.statePath())
-	if !strings.HasPrefix(string(b), "SEALED:a1-state:") || strings.Contains(string(b), "\n \"pending\"") {
-		t.Fatalf("state not sealed after save: %.60q", b)
-	}
-	if _, err := s.ConfirmSubmit(ctx, p.Token); err != nil {
-		t.Fatalf("confirm via sealed state: %v", err)
-	}
-	st, err := s.loadState()
-	if err != nil || len(st.Ledger) != 2 {
-		t.Fatalf("sealed ledger: %v entries=%d (want the old one + this job)", err, len(st.Ledger))
 	}
 }
 

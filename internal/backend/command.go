@@ -47,16 +47,7 @@ type Command struct {
 	big bool
 	// timeout overrides the default per-command timeout when set.
 	timeout time.Duration
-	// public marks output that is the same for every user (node state, the
-	// whole queue, the partition list, the site catalog). The hosted server
-	// may cache it once for everyone instead of once per person. Never set it
-	// on a command whose output depends on who runs it (their jobs, files,
-	// accounting, modules seen through their environment).
-	public bool
 }
-
-// Public reports whether the output is the same for every caller.
-func (c Command) Public() bool { return c.public }
 
 // Stdin is the data sent to the command, if any.
 func (c Command) Stdin() []byte { return c.stdin }
@@ -137,7 +128,7 @@ func SqueueUser(user string) (Command, error) {
 
 // SqueueAll lists every job in the queue.
 func SqueueAll() Command {
-	return Command{argv: []string{"squeue", "--json"}, kind: KindQueue, public: true}
+	return Command{argv: []string{"squeue", "--json"}, kind: KindQueue}
 }
 
 // SqueueJob shows one queued or running job. squeue exits 1 for a job that
@@ -238,7 +229,7 @@ func SacctStates(user, since, states string) (Command, error) {
 	return c, nil
 }
 
-// sacctSummaryTemplate prints job and step rows as plain text (SPEC section 23):
+// sacctSummaryTemplate prints job and step rows as plain text (SPEC section 7.1):
 // --json spends nearly all its time serializing (a week of one person's jobs:
 // 19.6 s as JSON, 0.2 s as text). Epoch times keep the parse exact. The
 // validated selection (-u user or -a, -S, -E) arrives as positional parameters.
@@ -304,7 +295,7 @@ func SacctFieldsForTest() string { return slurmFields }
 
 // Sinfo is `sinfo --json`.
 func Sinfo() Command {
-	return Command{argv: []string{"sinfo", "--json"}, kind: KindNodes, public: true}
+	return Command{argv: []string{"sinfo", "--json"}, kind: KindNodes}
 }
 
 // PartitionSharing is `sinfo -h -o %R|%h`: each partition's OverSubscribe setting
@@ -312,12 +303,12 @@ func Sinfo() Command {
 // output of Slurm 25.11 carries no such field (its oversubscribe flags stay empty
 // for EXCLUSIVE partitions), so the format string is the reliable source.
 func PartitionSharing() Command {
-	return Command{argv: []string{"sinfo", "-h", "-o", "%R|%h"}, kind: KindNodes, public: true}
+	return Command{argv: []string{"sinfo", "-h", "-o", "%R|%h"}, kind: KindNodes}
 }
 
 // Nodes is `scontrol show nodes --json`.
 func Nodes() Command {
-	return Command{argv: []string{"scontrol", "show", "nodes", "--json"}, kind: KindNodes, public: true}
+	return Command{argv: []string{"scontrol", "show", "nodes", "--json"}, kind: KindNodes}
 }
 
 // ---- F2: plain-text Slurm reads (the primary path) ----------------------------
@@ -363,7 +354,7 @@ const nodesTextTemplate = `scontrol --version; SLURM_TIME_FORMAT=%s exec scontro
 
 // SqueueAllText lists every job in the queue (text).
 func SqueueAllText() Command {
-	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand"}, kind: KindQueue, public: true}
+	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand"}, kind: KindQueue}
 }
 
 // SqueueUserText lists one user's queued and running jobs (text).
@@ -420,13 +411,13 @@ func SacctScript(id string) (Command, error) {
 
 // NodesText is `scontrol -o show nodes` after the Slurm release line.
 func NodesText() Command {
-	return Command{argv: []string{"bash", "-c", nodesTextTemplate, "clusterwand"}, kind: KindNodes, public: true}
+	return Command{argv: []string{"bash", "-c", nodesTextTemplate, "clusterwand"}, kind: KindNodes}
 }
 
 // PartitionsText is `scontrol -o show partition`: limits and who may use each
 // partition (AllowAccounts, DenyAccounts, AllowGroups).
 func PartitionsText() Command {
-	return Command{argv: []string{"scontrol", "-o", "show", "partition"}, kind: KindNodes, public: true}
+	return Command{argv: []string{"scontrol", "-o", "show", "partition"}, kind: KindNodes}
 }
 
 // Assoc is the caller's Slurm associations: default account, then one row per
@@ -443,7 +434,7 @@ func Groups() Command { return Command{argv: []string{"id", "-Gn"}, kind: KindCa
 
 // SlurmVersion is `sinfo --version`.
 func SlurmVersion() Command {
-	return Command{argv: []string{"sinfo", "--version"}, kind: KindCatalog, public: true}
+	return Command{argv: []string{"sinfo", "--version"}, kind: KindCatalog}
 }
 
 // ---- F3: discover (read-only probes of a new site) ------------------------------
@@ -451,7 +442,7 @@ func SlurmVersion() Command {
 // ShowConfig is `scontrol show config` (readable by every user; discover keeps
 // only a few keys from it).
 func ShowConfig() Command {
-	return Command{argv: []string{"scontrol", "show", "config"}, kind: KindCatalog, public: true}
+	return Command{argv: []string{"scontrol", "show", "config"}, kind: KindCatalog}
 }
 
 // moduleAvailTemplate lists every module the login shell can load, one per
@@ -498,7 +489,7 @@ func Catalog(p string) (Command, error) {
 	if !path.IsAbs(p) || path.Clean(p) != p || !strings.HasSuffix(p, ".json") {
 		return Command{}, fmt.Errorf("catalog path %q must be an absolute, clean .json path", p)
 	}
-	return Command{argv: []string{"cat", "--", p}, kind: KindCatalog, public: true}, nil
+	return Command{argv: []string{"cat", "--", p}, kind: KindCatalog}, nil
 }
 
 // Tail reads the last n lines of a file. The caller must have checked the path

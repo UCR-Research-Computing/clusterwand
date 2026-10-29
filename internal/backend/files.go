@@ -1,6 +1,6 @@
 package backend
 
-// Commands for v0.7.0 (SPEC section 18): paged listings, byte-range reads,
+// Commands for v0.7.0 (ursa-bifrost SPEC section 18): paged listings, byte-range reads,
 // searches, log windows, the helper tools and the results upload to staging.
 //
 // The same rule as command.go applies: every Command is built here from
@@ -136,7 +136,7 @@ func DiskFree(dirs ...string) (Command, error) {
 }
 
 // duTemplate sizes each top-level entry of the given folders, 8 at a time
-// (SPEC section 23; one at a time a 100 s budget left 43 of 91 entries of a busy
+// (storage_usage, SPEC section 9.1; one at a time a 100 s budget left 43 of 91 entries of a busy
 // home unknown). Each entry gets at most 30 s, and none starts once the 40 s
 // overall budget is spent. Entries it could not size print "?". Paths reach
 // the inner shell only as positional parameters, NUL-separated.

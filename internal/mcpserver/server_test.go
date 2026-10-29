@@ -320,7 +320,7 @@ func TestSubmitOverMCP(t *testing.T) {
 	}
 }
 
-// TestNoShellTool pins the decision in SPEC 18.5: no tool takes a command line.
+// TestNoShellTool pins the decision in SPEC 9.5: no tool takes a command line.
 func TestNoShellTool(t *testing.T) {
 	tools := toolNames(t, connect(t, "R1", "R2", "A1"))
 	for name, tl := range tools {
@@ -366,5 +366,49 @@ func TestNewToolsOverMCP(t *testing.T) {
 	d = m["data"].(map[string]any)
 	if d["total_lines"].(float64) < 5 || d["lines"].(float64) != 5 {
 		t.Errorf("log window: %v", d)
+	}
+}
+
+// Cleanup (v0.6.0): cluster_status and partitions describe only what the caller
+// will see; a caller whose answers carry no cost is never promised $/hour.
+func TestDescriptionsFollowCostVisibility(t *testing.T) {
+	newSrv := func(mut func(*config.Config)) map[string]*mcp.Tool {
+		cfg := config.Default()
+		cfg.Site = "ursa-major"
+		cfg.StatePath = filepath.Join(t.TempDir(), "a1.json")
+		cfg.Backend = "fixture"
+		cfg.FixturesDir = "../../testdata"
+		cfg.ClusterUser = "alice_ucr_edu"
+		cfg.AuditPath = filepath.Join(t.TempDir(), "audit.jsonl")
+		mut(&cfg)
+		s, err := core.New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ct, st := mcp.NewInMemoryTransports()
+		if _, err := New(s).Connect(context.Background(), st, nil); err != nil {
+			t.Fatal(err)
+		}
+		cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "0"}, nil).Connect(context.Background(), ct, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { cs.Close() })
+		return toolNames(t, cs)
+	}
+	seen := newSrv(func(*config.Config) {})
+	if !strings.Contains(seen["cluster_status"].Description, "$/hour") || !strings.Contains(seen["partitions"].Description, "$/node-hour") {
+		t.Errorf("caller who sees cost should be told about it: %q / %q", seen["cluster_status"].Description, seen["partitions"].Description)
+	}
+	for name, mut := range map[string]func(*config.Config){
+		"show_cost false":       func(c *config.Config) { c.ShowCost = false },
+		"tier not in show_cost": func(c *config.Config) { c.ShowCostTiers = []string{"R2"} },
+	} {
+		tools := newSrv(mut)
+		for _, tool := range []string{"cluster_status", "partitions"} {
+			if d := tools[tool].Description; strings.Contains(d, "$") || strings.Contains(d, "price") {
+				t.Errorf("%s: %s description advertises cost: %q", name, tool, d)
+			}
+		}
 	}
 }
