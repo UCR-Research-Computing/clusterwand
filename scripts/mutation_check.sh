@@ -366,6 +366,11 @@ mutate "f3 cli no overwrite"            cmd/clusterwand/discover.go '			if _, er
 mutate "f3 cli approved kept"           cmd/clusterwand/discover.go '			if sp, err := site.Parse(b); err == nil && sp.Approved {' '			if false {'
 mutate "f3 cli R1 only"                 cmd/clusterwand/discover.go '	cfg.Tiers = []string{"R1"}' '	cfg.Tiers = append(cfg.Tiers, "A1")'
 mutate "f3 probe restricted"            internal/discover/discover.go '	open := func(p Partition) bool { return !p.Restricted && p.State == "up" }' '	open := func(p Partition) bool { return p.State == "up" }'
+mutate "f4 results hidden listing"     internal/core/results.go '		if hiddenRel(parts[2]) {' '		if false {'
+mutate "f4 results hidden download"    internal/core/results.go '		if hiddenRel(name) {' '		if false {'
+mutate "f4 results hidden component"   internal/core/results.go '		if hiddenOrSensitive(part) {
+			return true' '		if false {
+			return true'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 )
 
 const goodScript = "#!/bin/bash\n#SBATCH -p computehigh\n#SBATCH -N 1\n#SBATCH -t 01:00:00\n#SBATCH -J hello\nmodule load python-sci\npython -c 'print(42)' > answer.txt\n"
@@ -163,8 +164,14 @@ func TestTokenExpiryAndTampering(t *testing.T) {
 		t.Fatalf("expired token accepted: %v", err)
 	}
 	s.Now = func() time.Time { return base }
-	if _, err := s.ConfirmSubmit(ctx, "bf1-000000000000000000000000000000000000"); err == nil {
+	_, err = s.ConfirmSubmit(ctx, "bf1-000000000000000000000000000000000000")
+	if err == nil {
 		t.Fatal("made-up token accepted")
+	}
+	// F4 live: the audit log redacted "confirm_token: prepare" to "[REDACTED] the
+	// action again"; the message must survive redaction as written.
+	if policy.Redact(err.Error()) != err.Error() {
+		t.Errorf("error text is mangled by redaction: %q", policy.Redact(err.Error()))
 	}
 	// tamper with the stored script: the hash check must refuse
 	p, _ = s.PrepareSubmit(ctx, SubmitInput{Script: goodScript})
@@ -323,6 +330,49 @@ func TestJobResults(t *testing.T) {
 	r, _ = s.JobResults(ctx, ResultsInput{JobID: "236", Download: true, Files: []string{"answer.txt"}})
 	if len(r.Saved) != 1 || r.Saved[0] != "answer.txt.1" {
 		t.Errorf("second download: %v", r.Saved)
+	}
+}
+
+// Found live in F4: a job folder holding .gitignore, macOS ._* files and
+// credential-like names must not list, read or download them (SPEC 18.4).
+func TestResultsHideHiddenAndCredentialFiles(t *testing.T) {
+	s, fx := a1Service(t)
+	ctx := context.Background()
+	dir := "/home/alice_ucr_edu/deep-research-lab/run_76"
+	fx.Files = map[string]map[string]string{dir: {
+		"answer.txt": "42\n", ".gitignore": "*.key\n", "accounts/._accounts.yaml": "x",
+		".git/config": "[core]\n", "keys/id_ed25519": "k", "api_token.txt": "t",
+	}}
+	r, err := s.JobResults(ctx, ResultsInput{JobID: "236"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Files) != 1 || r.Files[0].Path != "answer.txt" || r.TotalFiles != 1 || r.LeftOut != 5 {
+		t.Fatalf("files %+v total %d left_out %d", r.Files, r.TotalFiles, r.LeftOut)
+	}
+	if len(r.Notes) == 0 || !strings.Contains(r.Notes[0], "5 hidden or credential-like") {
+		t.Errorf("notes: %v", r.Notes)
+	}
+	for _, f := range []string{".gitignore", "accounts/._accounts.yaml", ".git/config", "keys/id_ed25519", "api_token.txt"} {
+		if _, err := s.JobResults(ctx, ResultsInput{JobID: "236", Read: f}); err == nil {
+			t.Errorf("read %s", f)
+		}
+		if _, err := s.JobResults(ctx, ResultsInput{JobID: "236", Read: f, Grep: "x"}); err == nil {
+			t.Errorf("grep %s", f)
+		}
+		if _, err := s.JobResults(ctx, ResultsInput{JobID: "236", Download: true, Files: []string{f}}); err == nil {
+			t.Errorf("download %s", f)
+		}
+	}
+	r, err = s.JobResults(ctx, ResultsInput{JobID: "236", Download: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Saved) != 1 || r.Saved[0] != "answer.txt" {
+		t.Fatalf("whole-folder download saved %v", r.Saved)
+	}
+	if _, err := os.Stat(filepath.Join(r.Downloaded, ".gitignore")); err == nil {
+		t.Error(".gitignore written to this machine")
 	}
 }
 

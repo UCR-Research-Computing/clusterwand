@@ -628,11 +628,11 @@ func (s *Service) take(st *a1State, tok, kind string) (pending, error) {
 	key := tokenKey(strings.TrimSpace(tok))
 	p, ok := st.Pending[key]
 	if !ok {
-		return pending{}, errors.New("unknown or already used confirm_token: prepare the action again")
+		return pending{}, errors.New("unknown or already used confirm_token; prepare the action again")
 	}
 	delete(st.Pending, key) // single use, even when it then fails
 	if s.Now().After(p.Expires) {
-		return pending{}, errors.New("confirm_token expired: prepare the action again")
+		return pending{}, errors.New("confirm_token expired; prepare the action again")
 	}
 	if p.Kind != kind {
 		return pending{}, fmt.Errorf("this confirm_token is for %s, not %s", p.Kind, kind)

@@ -785,6 +785,9 @@ Hidden entries (any path component starting with `.`: `.ssh`, `.config`, `.aws`,
 `.bash_history`...) and credential-like names (`id_*`, `*.pem`, `*.key`, `*.p12`,
 `*.pfx`, `*.env`, names containing `credential`, `secret`, `token` or `password`) are
 refused for reading and left out of listings. Everything returned is redacted.
+The same rule covers job folders (ClusterWand v0.5.0): `job_results` leaves hidden and
+credential-like files out of its listing (counted in `left_out`), so they cannot be read,
+searched or picked for download, and a whole-folder download skips them when unpacking.
 
 ### 18.5 Why there is no shell tool
 
@@ -1421,6 +1424,7 @@ the person can reach with their own SSH (internal/discover, cmd/clusterwand/disc
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-29 | ClusterWand v0.5.0 | Live L1 campaign on Ursa Major over plain SSH (docs/LIVE_CAMPAIGN_F4.md): every R1, R2 and A1 tool through the CLI and the stdio MCP server, 25 negative cases, a 10-call parallel burst, one real two-step submit on `check` read back with the tools, `discover` run live. Fixed: `job_results` listed, read and downloaded hidden and credential-like files inside a job folder (section 18.4 now covers job folders); new `build-failure` diagnosis rule (compiler/linker errors); confirm-token error wording no longer mangled by redaction in the audit log. 3 new mutation guards |
 | 2026-10-29 | ClusterWand v0.4.0 | Section 27: `clusterwand discover` drafts site.yaml + catalog.json (approved: false) from read-only login-node probes; host-key pinning (`host_keys`, strict, own known_hosts); local `catalog_file` with a draft gate; `--record` anonymised fixtures; `--compare` with a reviewed profile. Ursa draft matches the hand profile on every inferred field. 23 new mutation guards |
 | 2026-10-28 | ClusterWand v0.3.0 | Section 26: plain-text Slurm reads are the primary path (squeue -O, sacct -P with header, scontrol -o, sacct -B), JSON behind site `slurm.json`; text and JSON answers identical on the fixtures and live on Ursa; Slurm 21.08 field fallbacks; output-path pattern expansion. Lab-locked partitions (AllowAccounts/DenyAccounts/AllowGroups) read live: hidden from `partitions`, refused with a working `--account` in `script_check`/`job_submit`/`interactive_help`, skipped in fallback advice. Real 21.08 and 25.11 text fixtures; optional containerised Slurm 21.08 workflow. 30 new mutation guards |
 | 2026-10-28 | ClusterWand v0.2.0 | Site profiles (section 25): every Ursa constant moved from `internal/` to `sites/ursa-major/site.yaml`; charge models `usd_per_node_hour`, `su_per_core_hour` (SU caps), `none`; generic profile when none is set; Ursa golden tests byte-identical to v0.1.0; synthetic second site proves no Ursa strings or dollar figures leak. Fixed on the way: SU prices showing in `usd` fields of partitions, job cost, waste and allocation. Mutation guards: 12 repointed to moved code, 19 new (167) |

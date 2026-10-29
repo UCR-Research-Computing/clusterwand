@@ -35,3 +35,7 @@ hand-written profile has them: home, scratch, cloud nodes, probe `check`, genera
 `$/node-hour` charge model and the published catalog, `fast`, the stockout fallbacks, CPU
 notes and AVX2-only partitions (the nodes advertise no CPU features), stockout reasons,
 help desk name and the 65 wording keys. Details: docs/SPEC.md section 27.
+
+F4 (v0.5.0): the same discover run live against `ursa-login` gives the same result (8 of 19
+fields agree, the 2 differences are AVX2-only partitions and the python module list; the
+rest is by hand). Live campaign: docs/LIVE_CAMPAIGN_F4.md.

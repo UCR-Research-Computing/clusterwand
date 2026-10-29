@@ -284,7 +284,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 | F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | done, v0.2.0 |
 | F2 | Slurm adapter: plain-text reads as the primary path (Slurm 21.08 to 25.11), JSON behind a site flag; lab-locked partitions (AllowAccounts/AllowGroups) | done, v0.3.0 |
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey; host-key pin; review gate | done, v0.4.0 |
-| F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |
+| F4 | Live campaign on a real cluster over plain SSH ([report](docs/LIVE_CAMPAIGN_F4.md)) | done, v0.5.0 |
 | Later | Multi-cluster configs | not started |
 
 ## Development

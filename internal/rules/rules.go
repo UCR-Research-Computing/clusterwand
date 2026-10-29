@@ -159,6 +159,12 @@ var logRules = []logRule{
 		re:         regexp.MustCompile(`(?m)^(NameError|TypeError|ValueError|IndexError|KeyError|UnboundLocalError|FileNotFoundError|AssertionError|RuntimeError): .+$`),
 		suggestion: "A bug in the script (not the cluster): read the traceback just above this line for the file and line number, fix it there, and rerun. If earlier stages finished, rerun only the failed step instead of the whole job.",
 	},
+	{
+		// F4 live (Ursa job 1588): a source build stopped at the link step.
+		id: "build-failure", severity: Error, title: "A software build failed to compile or link",
+		re:         regexp.MustCompile(`undefined reference to ` + "`" + `|collect2: error: ld returned|ld: cannot find -l\S+|(?m)^\S+\.(?:c|cc|cpp|cxx|cu|f90|F90|f):\d+:\d+: (?:fatal )?error: `),
+		suggestion: "The build stopped at the compiler or linker, not the cluster. Read the first error, not the last (rerun make serially, e.g. make -j1, to find it). Undefined references usually mean a missing library or mismatched build options (CUDA/MPI on or off, compiler versions); use one compiler module for the whole build, start from a clean build folder, or use an existing module or container instead of building.",
+	},
 }
 
 // Explain runs every rule and returns the findings, most important first.
