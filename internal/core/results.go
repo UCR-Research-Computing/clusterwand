@@ -82,11 +82,50 @@ func (s *Service) jobFolder(ctx context.Context, jobID string) (*JobDetail, stri
 	if err := s.checkLogPath(dir+"/x", d.User); err != nil {
 		return nil, "", err
 	}
+	if err := s.checkJobDir(dir, d.User); err != nil {
+		return nil, "", err
+	}
+	// v0.5.1: a working directory reached through a symlink must still land in
+	// the allowed roots, outside hidden and credential-like folders
+	rc, err := backend.Realpath(dir)
+	if err != nil {
+		return nil, "", err
+	}
+	out, err := s.run(ctx, rc)
+	if errors.Is(err, backend.ErrUnreachable) {
+		return nil, "", err
+	}
+	// a folder that is gone resolves to nothing: the listing below is simply
+	// empty, as before; only a folder that exists can lead somewhere else
+	if real := strings.TrimSpace(string(out)); err == nil && real != dir {
+		if err := s.checkLogPath(real+"/x", d.User); err != nil {
+			return nil, "", fmt.Errorf("job %s's folder %s is a link to %s: %w", jobID, dir, real, err)
+		}
+		if err := s.checkJobDir(real, d.User); err != nil {
+			return nil, "", fmt.Errorf("job %s's folder %s is a link to %s: %w", jobID, dir, real, err)
+		}
+		dir = real
+	}
 	home := site.Dir(s.Site.Paths.Home, d.User)
 	if dir == home || dir == home+"/" {
 		return nil, "", fmt.Errorf("job %s ran in your home folder itself (%s); listing it would show everything you own. Submit jobs with clusterwand (they run in ~/clusterwand-jobs/...) or give it a folder", jobID, dir)
 	}
 	return d, dir, nil
+}
+
+// checkJobDir refuses a job folder with a hidden or credential-like component
+// below its allowed root (a job run from ~/.ssh must not expose ~/.ssh).
+func (s *Service) checkJobDir(dir, owner string) error {
+	for _, root := range s.Cfg.LogRoots {
+		r := strings.TrimSuffix(strings.ReplaceAll(root, "{user}", owner), "/")
+		if rel, ok := strings.CutPrefix(dir, r+"/"); ok {
+			if hiddenRel(rel) {
+				return fmt.Errorf("%w: %s is inside a hidden or credential-like folder; clusterwand does not read those", policy.ErrDenied, dir)
+			}
+			return nil
+		}
+	}
+	return nil // checkLogPath has already refused folders outside every root
 }
 
 // hiddenRel reports whether any component of a job-folder relative path is

@@ -33,6 +33,7 @@
         "squeue --json -j 236",
         "sacct --json -j 236",
         "cat -- /apps/docs/catalog.json",
+        "realpath -e -- /home/alice_ucr_edu/deep-research-lab/run_76",
         "bash -c 'find \"$1\" -maxdepth 10 -type f -printf '\\''%s\\t%T@\\t%P\\n'\\'' 2\u003e/dev/null | head -n 200001' clusterwand /home/alice_ucr_edu/deep-research-lab/run_76"
       ]
     },

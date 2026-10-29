@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,5 +115,27 @@ func TestRedactWholeAssignedValue(t *testing.T) {
 	}
 	if !strings.Contains(out, "normal line 42") {
 		t.Error("over-redacted")
+	}
+}
+
+// TestAuditDashNeverStdout: audit_path "-" must not write to stdout, which
+// carries the MCP stdio protocol (review finding, v0.5.1).
+func TestAuditDashNeverStdout(t *testing.T) {
+	if auditStream == io.Writer(os.Stdout) {
+		t.Fatal("audit_path \"-\" writes to stdout")
+	}
+	var buf strings.Builder
+	old := auditStream
+	auditStream = &buf
+	defer func() { auditStream = old }()
+	a, err := NewAudit("-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Write(Record{Tool: "x", Decision: "allowed"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"tool":"x"`) {
+		t.Errorf("audit line not written: %q", buf.String())
 	}
 }

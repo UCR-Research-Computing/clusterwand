@@ -431,6 +431,22 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	if float64(mins) > caps.MaxHours*60 {
 		return nil, fmt.Errorf("%w: time limit %d min is over the %.0f h cap (caps.max_hours)", ErrCapExceeded, mins, caps.MaxHours)
 	}
+	// v0.5.1: a job array is one sbatch but many jobs; each task gets the enforced
+	// nodes and time, so every cap that counts money counts all of them. A
+	// heterogeneous job's later components keep their own #SBATCH resources (the
+	// enforced command-line flags reach only the first), so it is refused.
+	if req["hetjob"] != "" || req["packjob"] != "" {
+		return nil, errors.New("heterogeneous jobs (#SBATCH hetjob / packjob) are not supported: the caps apply only to the first component; submit each component as its own job")
+	}
+	tasks := 1
+	if spec := req["array"]; spec != "" {
+		n, ok := arrayTasks(spec)
+		if !ok {
+			return nil, fmt.Errorf("--array=%s: cannot count the array's tasks, so the cost caps cannot be checked; use a plain range such as 1-100 or 1-100%%4", spec)
+		}
+		tasks = n
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("job array of %d tasks: the worst case below counts every task", n))
+	}
 	price, priced := s.price(cat, part)
 	jobCap, dayCap, unit := s.chargeCaps()
 	if unit == "SU" && (jobCap <= 0 || dayCap <= 0) {
@@ -446,9 +462,13 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	if s.partitionShared(ctx, part) {
 		share = coreRequest(req, cp, true).NodeShare
 	}
-	worst := round(price*float64(nodes)*share*float64(mins)/60, 2)
+	worst := round(price*float64(nodes)*share*float64(mins)/60*float64(tasks), 2)
 	if worst > jobCap {
-		return nil, fmt.Errorf("%w: worst case %s (%d node(s) x %.0f%% of a node x %d min x %s/node-h) is over the %s per-job cap", ErrCapExceeded, s.amount(worst), nodes, 100*share, mins, s.amount(price), s.amount(jobCap))
+		perTask := ""
+		if tasks > 1 {
+			perTask = fmt.Sprintf(" x %d array tasks", tasks)
+		}
+		return nil, fmt.Errorf("%w: worst case %s (%d node(s) x %.0f%% of a node x %d min x %s/node-h%s) is over the %s per-job cap", ErrCapExceeded, s.amount(worst), nodes, 100*share, mins, s.amount(price), perTask, s.amount(jobCap))
 	}
 
 	lk, err := s.lockState()

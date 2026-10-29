@@ -29,6 +29,7 @@
 | | |
 |---|---|
 | Document | Specification and design (Draft 8, 2026-10-27: adds planned section 24, allocation framing; built through bifrost v0.9.18 and ursa-agent 0.4.6) |
+| ClusterWand status | v0.5.1 (2026-10-29): CLI and MCP over stdio on the user's machine, SSH only (no hosted server, OAuth, IAP or staging). Site profiles, plain-text Slurm reads, `discover`, live-tested on Ursa Major (docs/LIVE_CAMPAIGN_F4.md). The Status row below is ursa-bifrost history at the fork. |
 | Status | bifrost v0.9.18, ursa-agent 0.4.6 (released tags), 2026-10-27 (spec Draft 8; section 24 planned). Built and live: CLI, MCP over stdio (laptop) and over HTTP with Google sign-in (Cloud Run `bifrost-mcp`), and ursa-agent (Cloud Run): a read-only cluster dashboard with the chat assistant in a drawer. Ursa Major shares nodes on every partition but highmem and gpul4 since 2026-10-02 (section 19). Sections 17-21 and 23 and docs/CLOUD_PLAN.md record what was built (22 and 24 are planned); open questions left in section 15. |
 | Owner | Chuck Forsyth (UCR Research Computing) |
 | Name | `ursa-bifrost` (repo, folder); CLI and MCP command `bifrost`. Was working name `hpc-agent`. |
@@ -453,7 +454,7 @@ server:
 staging: {bucket: ucr-ursa-major-hpc-cluster-bifrost-staging, upload_minutes: 15, link_minutes: 60,
           max_upload_bytes: 5368709120, max_user_bytes: 21474836480, max_link_bytes: 2147483648,
           retain_days: 7}
-audit_path: "-"              # stdout -> Cloud Logging
+audit_path: "-"              # (ursa-bifrost hosted: stdout -> Cloud Logging; ClusterWand: stderr)
 caps: {..., max_cost_usd_per_day: 50}   # hosted day cap (per person)
 show_cost_tiers: [R2]        # researchers (R1) see work units only; dollars to staff
 ```
@@ -1424,6 +1425,7 @@ the person can reach with their own SSH (internal/discover, cmd/clusterwand/disc
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-29 | ClusterWand v0.5.1 | Fresh-eyes review fixes. A1: `job_submit` and `script_check` count every task of an `#SBATCH --array`/`-a` job in the worst case and caps (an array was priced as one task); uncountable array specs and heterogeneous jobs (`hetjob`/`packjob`) are refused. `job_results`: the job folder is resolved with realpath and refused when it, or its link target, is hidden, credential-like or outside the allowed roots (section 18.4). Audit `"-"` goes to stderr (stdout is the MCP stdio stream). 10 new mutation guards |
 | 2026-10-29 | ClusterWand v0.5.0 | Live L1 campaign on Ursa Major over plain SSH (docs/LIVE_CAMPAIGN_F4.md): every R1, R2 and A1 tool through the CLI and the stdio MCP server, 25 negative cases, a 10-call parallel burst, one real two-step submit on `check` read back with the tools, `discover` run live. Fixed: `job_results` listed, read and downloaded hidden and credential-like files inside a job folder (section 18.4 now covers job folders); new `build-failure` diagnosis rule (compiler/linker errors); confirm-token error wording no longer mangled by redaction in the audit log. 3 new mutation guards |
 | 2026-10-29 | ClusterWand v0.4.0 | Section 27: `clusterwand discover` drafts site.yaml + catalog.json (approved: false) from read-only login-node probes; host-key pinning (`host_keys`, strict, own known_hosts); local `catalog_file` with a draft gate; `--record` anonymised fixtures; `--compare` with a reviewed profile. Ursa draft matches the hand profile on every inferred field. 23 new mutation guards |
 | 2026-10-28 | ClusterWand v0.3.0 | Section 26: plain-text Slurm reads are the primary path (squeue -O, sacct -P with header, scontrol -o, sacct -B), JSON behind site `slurm.json`; text and JSON answers identical on the fixtures and live on Ursa; Slurm 21.08 field fallbacks; output-path pattern expansion. Lab-locked partitions (AllowAccounts/DenyAccounts/AllowGroups) read live: hidden from `partitions`, refused with a working `--account` in `script_check`/`job_submit`/`interactive_help`, skipped in fallback advice. Real 21.08 and 25.11 text fixtures; optional containerised Slurm 21.08 workflow. 30 new mutation guards |

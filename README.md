@@ -228,7 +228,7 @@ occasionally be manipulated by text it reads.
   `internal/backend/command.go` and `files.go`, each validating its arguments; shell
   templates are fixed text and caller values arrive only as positional parameters.
   `TestAllowListIsClosed` pins the allow-list, and `scripts/mutation_check.sh` disables
-  each of 148 guards in turn and requires a test to fail.
+  each safety guard (over 230) in turn and requires a test to fail.
 - **Read-only by default; acting takes two steps.** State changes exist only in tier A1. A
   prepare call stores the exact action under a random single-use token (10-minute expiry,
   bound to the plan hash); the confirm call accepts nothing but the token. Caps on nodes,

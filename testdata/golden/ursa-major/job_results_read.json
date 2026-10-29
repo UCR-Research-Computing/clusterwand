@@ -44,6 +44,7 @@
         "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand -j 236",
         "bash -c 'f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName; sacct --helpformat | grep -qw StdOut || f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName; SLURM_TIME_FORMAT=%s exec sacct -P --noconvert --delimiter=$'\\''\\037'\\'' -o \"$f\" \"$@\"' clusterwand -j 236",
         "cat -- /apps/docs/catalog.json",
+        "realpath -e -- /home/alice_ucr_edu/deep-research-lab/run_76",
         "bash -c 'find \"$1\" -maxdepth 10 -type f -printf '\\''%s\\t%T@\\t%P\\n'\\'' 2\u003e/dev/null | head -n 200001' clusterwand /home/alice_ucr_edu/deep-research-lab/run_76",
         "bash -c 'set -e; [ -f \"$1\" ] || { echo \"$1: not a regular file\" \u003e\u00262; exit 4; }; stat -L --printf '\\''%s\\n'\\'' -- \"$1\"; dd if=\"$1\" iflag=skip_bytes,count_bytes skip=\"$2\" count=\"$3\" bs=65536 status=none' clusterwand /home/alice_ucr_edu/deep-research-lab/run_76/log.txt 0 16384"
       ]

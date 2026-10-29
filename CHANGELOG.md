@@ -5,6 +5,26 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.5.1 - 2026-10-29
+
+Fixes from a fresh-eyes adversarial review of v0.5.0.
+
+- **Fix: job arrays now count against the caps per task.** `job_submit` priced an
+  `#SBATCH --array` job as one task, so a 1000-task array of one-hour jobs was planned at
+  1/1000 of its real worst case and passed the per-job and per-day caps; `-a` was not read
+  at all. The worst case (and `script_check`'s estimate) now multiply by the number of
+  tasks, a spec that cannot be counted is refused, and heterogeneous jobs
+  (`#SBATCH hetjob`/`packjob`, whose later components escape the enforced flags) are
+  refused.
+- **Fix: `job_results` checks the job folder itself.** A job whose working directory was
+  hidden or credential-like (`~/.config/app`, `~/secrets/run`), or a symlink leading out of
+  the allowed roots or into such a folder, was listed and readable. The folder is now
+  resolved on the cluster and checked like `files_list` paths.
+- **Fix: `audit_path: "-"` writes to stderr**, not stdout, where it would corrupt the MCP
+  stdio stream.
+- Docs: the mutation-guard count is no longer pinned (it said 148).
+- **Mutation check:** 10 new guards (v051*).
+
 ## v0.5.0 - 2026-10-29
 
 - **Live campaign on Ursa Major over plain SSH** ([docs/LIVE_CAMPAIGN_F4.md](docs/LIVE_CAMPAIGN_F4.md)):
