@@ -267,3 +267,18 @@ func TestSummaryRowWithoutRestarts(t *testing.T) {
 		t.Errorf("%+v", js[0])
 	}
 }
+
+// "CANCELLED by <uid>": the owner's uid reads as the owner; anyone else's uid
+// is reported as a uid, never as the owner.
+func TestSacctCancelledByOther(t *testing.T) {
+	h := strings.Join([]string{"JobIDRaw", "UID", "User", "State", "JobName"}, Delim)
+	rows := h + "\n" + strings.Join([]string{"7", "1000", "alice", "CANCELLED by 0", "x"}, Delim) + "\n" +
+		strings.Join([]string{"8", "1000", "alice", "CANCELLED by 1000", "y"}, Delim) + "\n"
+	js, err := ParseSacctText([]byte(rows))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if js[0].KillRequestUser != "uid 0" || js[1].KillRequestUser != "alice" || js[0].StateName() != "CANCELLED" {
+		t.Errorf("by: %q %q", js[0].KillRequestUser, js[1].KillRequestUser)
+	}
+}

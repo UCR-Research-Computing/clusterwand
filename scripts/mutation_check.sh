@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml"
+FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -280,6 +280,67 @@ mutate "f1 sharing-only usd strip"    internal/core/service.go '	case *ScriptChe
 			_ = v'
 mutate "f1 waste price gated"         internal/core/p2.go 'if p, ok := s.price(cat, part); ok && s.canSeeCost() {' 'if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost {'
 mutate "f1 catalog resource stripped" internal/core/service.go '				v.Partitions[i].USDPerNodeHr = nil' '				_ = i'
+# F2: plain-text Slurm reads and lab-locked partitions
+mutate "f2 squeue user validated"       internal/backend/command.go 'func SqueueUserText(user string) (Command, error) {
+	if err := ValidUser(user); err != nil {' 'func SqueueUserText(user string) (Command, error) {
+	if err := ValidUser(user); err != nil && false {'
+mutate "f2 sacct job validated"         internal/backend/command.go 'func SacctJobText(id string) (Command, error) {
+	if err := ValidJobID(id); err != nil {' 'func SacctJobText(id string) (Command, error) {
+	if err := ValidJobID(id); err != nil && false {'
+mutate "f2 assoc user validated"        internal/backend/command.go 'func Assoc(user string) (Command, error) {
+	if err := ValidUser(user); err != nil {' 'func Assoc(user string) (Command, error) {
+	if err := ValidUser(user); err != nil && false {'
+mutate "f2 assoc not public"            internal/backend/command.go '"format=DefaultAccount,Account,Partition"}, kind: KindCatalog}' '"format=DefaultAccount,Account,Partition"}, kind: KindCatalog, public: true}'
+mutate "f2 job_ids uncached"            internal/backend/command.go 'squeueTextTemplate, "clusterwand", "-j", list}, kind: KindNoCache' 'squeueTextTemplate, "clusterwand", "-j", list}, kind: KindQueue'
+mutate "f2 legacy sacct fields"         internal/backend/command.go 'sacct --helpformat | grep -qw StdOut || f=' 'true || f='
+mutate "f2 summary restarts compat"     internal/backend/command.go "| sed 's/|/||/15'" "| cat"
+mutate "f2 squeue row field count"      internal/slurm/text.go '		if len(f) != n {
+			return nil, fmt.Errorf("squeue row' '		if len(f) < 0 {
+			return nil, fmt.Errorf("squeue row'
+mutate "f2 sacct name last"             internal/slurm/text.go '	if col["jobname"] != len(head)-1 {' '	if false {'
+mutate "f2 sacct steps attach"          internal/slurm/text.go '			jobs[i].Steps = append(jobs[i].Steps, st)
+			continue' '			_ = st
+			continue'
+mutate "f2 cancel by uid"               internal/slurm/text.go '			if by == get("UID") {' '			if true {'
+mutate "f2 pattern relative"            internal/slurm/text.go '	if !strings.HasPrefix(p, "/") && j.WorkDir != "" {' '	if false {'
+mutate "f2 pattern array task"          internal/slurm/text.go '			case "a":
+				return num(task)' '			case "a":
+				return num("0")'
+mutate "f2 not responding"              internal/slurm/text.go 'out = append(out, strings.TrimSuffix(p, "*"), "NOT_RESPONDING")' 'out = append(out, strings.TrimSuffix(p, "*"))'
+mutate "f2 reason by split"             internal/slurm/text.go '				n.Reason, n.ReasonSetBy, n.ReasonAt = m[1], m[2], numOf(m[3])' '				_ = m'
+mutate "f2 ALL is unrestricted"         internal/slurm/text.go '	if s == "" || s == "ALL" {' '	if s == "" {'
+mutate "f2 limit unlimited"             internal/slurm/text.go '			return Num{Infinite: true} // UNLIMITED, Partition_Limit' '			return Num{}'
+mutate "f2 text is default"             internal/core/slurmread.go 'func (s *Service) useJSON() bool { return s.Site.Slurm.JSON }' 'func (s *Service) useJSON() bool { return true }'
+mutate "f2 text script read"            internal/core/jobs.go '				j.Script = s.batchScript(ctx, fmt.Sprint(j.JobID))' '				_ = j'
+mutate "f2 deny accounts"               internal/core/access.go '		if d == acct {
+			return false' '		if d == acct {
+			return true'
+mutate "f2 allow accounts"              internal/core/access.go '		if x == acct {
+			return true
+		}
+	}
+	return false' '		if x == acct {
+			return true
+		}
+	}
+	return true'
+mutate "f2 allow groups"                internal/core/access.go '		if !in {
+			return fmt.Sprintf' '		if false {
+			return fmt.Sprintf'
+mutate "f2 assoc partition scope"       internal/core/access.go '		if (as.Partition == "" || as.Partition == part) && !seen[as.Account] {' '		if !seen[as.Account] {'
+mutate "f2 named account held"          internal/core/access.go '	if account != "" && !contains(usable, account) {' '	if false {'
+mutate "f2 unknown limits allow"        internal/core/access.go '	if a == nil {
+		return "", ""
+	}
+	p, ok := a.parts[part]' '	if a == nil {
+		return "locked", ""
+	}
+	p, ok := a.parts[part]'
+mutate "f2 partitions hide locked"      internal/core/cluster.go '		if !acc.allowed(p.Name) {' '		if false {'
+mutate "f2 script_check locked"         internal/core/cluster.go '			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); why != "" {' '			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); false && why != "" && fix != "" {'
+mutate "f2 interactive locked"          internal/core/helpers.go '	if why, fix := s.partitionAccess(ctx).check(part, ""); why != "" {' '	if why, fix := s.partitionAccess(ctx).check(part, ""); false && why != "" && fix != "" {'
+mutate "f2 fallback skips locked"       internal/core/a1.go '		if p != part && upIdle[p] && acc.allowed(p) {' '		if p != part && upIdle[p] && acc != nil {'
+mutate "f2 invalidate text queue"       internal/core/a1.go 'strings.Contains(k, "exec squeue ") ||' 'false ||'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

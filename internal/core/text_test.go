@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -359,5 +361,60 @@ func TestFallbackSkipsLabLocked(t *testing.T) {
 	var nilAccess *access
 	if !nilAccess.allowed("highmem") {
 		t.Error("unknown limits must allow")
+	}
+}
+
+// A state change drops the cached text queue and accounting reads too.
+func TestInvalidateDropsTextReads(t *testing.T) {
+	s, _ := newTestService(t)
+	ctx := context.Background()
+	if _, err := s.queue(ctx, queueSel{user: "alice_ucr_edu"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.acctJobs(ctx, []string{"236"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.nodes(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.cache) < 3 {
+		t.Fatalf("expected cached reads, got %d", len(s.cache))
+	}
+	s.invalidateQueue()
+	for k := range s.cache {
+		if strings.Contains(k, "squeue") || strings.Contains(k, "sacct") || strings.Contains(k, "show nodes") {
+			t.Errorf("still cached after a state change: %.80s", k)
+		}
+	}
+}
+
+// The stockout advice never points at a partition the caller may not use.
+func TestPartitionTroubleSkipsLabLocked(t *testing.T) {
+	dir := t.TempDir()
+	for _, f := range []string{"catalog.json", "squeue.json", "sacct_jobs.json", "sharing.txt"} {
+		b, err := os.ReadFile(filepath.Join("../../testdata", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = os.WriteFile(filepath.Join(dir, f), b, 0o644)
+	}
+	nodes := `{"meta":{"slurm":{"release":"25.11.4"}},"nodes":[
+{"name":"s-0","state":["DOWN","CLOUD"],"partitions":["standard"],"reason":"RESOURCE_POOL_EXHAUSTED","cpus":16},
+{"name":"h-0","state":["IDLE","CLOUD"],"partitions":["highmem"],"cpus":32},
+{"name":"c-0","state":["IDLE","CLOUD"],"partitions":["computehigh"],"cpus":22}]}`
+	_ = os.WriteFile(filepath.Join(dir, "nodes.json"), []byte(nodes), 0o644)
+	s, _ := newTestService(t)
+	s.Backend = &backend.Fixture{Dir: dir, User: "alice_ucr_edu", Partitions: labPartitions, Accounts: "general|general|\n", Groups: "x"}
+	s.Site.Partitions.FallbackIdle = []string{"highmem", "computehigh"}
+	s.Site.Partitions.FallbackCold = []string{"highmem", "computehigh"}
+	why := s.partitionTrouble(context.Background(), "standard")
+	if !strings.Contains(why, "consider partition computehigh") || strings.Contains(why, "highmem") {
+		t.Errorf("advice: %q", why)
+	}
+	// a lab member may be pointed at highmem
+	s.Backend = &backend.Fixture{Dir: dir, User: "alice_ucr_edu", Partitions: labPartitions, Accounts: "staff|staff|\n", Groups: "x"}
+	s.cache = map[string]cacheEntry{}
+	if why := s.partitionTrouble(context.Background(), "standard"); !strings.Contains(why, "consider partition highmem") {
+		t.Errorf("lab member advice: %q", why)
 	}
 }
