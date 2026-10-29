@@ -243,3 +243,27 @@ func TestTextParsersRefuseBadRows(t *testing.T) {
 		t.Error("short assoc row accepted")
 	}
 }
+
+// The 21.08 summary template prints the list without Restarts and sed puts an
+// empty column back before JobName (sed 's/|/||/15'): the row parses with 0.
+func TestSummaryRowWithoutRestarts(t *testing.T) {
+	legacy := "4|alice|normal|COMPLETED|None|0:0|c1|1|1793239840|1793240341|1793240541|200|00:00.036|billing=1,cpu=1,mem=500M,node=1||we|ird"
+	// what sed does to the 16-field row: the 15th "|" (after MaxRSS) doubles
+	n, i := 0, 0
+	for i = range legacy {
+		if legacy[i] == '|' {
+			n++
+			if n == 15 {
+				break
+			}
+		}
+	}
+	row := legacy[:i] + "|" + legacy[i:]
+	js, err := ParseSacctRows([]byte(row + "\n"))
+	if err != nil || len(js) != 1 {
+		t.Fatalf("%v %d", err, len(js))
+	}
+	if js[0].RestartCnt != 0 || js[0].Name != "we|ird" || js[0].TRES.Allocated.Get("cpu") != 1 {
+		t.Errorf("%+v", js[0])
+	}
+}

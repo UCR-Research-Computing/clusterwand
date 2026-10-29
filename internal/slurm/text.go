@@ -36,7 +36,7 @@ var SacctJobFields = []string{"JobID", "JobIDRaw", "UID", "User", "Account", "Pa
 	"ExitCode", "NodeList", "NNodes", "Submit", "Start", "End", "ElapsedRaw", "TotalCPU", "TimelimitRaw",
 	"AllocTRES", "ReqTRES", "MaxRSS", "Restarts", "WorkDir", "StdOut", "StdErr", "SubmitLine", "JobName"}
 
-// LegacySacctFields are the sacct fields Slurm before 23.02 lacks (21.08 answers
+// LegacySacctFields are the sacct fields older Slurm lacks (21.08 answers
 // `Invalid field requested: "Restarts"`). Without StdOut a finished job's log path
 // is unknown; clusterwand then says so rather than guess slurm-<id>.out.
 var LegacySacctFields = []string{"Restarts", "StdOut", "StdErr"}

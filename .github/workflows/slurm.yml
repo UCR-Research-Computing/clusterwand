@@ -1,0 +1,40 @@
+name: slurm
+# F2: run clusterwand's plain-text Slurm reads against a real (containerised)
+# Slurm 21.08 cluster: every read command is sent exactly as the SSH backend
+# sends it and its output goes through the same parsers. Separate and optional
+# (not a required check): it pulls a ~700 MB image and needs about 3 minutes.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["internal/slurm/**", "internal/backend/command.go", "internal/core/slurmread.go", "internal/core/access.go", ".github/workflows/slurm.yml"]
+
+jobs:
+  slurm-21-08:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: build the live test
+        run: GOOS=linux GOARCH=amd64 go test -c -tags slurmlive -o cwlive.test ./internal/core
+      - name: start Slurm 21.08.6 (giovtorres/docker-centos7-slurm)
+        run: |
+          docker run -dt --privileged --name slurm -h slurmctl giovtorres/docker-centos7-slurm:21.08.6
+          for i in $(seq 1 60); do docker logs slurm 2>&1 | grep -q "Cluster is now available" && break; sleep 5; done
+          docker exec slurm sinfo
+      - name: a user, two accounts, a lab-locked partition, a few jobs
+        run: |
+          docker exec slurm bash -c '
+            useradd -m alice
+            sacctmgr -i add account general labx >/dev/null
+            sacctmgr -i add user alice account=general defaultaccount=general >/dev/null
+            sacctmgr -i add user alice account=labx >/dev/null
+            scontrol update PartitionName=debug AllowAccounts=labx,root
+            su - alice -c "sbatch -J \"pipe|name\" --wrap=\"exit 3\"; sbatch -p debug -A labx -t 10 --wrap=hostname; sbatch -a 0-1 -t 5 --wrap=\"sleep 30\""
+            sleep 10'
+      - name: text reads parse on Slurm 21.08
+        run: |
+          docker cp cwlive.test slurm:/tmp/cwlive.test
+          docker exec slurm su - alice -c 'cd /tmp && SLURM_LIVE_USER=alice SLURM_LIVE_LOCKED=debug ./cwlive.test -test.run Live -test.v'

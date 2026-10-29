@@ -54,8 +54,8 @@ type Fixture struct {
 	// Sharing answers `sinfo -h -o %R|%h` (partition|OverSubscribe lines); empty
 	// means the recorded Dir/sharing.txt.
 	Sharing string
-	// LegacySacct prints sacct text the way Slurm before 23.02 does (no
-	// Restarts, StdOut, StdErr fields).
+	// LegacySacct prints sacct text the way Slurm 21.08 does (no Restarts,
+	// StdOut, StdErr fields).
 	LegacySacct bool
 	// Accounts answers `sacctmgr show user ... withassoc` (DefaultAccount|Account|Partition
 	// lines); empty means the recorded Dir/assoc.txt, else the user's default
@@ -228,7 +228,7 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		if out, ok := f.Out[a[2]]; ok {
 			return []byte(out), nil
 		}
-		if a[2] == sacctSummaryTemplate {
+		if a[2] == sacctSummaryCompat {
 			// the plain-text accounting rows, printed from the same recording
 			// the --json answers come from (so both paths see identical jobs)
 			b, err := read("sacct_jobs.json")

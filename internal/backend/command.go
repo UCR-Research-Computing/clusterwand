@@ -242,7 +242,18 @@ func SacctStates(user, since, states string) (Command, error) {
 // --json spends nearly all its time serializing (a week of one person's jobs:
 // 19.6 s as JSON, 0.2 s as text). Epoch times keep the parse exact. The
 // validated selection (-u user or -a, -S, -E) arrives as positional parameters.
+//
+// F2: Slurm 21.08 has no Restarts field and refuses the whole list. There the
+// template asks for the list without it and puts an empty Restarts column back
+// (sed replaces the 15th "|", the one before JobName, with "||"), so the parser
+// sees the same 17 columns and reads 0 restarts.
 const sacctSummaryTemplate = `SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o ` + slurmFields + ` "$@"`
+
+// sacctSummaryCompat runs sacctSummaryTemplate where sacct knows Restarts.
+const sacctSummaryCompat = `if sacct --helpformat | grep -qw Restarts; then ` + sacctSummaryTemplate + `; fi; set -o pipefail; SLURM_TIME_FORMAT=%s sacct -n -P --noconvert -o ` + slurmLegacyFields + ` "$@" | sed 's/|/||/15'`
+
+// slurmLegacyFields is slurmFields without Restarts.
+const slurmLegacyFields = "JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,JobName"
 
 // slurmFields mirrors slurm.SacctFields (the backend does not import slurm;
 // TestSacctSummaryFields keeps the two equal).
@@ -281,12 +292,12 @@ func sacctSummary(who []string, since, until string) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	argv := append([]string{"bash", "-c", sacctSummaryTemplate, "clusterwand"}, r.argv[2:]...)
+	argv := append([]string{"bash", "-c", sacctSummaryCompat, "clusterwand"}, r.argv[2:]...)
 	return Command{argv: argv, kind: KindAcct}, nil
 }
 
 // SacctSummaryTemplateForTest lets fixtures answer the summary template.
-func SacctSummaryTemplateForTest() string { return sacctSummaryTemplate }
+func SacctSummaryTemplateForTest() string { return sacctSummaryCompat }
 
 // SacctFieldsForTest is the field list the template prints.
 func SacctFieldsForTest() string { return slurmFields }
@@ -337,7 +348,7 @@ func squeueFormat() string {
 }
 
 // sacctTextFields mirrors slurm.SacctJobFields; sacctLegacyFields drops the
-// fields Slurm before 23.02 lacks (Restarts, StdOut, StdErr).
+// fields older Slurm lacks (21.08 has no Restarts, StdOut or StdErr).
 const (
 	sacctTextFields   = "JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName"
 	sacctLegacyFields = "JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName"

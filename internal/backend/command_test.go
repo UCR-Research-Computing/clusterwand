@@ -122,7 +122,7 @@ func TestAllowListIsClosed(t *testing.T) {
 		if c.argv[0] == "scontrol" && (len(c.argv) < 2 || (c.argv[1] != "show" && c.argv[1] != "hold" && c.argv[1] != "release")) {
 			t.Errorf("scontrol may only show, hold or release: %v", c.argv)
 		}
-		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryTemplate &&
+		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryCompat &&
 			c.argv[2] != squeueTextTemplate && c.argv[2] != sacctTextTemplate && c.argv[2] != nodesTextTemplate {
 			t.Errorf("bash only runs module show or the fixed submit template: %v", c.argv)
 		}
@@ -204,7 +204,7 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 			return EnvCheck("check", []string{"gcc"}, []string{"python3"}, map[string]bool{"python3": true})
 		}},
 	}
-	fixed := map[string]bool{treeTemplate: true, readRangeTemplate: true, grepTemplate: true, logWindowTemplate: true, listDirTemplate: true, duTemplate: true, envTemplate: true, sacctSummaryTemplate: true}
+	fixed := map[string]bool{treeTemplate: true, readRangeTemplate: true, grepTemplate: true, logWindowTemplate: true, listDirTemplate: true, duTemplate: true, envTemplate: true, sacctSummaryCompat: true}
 	for _, c := range cs {
 		cmd, err := c.mk()
 		if err != nil {
@@ -319,6 +319,12 @@ func TestSacctSummaryCommand(t *testing.T) {
 	}
 	if !strings.Contains(sacctSummaryTemplate, "-o "+SacctFieldsForTest()+" ") || !strings.HasPrefix(sacctSummaryTemplate, "SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert ") {
 		t.Errorf("template: %s", sacctSummaryTemplate)
+	}
+	// F2: Slurm without Restarts gets the legacy list with an empty column put back
+	if !strings.Contains(sacctSummaryCompat, "grep -qw Restarts; then "+sacctSummaryTemplate+"; fi") ||
+		!strings.Contains(sacctSummaryCompat, "-o "+slurmLegacyFields+` "$@" | sed 's/|/||/15'`) || !strings.Contains(sacctSummaryCompat, "pipefail") ||
+		slurmLegacyFields != strings.Replace(slurmFields, "Restarts,", "", 1) || strings.Count(slurmLegacyFields, ",") != 15 {
+		t.Errorf("compat template: %s", sacctSummaryCompat)
 	}
 }
 
