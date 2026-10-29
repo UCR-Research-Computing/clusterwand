@@ -77,6 +77,11 @@ func TestValidate(t *testing.T) {
 		"su without rates":  ok + "charge: {model: su_per_core_hour}\n",
 		"negative rate":     ok + "charge: {model: su_per_core_hour, rates: {cpu: -1}}\n",
 		"unknown field":     ok + "partitons: {}\n",
+		"bad host key":      ok + "host_keys: [\"node1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\"]\n",
+		"host key option":   ok + "host_keys: [\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\\nProxyCommand x\"]\n",
+		"catalog_file up":   ok + "catalog_file: ../x.json\n",
+		"catalog_file abs":  ok + "catalog_file: /x.json\n",
+		"catalog both":      ok + "catalog: /a/c.json\ncatalog_file: c.json\n",
 	} {
 		if _, err := Parse([]byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -101,5 +106,25 @@ func TestFileAndEmbeddedErrors(t *testing.T) {
 	}
 	if strings.Join(sp.Paths.LogRoots, ",") != "/u/{user}/,/s/{user}/" {
 		t.Errorf("default log roots: %v", sp.Paths.LogRoots)
+	}
+}
+
+func TestCatalogFileAndHostKeys(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "s.yaml")
+	key := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+	_ = os.WriteFile(p, []byte("name: mine\napproved: true\ncatalog_file: catalog.json\nhost_keys: [\""+key+"\"]\n"), 0o600)
+	sp, err := File(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sp.CatalogFilePath() != filepath.Join(dir, "catalog.json") || len(sp.HostKeys) != 1 {
+		t.Errorf("profile: %+v", sp)
+	}
+	if _, err := parseEmbedded([]byte("name: x\napproved: true\ncatalog_file: c.json\n")); err == nil {
+		t.Error("shipped profile with catalog_file accepted")
+	}
+	if ValidHostKey(key) != nil || ValidHostKey("ssh-dss "+key[12:]) == nil {
+		t.Error("ValidHostKey")
 	}
 }

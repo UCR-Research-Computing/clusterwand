@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go"
+FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go internal/backend/ssh.go internal/discover/discover.go internal/discover/record.go internal/discover/hostkeys.go cmd/clusterwand/discover.go"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -343,6 +343,29 @@ mutate "f2 script_check locked"         internal/core/cluster.go '			if why, fix
 mutate "f2 interactive locked"          internal/core/helpers.go '	if why, fix := s.partitionAccess(ctx).check(part, ""); why != "" {' '	if why, fix := s.partitionAccess(ctx).check(part, ""); false && why != "" && fix != "" {'
 mutate "f2 fallback skips locked"       internal/core/a1.go '		if p != part && upIdle[p] && acc.allowed(p) {' '		if p != part && upIdle[p] && acc != nil {'
 mutate "f2 invalidate text queue"       internal/core/a1.go 'strings.Contains(k, "exec squeue ") ||' 'false ||'
+mutate "f3 draft catalog refused"       internal/core/service.go '	if cat.Approved != nil && !*cat.Approved {' '	if false {'
+mutate "f3 local catalog only unset"    internal/core/service.go '	if s.Cfg.CatalogPath == "" && s.Site.CatalogFilePath() != "" {' '	if false {'
+mutate "f3 host key format"             internal/site/site.go '		if err := ValidHostKey(k); err != nil {' '		if err := ValidHostKey(k); false \&\& err != nil {'
+mutate "f3 catalog_file inside folder"  internal/site/site.go 'strings.HasPrefix(c, "../") ||' 'false ||'
+mutate "f3 catalog_file not embedded"   internal/site/site.go '	if err == nil && sp.CatalogFile != "" {' '	if false {'
+mutate "f3 pin strict"                  internal/backend/ssh.go '"-o", "StrictHostKeyChecking=yes",' '"-o", "StrictHostKeyChecking=accept-new",'
+mutate "f3 pin no global file"          internal/backend/ssh.go '"-o", "GlobalKnownHostsFile=/dev/null",' ''
+mutate "f3 pin key newline"             internal/backend/ssh.go '		if strings.ContainsAny(k, "\n\r\x00") || strings.Count(k, " ") != 1 {' '		if false {'
+mutate "f3 pin site name"               internal/backend/ssh.go '	if strings.ContainsAny(site, "/\x00 \n") || site == "" || site == "." || site == ".." {' '	if site == "" {'
+mutate "f3 new pins"                    internal/core/service.go '		if len(sp.HostKeys) > 0 {' '		if false {'
+mutate "f3 draft unapproved"            internal/discover/discover.go '	b.WriteString("approved: false\n")' '	b.WriteString("approved: true\n")'
+mutate "f3 catalog unapproved"          internal/discover/discover.go 'Generator: "clusterwand discover " + d.By, Approved: false,' 'Generator: "clusterwand discover " + d.By, Approved: true,'
+mutate "f3 anon user"                   internal/discover/record.go '		if p.User != "" {' '		if false {'
+mutate "f3 anon ip"                     internal/discover/record.go '		s = rePrivateIP.ReplaceAllString(s, "10.0.0.1")' ''
+mutate "f3 anon accounts"               internal/discover/record.go '				if a == "ALL" || a == "(null)" || a == "N/A" {' '				if true {'
+mutate "f3 anon config filter"          internal/discover/record.go 'Config: scrub(FilterConfig(p.Config))' 'Config: scrub(p.Config)'
+mutate "f3 hostkeys host option"        internal/discover/hostkeys.go '	if strings.HasPrefix(host, "-") || strings.ContainsAny(host, " \t\n\x00") || host == "" {' '	if host == "" {'
+mutate "f3 cli host option"             cmd/clusterwand/discover.go '	if strings.HasPrefix(host, "-") || strings.ContainsAny(host, " \t\n\x00") {' '	if false {'
+mutate "f3 hostkeys valid key"          internal/discover/hostkeys.go '			if site.ValidHostKey(k) == nil && !seen[k] {' '			if !seen[k] {'
+mutate "f3 cli no overwrite"            cmd/clusterwand/discover.go '			if _, err := os.Stat(f); err == nil {' '			if false {'
+mutate "f3 cli approved kept"           cmd/clusterwand/discover.go '			if sp, err := site.Parse(b); err == nil && sp.Approved {' '			if false {'
+mutate "f3 cli R1 only"                 cmd/clusterwand/discover.go '	cfg.Tiers = []string{"R1"}' '	cfg.Tiers = append(cfg.Tiers, "A1")'
+mutate "f3 probe restricted"            internal/discover/discover.go '	open := func(p Partition) bool { return !p.Restricted && p.State == "up" }' '	open := func(p Partition) bool { return p.State == "up" }'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

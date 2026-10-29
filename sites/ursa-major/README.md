@@ -26,3 +26,12 @@ $/node-hour charge model, cloud-node wording and stock-out reasons. Select it wi
 every tool answers byte-identically to ursa-bifrost v0.10.1 on the recorded fixtures with
 this profile loaded. Partition limits (MaxTime, SuspendTime) come from Slurm and the
 catalog at run time; the values checked live on 2026-10-28 are in the file's header.
+
+F3 (v0.4.0): `clusterwand discover --site ursa-discovered --host ursa-login --compare
+ursa-major` drafts a profile from the login node alone. On the recorded probe
+(`testdata/discover/ursa-25.11`) it finds every role it tries to infer exactly as this
+hand-written profile has them: home, scratch, cloud nodes, probe `check`, general
+`standard`, GPU `gpul4`, high-memory `highmem`. What only a person can add here: the
+`$/node-hour` charge model and the published catalog, `fast`, the stockout fallbacks, CPU
+notes and AVX2-only partitions (the nodes advertise no CPU features), stockout reasons,
+help desk name and the 65 wording keys. Details: docs/SPEC.md section 27.

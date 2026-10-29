@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -134,7 +136,13 @@ func New(cfg config.Config) (*Service, error) {
 	case "fixture":
 		be = &backend.Fixture{Dir: cfg.FixturesDir, User: firstNonEmpty(cfg.ClusterUser, "alice_ucr_edu"), Logs: map[string]string{}}
 	default:
-		be = backend.NewSSH(cfg.SSH)
+		ssh := backend.NewSSH(cfg.SSH)
+		if len(sp.HostKeys) > 0 {
+			if err := ssh.Pin(sp.Name, sp.HostKeys, KnownHostsDir(cfg)); err != nil {
+				return nil, fmt.Errorf("pinning %s host keys: %w", sp.Name, err)
+			}
+		}
+		be = ssh
 	}
 	audit, err := policy.NewAudit(config.Expand(cfg.AuditPath))
 	if err != nil {
@@ -145,6 +153,11 @@ func New(cfg config.Config) (*Service, error) {
 		Limiter: policy.NewLimiter(cfg.Limits.CallsPerMin),
 		Now:     time.Now, cache: map[string]cacheEntry{},
 	}, nil
+}
+
+// KnownHostsDir is where pinned host keys are written (next to the A1 state).
+func KnownHostsDir(cfg config.Config) string {
+	return filepath.Join(filepath.Dir(config.Expand(cfg.StatePath)), "known_hosts")
 }
 
 // Close releases backend resources.
@@ -333,6 +346,9 @@ func (s *Service) User(ctx context.Context) (string, error) {
 
 // Catalog fetches (and caches) the cluster catalog.
 func (s *Service) Catalog(ctx context.Context) (*Catalog, error) {
+	if s.Cfg.CatalogPath == "" && s.Site.CatalogFilePath() != "" {
+		return s.localCatalog()
+	}
 	if s.Cfg.CatalogPath == "" {
 		return nil, errors.New("no cluster catalog configured: set catalog_path, or use a site profile that names one")
 	}
@@ -347,6 +363,26 @@ func (s *Service) Catalog(ctx context.Context) (*Catalog, error) {
 	cat, err := parseCatalog(b)
 	if err != nil {
 		return nil, err
+	}
+	cat.GPUModules = s.Site.Modules.GPU
+	return cat, nil
+}
+
+// localCatalog reads the site's own catalog file (catalog_file next to a
+// site_file profile). A discover draft says "approved": false and is refused
+// until a person reviews it.
+func (s *Service) localCatalog() (*Catalog, error) {
+	p := s.Site.CatalogFilePath()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return nil, fmt.Errorf("reading site catalog: %w", err)
+	}
+	cat, err := parseCatalog(b)
+	if err != nil {
+		return nil, err
+	}
+	if cat.Approved != nil && !*cat.Approved {
+		return nil, fmt.Errorf("site catalog %s is a draft (\"approved\": false): review it, then set \"approved\": true", p)
 	}
 	cat.GPUModules = s.Site.Modules.GPU
 	return cat, nil

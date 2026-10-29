@@ -65,6 +65,8 @@ Usage:
   clusterwand confirm <token>                  confirm a prepared action (A1)
   clusterwand config init|show|path
   clusterwand doctor                           check config, SSH and the catalog
+  clusterwand discover --site NAME --host ALIAS [--out DIR] [--record DIR] [--compare SITE]
+                                               draft a site profile (read-only; approved: false)
   clusterwand version
 
 Global flags (anywhere): --json  --config PATH
@@ -127,6 +129,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		})
 	case "config":
 		return configCmd(rest, stdout, stderr, g)
+	case "discover":
+		return discoverCmd(rest, stdout, stderr, g)
 	}
 
 	cfg, err := config.Load(g.config)

@@ -20,6 +20,47 @@ type SSH struct {
 	mu   sync.Mutex
 	argv []string // ssh argv without destination
 	dest string
+	// pin, when set, is the known_hosts file holding the only host keys ssh
+	// may accept (F3: a site profile's host_keys), under alias pinAlias.
+	pin, pinAlias string
+}
+
+// Pin makes ssh accept only keys for the login node: they are written to
+// dir/<site> (0600) and ssh is told to check against that file alone, under
+// the alias clusterwand-<site>, refusing any other key. Call before first use.
+func (s *SSH) Pin(site string, keys []string, dir string) error {
+	if len(keys) == 0 {
+		return errors.New("no host keys to pin")
+	}
+	if strings.ContainsAny(site, "/\x00 \n") || site == "" || site == "." || site == ".." {
+		return fmt.Errorf("site name %q cannot name a known_hosts file", site)
+	}
+	alias := "clusterwand-" + site
+	var b strings.Builder
+	for _, k := range keys {
+		if strings.ContainsAny(k, "\n\r\x00") || strings.Count(k, " ") != 1 {
+			return fmt.Errorf("host key %.40q is not \"<type> <base64>\"", k)
+		}
+		b.WriteString(alias + " " + k + "\n")
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	f := filepath.Join(dir, site)
+	if err := os.WriteFile(f, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.pin, s.pinAlias, s.argv = f, alias, nil
+	s.mu.Unlock()
+	return nil
+}
+
+// Pinned is the known_hosts file in force ("" when the host key is not pinned).
+func (s *SSH) Pinned() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pin
 }
 
 // NewSSH returns an SSH backend; the connection is set up on first use.
@@ -49,9 +90,23 @@ func (s *SSH) base(ctx context.Context) ([]string, string, error) {
 	if timeout <= 0 {
 		timeout = 30
 	}
+	prefix := "cw-"
+	if s.pin != "" {
+		// a pinned connection never reuses an unpinned master (and vice versa);
+		// command-line options win over ~/.ssh/config
+		prefix = "ck-"
+		argv = append(argv,
+			"-o", "StrictHostKeyChecking=yes",
+			"-o", "UserKnownHostsFile=\""+s.pin+"\"",
+			"-o", "GlobalKnownHostsFile=/dev/null",
+			"-o", "HostKeyAlias="+s.pinAlias,
+			"-o", "UpdateHostKeys=no",
+			"-o", "CheckHostIP=no",
+		)
+	}
 	argv = append(argv,
 		"-o", "ControlMaster=auto",
-		"-o", "ControlPath="+filepath.Join(dir, "cw-%C"),
+		"-o", "ControlPath="+filepath.Join(dir, prefix+"%C"),
 		"-o", fmt.Sprintf("ControlPersist=%d", persist),
 		"-o", "BatchMode=yes",
 		"-o", "ServerAliveInterval=30",

@@ -446,6 +446,43 @@ func SlurmVersion() Command {
 	return Command{argv: []string{"sinfo", "--version"}, kind: KindCatalog, public: true}
 }
 
+// ---- F3: discover (read-only probes of a new site) ------------------------------
+
+// ShowConfig is `scontrol show config` (readable by every user; discover keeps
+// only a few keys from it).
+func ShowConfig() Command {
+	return Command{argv: []string{"scontrol", "show", "config"}, kind: KindCatalog, public: true}
+}
+
+// moduleAvailTemplate lists every module the login shell can load, one per
+// line (Lmod and Tcl Environment Modules both print to stderr; folder headers
+// end in ":").
+const moduleAvailTemplate = `module -t avail 2>&1`
+
+// ModuleAvail is `module -t avail` in a login shell (exit 1: no module command,
+// the empty answer means "no module system").
+func ModuleAvail() Command {
+	return Command{argv: []string{"bash", "-lc", moduleAvailTemplate}, kind: KindModules, okExit: []int{1, 127}}
+}
+
+// discoverEnvTemplate reports the caller's home, which candidate scratch
+// folders of theirs exist (only folders named after $USER, plus $SCRATCH), and
+// the module system. Nothing is written; only `test -d` and the environment.
+const discoverEnvTemplate = `printf 'home\t%s\n' "$HOME"; printf 'scratch_env\t%s\n' "${SCRATCH:-}"; ` +
+	`for d in "${SCRATCH:-}" "/scratch/$USER" "/scratch/users/$USER" "/work/$USER" "/bigdata/$USER" "/rhome/$USER" "/lustre/scratch/$USER" "/gpfs/scratch/$USER"; do ` +
+	`[ -n "$d" ] && [ -d "$d" ] && printf 'dir\t%s\n' "$d"; done; ` +
+	`printf 'lmod\t%s\n' "${LMOD_VERSION:-}"; type module >/dev/null 2>&1 && printf 'module\tyes\n'; true`
+
+// DiscoverEnv is discoverEnvTemplate in a login shell (module only exists there).
+func DiscoverEnv() Command {
+	return Command{argv: []string{"bash", "-lc", discoverEnvTemplate}, kind: KindCatalog}
+}
+
+// DiscoverTemplatesForTest lets tests answer the discover templates.
+func DiscoverTemplatesForTest() (moduleAvail, env string) {
+	return moduleAvailTemplate, discoverEnvTemplate
+}
+
 // TextTemplatesForTest lets fixtures answer the text templates.
 func TextTemplatesForTest() (squeue, sacct, nodes string) {
 	return squeueTextTemplate, sacctTextTemplate, nodesTextTemplate
