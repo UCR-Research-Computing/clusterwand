@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -78,6 +79,14 @@ type Slurm struct {
 	JSON bool `yaml:"json"` // read squeue/sacct/scontrol nodes with --json
 }
 
+// Discovered says where and when `clusterwand discover` drafted a profile.
+type Discovered struct {
+	From  string `yaml:"from"`  // the SSH host alias it read
+	On    string `yaml:"on"`    // date (YYYY-MM-DD)
+	Slurm string `yaml:"slurm"` // Slurm release seen
+	By    string `yaml:"by"`    // clusterwand version
+}
+
 // Profile is one site.
 type Profile struct {
 	Name        string     `yaml:"name"`
@@ -95,15 +104,42 @@ type Profile struct {
 	Charge      Charge     `yaml:"charge"`
 	Allocation  Allocation `yaml:"allocation"`
 	Slurm       Slurm      `yaml:"slurm"`
+	// HostKeys pins the login node's SSH host keys ("ssh-ed25519 AAAA...");
+	// when set, ssh accepts only these keys for this site (F3, recorded by
+	// discover from the keys your own ssh already trusts).
+	HostKeys []string `yaml:"host_keys,omitempty"`
+	// CatalogFile is a catalog kept next to a site_file profile (relative to
+	// the profile's folder), used instead of a catalog on the login node. A
+	// draft from discover carries "approved": false and is refused until a
+	// person sets it to true.
+	CatalogFile string `yaml:"catalog_file,omitempty"`
+	// Discovered records where a discover draft came from (informational).
+	Discovered *Discovered `yaml:"discovered,omitempty"`
 	// Text replaces generic wording by key (see Text). {help}, {title} and
 	// {probe} are filled everywhere; some keys take more (documented at the call).
 	Texts map[string]string `yaml:"text"`
+	// catalogPath is CatalogFile resolved against the profile's folder (File).
+	catalogPath string
 }
+
+// CatalogFilePath is the local catalog file, resolved ("" when none).
+func (p *Profile) CatalogFilePath() string { return p.catalogPath }
 
 var (
 	reName      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,40}$`)
 	rePartition = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
+	// reHostKey is one public host key: type and base64 blob, nothing else
+	// (no host pattern, no marker, no options).
+	reHostKey = regexp.MustCompile(`^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]{40,}={0,2}$`)
 )
+
+// ValidHostKey checks one pinned host key ("ssh-ed25519 AAAA...").
+func ValidHostKey(k string) error {
+	if !reHostKey.MatchString(k) {
+		return fmt.Errorf("host key %.40q is not \"<type> <base64>\"", k)
+	}
+	return nil
+}
 
 // Generic is the empty profile: generic wording, no roles, no charge, home in
 // /home/<user>.
@@ -152,6 +188,17 @@ func (p *Profile) Validate() error {
 	}
 	if !p.Approved {
 		return fmt.Errorf("site profile %s is not approved: review it, then set approved: true", p.Name)
+	}
+	for _, k := range p.HostKeys {
+		if err := ValidHostKey(k); err != nil {
+			return fmt.Errorf("site profile %s: %w", p.Name, err)
+		}
+	}
+	if c := p.CatalogFile; c != "" && (path.IsAbs(c) || path.Clean(c) != c || strings.HasPrefix(c, "../") || c == ".." || !strings.HasSuffix(c, ".json")) {
+		return fmt.Errorf("site profile %s: catalog_file %q must be a clean .json path inside the profile's folder", p.Name, c)
+	}
+	if p.Catalog != "" && p.CatalogFile != "" {
+		return fmt.Errorf("site profile %s: set catalog or catalog_file, not both", p.Name)
 	}
 	if p.Catalog != "" && (!path.IsAbs(p.Catalog) || path.Clean(p.Catalog) != p.Catalog || !strings.HasSuffix(p.Catalog, ".json")) {
 		return fmt.Errorf("site profile %s: catalog %q must be an absolute, clean .json path", p.Name, p.Catalog)
@@ -217,16 +264,27 @@ func Embedded(name string) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Parse(b)
+	sp, err := Parse(b)
+	if err == nil && sp.CatalogFile != "" {
+		return nil, fmt.Errorf("site profile %s: catalog_file only works in your own site_file profile", name)
+	}
+	return sp, err
 }
 
-// File loads a profile from a file.
+// File loads a profile from a file; catalog_file is resolved next to it.
 func File(p string) (*Profile, error) {
 	b, err := os.ReadFile(p)
 	if err != nil {
 		return nil, fmt.Errorf("site profile: %w", err)
 	}
-	return Parse(b)
+	sp, err := Parse(b)
+	if err != nil {
+		return nil, err
+	}
+	if sp.CatalogFile != "" {
+		sp.catalogPath = filepath.Join(filepath.Dir(p), filepath.FromSlash(sp.CatalogFile))
+	}
+	return sp, nil
 }
 
 // Names lists the embedded profiles.

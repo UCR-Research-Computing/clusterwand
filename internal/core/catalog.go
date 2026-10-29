@@ -11,9 +11,12 @@ import (
 // login node. Schema "clusterwand-catalog/1" (or the identical "ursa-catalog/1"
 // that ursa-catalog publishes).
 type Catalog struct {
-	Schema     string             `json:"schema"`
-	Cluster    string             `json:"cluster"`
-	Generated  string             `json:"generated"`
+	Schema    string `json:"schema"`
+	Cluster   string `json:"cluster"`
+	Generated string `json:"generated"`
+	// Approved is false on a catalog drafted by discover (refused until a
+	// person reviews it); absent on published catalogs.
+	Approved   *bool              `json:"approved,omitempty"`
 	Partitions []CatalogPartition `json:"partitions"`
 	Rules      []string           `json:"rules"`
 	Modules    struct {

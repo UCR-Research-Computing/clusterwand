@@ -553,3 +553,7 @@ func limitOf(s string) Num {
 	}
 	return Num{Set: true, Number: float64(days*1440 + secs/60)}
 }
+
+// LimitMinutes reads a Slurm time limit (MaxTime, TimeLimit) in minutes;
+// UNLIMITED is Infinite, an unreadable value is unset.
+func LimitMinutes(s string) Num { return limitOf(s) }

@@ -99,7 +99,8 @@ func TestAllowListIsClosed(t *testing.T) {
 	tas, _ := SacctJobsText([]string{"1", "2"})
 	sb2, _ := SacctScript("1")
 	as, _ := Assoc("alice")
-	texts := []Command{SqueueAllText(), tu, tj, tjs, ta, tas, sb2, NodesText(), PartitionsText(), as, Groups(), SlurmVersion()}
+	texts := []Command{SqueueAllText(), tu, tj, tjs, ta, tas, sb2, NodesText(), PartitionsText(), as, Groups(), SlurmVersion(),
+		ShowConfig(), ModuleAvail(), DiscoverEnv()} // F3 discover probes
 	writes := map[string]bool{}
 	for _, c := range []Command{sb, sc, ho, re} {
 		writes[c.String()] = true
@@ -123,7 +124,8 @@ func TestAllowListIsClosed(t *testing.T) {
 			t.Errorf("scontrol may only show, hold or release: %v", c.argv)
 		}
 		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryCompat &&
-			c.argv[2] != squeueTextTemplate && c.argv[2] != sacctTextTemplate && c.argv[2] != nodesTextTemplate {
+			c.argv[2] != squeueTextTemplate && c.argv[2] != sacctTextTemplate && c.argv[2] != nodesTextTemplate &&
+			c.argv[2] != moduleAvailTemplate && c.argv[2] != discoverEnvTemplate {
 			t.Errorf("bash only runs module show or the fixed submit template: %v", c.argv)
 		}
 		if c.argv[0] == "sacctmgr" && strings.Join(c.argv[1:5], " ") != "-n -P show user" {
