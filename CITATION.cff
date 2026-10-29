@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ClusterWand: safe, typed MCP tools that let AI assistants work any Slurm cluster over SSH"
+type: software
+authors:
+  - family-names: "Forsyth III"
+    given-names: "Charles E."
+    orcid: "https://orcid.org/0000-0003-4872-0296"
+    affiliation: "University of California, Riverside"
+  - name: "UCR Research Computing"
+repository-code: "https://github.com/UCR-Research-Computing/clusterwand"
+license: MIT
+keywords:
+  - "Model Context Protocol"
+  - "Slurm"
+  - "HPC"
+  - "AI assistants"
+references:
+  - type: report
+    title: "Field Note describing this software"
+    doi: "10.5281/zenodo.23752286"
+    authors:
+      - family-names: "Forsyth III"
+        given-names: "Charles E."
