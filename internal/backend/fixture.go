@@ -54,6 +54,17 @@ type Fixture struct {
 	// Sharing answers `sinfo -h -o %R|%h` (partition|OverSubscribe lines); empty
 	// means the recorded Dir/sharing.txt.
 	Sharing string
+	// LegacySacct prints sacct text the way Slurm before 23.02 does (no
+	// Restarts, StdOut, StdErr fields).
+	LegacySacct bool
+	// Accounts answers `sacctmgr show user ... withassoc` (DefaultAccount|Account|Partition
+	// lines); empty means the recorded Dir/assoc.txt, else the user's default
+	// account only. Groups answers `id -Gn` (default: the user's name).
+	Accounts string
+	Groups   string
+	// Partitions answers `scontrol -o show partition`; empty means
+	// Dir/partitions.txt, else printed from Dir/partitions.json.
+	Partitions string
 }
 
 // Name is the backend label.
@@ -80,7 +91,18 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 	}
 	switch a[0] {
 	case "id":
+		if len(a) > 1 && a[1] == "-Gn" {
+			return []byte(firstNonEmptyStr(f.Groups, f.User) + "\n"), nil
+		}
 		return []byte(f.User + "\n"), nil
+	case "sacctmgr":
+		if f.Accounts != "" {
+			return []byte(f.Accounts), nil
+		}
+		if b, err := read("assoc.txt"); err == nil {
+			return b, nil
+		}
+		return []byte("default|default|\n"), nil
 	case "squeue":
 		b, err := read("squeue.json")
 		if err != nil {
@@ -95,11 +117,17 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(a) > 2 && a[2] == "-B" {
+			return scriptFromJSON(b, flag(a, "-j"))
+		}
 		if id := flag(a, "-j"); id != "" && !f.IgnoreJobFilter {
 			return filterJobs(b, id, "job_id")
 		}
 		return b, nil
 	case "sinfo":
+		if len(a) > 1 && a[1] == "--version" {
+			return []byte("slurm 25.11.4\n"), nil
+		}
 		if len(a) > 1 && a[1] == "-h" {
 			// PartitionSharing: the test's Sharing text, else the recorded
 			// sharing.txt (partition|OverSubscribe lines)
@@ -112,6 +140,19 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 	case "scontrol":
 		if a[1] == "hold" || a[1] == "release" {
 			return nil, nil
+		}
+		if a[1] == "-o" && len(a) > 3 && a[3] == "partition" {
+			if f.Partitions != "" {
+				return []byte(f.Partitions), nil
+			}
+			if b, err := read("partitions.txt"); err == nil {
+				return b, nil
+			}
+			b, err := read("partitions.json")
+			if err != nil {
+				return nil, err
+			}
+			return partitionsTextFromJSON(b)
 		}
 		return read("nodes.json")
 	case "cat":
@@ -129,6 +170,9 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		}
 		return read(filepath.Join("logs", name))
 	case "bash":
+		if out, ok, err := f.textAnswer(a); ok {
+			return out, err
+		}
 		if strings.Contains(a[2], "module -t show") {
 			// emulate the site's hierarchical Lmod: MPI-built packages are only
 			// in the module path after an MPI is loaded (Lmod prints a warning

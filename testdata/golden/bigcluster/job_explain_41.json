@@ -39,8 +39,8 @@
       "backend": "fixture:bigcluster",
       "cached": true,
       "commands": [
-        "squeue --json -j 41",
-        "sacct --json -j 41",
+        "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand -j 41",
+        "bash -c 'f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName; sacct --helpformat | grep -qw StdOut || f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName; SLURM_TIME_FORMAT=%s exec sacct -P --noconvert --delimiter=$'\\''\\037'\\'' -o \"$f\" \"$@\"' clusterwand -j 41",
         "cat -- /opt/site/catalog.json",
         "cat -- /opt/site/catalog.json",
         "tail -n 80 -- /users/bob42/projects/run_4/job.log"

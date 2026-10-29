@@ -51,20 +51,13 @@ type ClusterStatus struct {
 
 // ClusterStatus reads node and queue state.
 func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
-	var nr slurm.NodesResponse
-	b, err := s.run(ctx, backend.Nodes())
+	ns, release, err := s.nodes(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := slurm.Decode(b, &nr); err != nil {
-		return nil, err
-	}
+	nr := slurm.NodesResponse{Nodes: ns}
 	var q slurm.QueueResponse
-	b, err = s.run(ctx, backend.SqueueAll())
-	if err != nil {
-		return nil, err
-	}
-	if err := slurm.Decode(b, &q); err != nil {
+	if q.Jobs, err = s.queue(ctx, queueSel{all: true}); err != nil {
 		return nil, err
 	}
 	cat, _ := s.Catalog(ctx)
@@ -77,7 +70,7 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 		}
 		return p
 	}
-	cs := &ClusterStatus{Cluster: s.Cfg.Cluster, SlurmVersion: nr.Meta.Slurm.Release, PendingByWhy: map[string]int{}}
+	cs := &ClusterStatus{Cluster: s.Cfg.Cluster, SlurmVersion: release, PendingByWhy: map[string]int{}}
 	for _, n := range nr.Nodes {
 		for _, pn := range n.Partitions {
 			p := get(pn)

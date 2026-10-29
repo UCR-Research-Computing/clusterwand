@@ -1,0 +1,50 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "how_to_load": "module load \u003cname\u003e[/\u003cversion\u003e]; MPI-built packages appear after `module load openmpi` (or mpich / intel-oneapi-mpi). Compilers: gcc/13.5.0 is the default toolchain of the Spack stack. `module spider \u003cname\u003e` shows how to reach any module.",
+      "matches": [
+        {
+          "gpu": true,
+          "name": "gromacs",
+          "requires": "module load openmpi",
+          "usage_card": "GROMACS 2026.1: gmx_mpi (openmpi build) and gmx; -cuda module for GPUs. Keep -ntomp x ranks free of large prime factors (22 cores: use 20 or 16), or domain decomposition aborts.",
+          "versions": [
+            "2026.1",
+            "2026.1-cuda"
+          ]
+        }
+      ],
+      "recipes": [
+        {
+          "field": "molecular dynamics",
+          "load": [
+            "openmpi",
+            "gromacs/2026.1"
+          ],
+          "name": "GROMACS (CPU, MPI)",
+          "notes": "Use thread/rank counts with small prime factors (16, 20), not 22.",
+          "partition": "computehigh",
+          "run": "srun gmx_mpi mdrun -deffnm md -ntomp $SLURM_CPUS_PER_TASK"
+        },
+        {
+          "field": "molecular dynamics",
+          "gpus": 1,
+          "load": [
+            "openmpi",
+            "gromacs/2026.1-cuda"
+          ],
+          "name": "GROMACS (GPU)",
+          "partition": "gpul4",
+          "run": "gmx_mpi mdrun -deffnm md -nb gpu -pme gpu"
+        }
+      ]
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json"
+      ]
+    }
+  }
+}

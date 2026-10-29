@@ -24,8 +24,8 @@
     "source": {
       "backend": "fixture:bigcluster",
       "commands": [
-        "scontrol show nodes --json",
-        "squeue --json",
+        "bash -c 'scontrol --version; SLURM_TIME_FORMAT=%s exec scontrol -o show nodes' clusterwand",
+        "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand",
         "bash -c 'SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"' clusterwand -a -S now-1days"
       ]
     }

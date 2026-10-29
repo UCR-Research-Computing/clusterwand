@@ -1,0 +1,124 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "count_by_kind": {
+        "allocated-idle-node": 1,
+        "low-cpu": 5,
+        "timeout-idle": 1,
+        "warm-worker": 1
+      },
+      "items": [
+        {
+          "detail": "TIMEOUT, CPU efficiency 0% on 22 cores for 1h30m",
+          "est_wasted_usd": 2.81,
+          "job_id": "253",
+          "kind": "timeout-idle",
+          "node_hours": 1.5,
+          "partition": "computehigh",
+          "suggestion": "Ran to its time limit while barely using the CPU: likely stuck (waiting on a download, a lock, input). Check the log before resubmitting with more time.",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 1.5
+        },
+        {
+          "detail": "CANCELLED, CPU efficiency 46% on 22 cores for 1h22m",
+          "est_wasted_usd": 1.38,
+          "job_id": "93",
+          "kind": "low-cpu",
+          "node_hours": 1.38,
+          "partition": "computehigh",
+          "suggestion": "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.74
+        },
+        {
+          "detail": "COMPLETED, CPU efficiency 0% on 22 cores for 19m20s",
+          "est_wasted_usd": 0.6,
+          "job_id": "261",
+          "kind": "warm-worker",
+          "node_hours": 0.32,
+          "partition": "computehigh",
+          "suggestion": "A keep-warm job that holds a node so later work starts without a boot wait. Its idle time is the price of that latency: compare it with ~2-5 min cold boots and shorten or stop it when nothing is queued.",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.32
+        },
+        {
+          "detail": "FAILED, CPU efficiency 5% on 8 cores for 18m14s",
+          "est_wasted_usd": 0.33,
+          "job_id": "37",
+          "kind": "low-cpu",
+          "node_hours": 0.3,
+          "partition": "gpul4",
+          "suggestion": "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.29
+        },
+        {
+          "detail": "FAILED, CPU efficiency 20% on 8 cores for 16m10s",
+          "est_wasted_usd": 0.25,
+          "job_id": "45",
+          "kind": "low-cpu",
+          "node_hours": 0.27,
+          "partition": "gpul4",
+          "suggestion": "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.22
+        },
+        {
+          "detail": "FAILED, CPU efficiency 4% on 8 cores for 1m52s",
+          "est_wasted_usd": 0.03,
+          "job_id": "229",
+          "kind": "low-cpu",
+          "node_hours": 0.03,
+          "partition": "gpul4",
+          "suggestion": "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.03
+        },
+        {
+          "detail": "FAILED, CPU efficiency 8% on 8 cores for 1m00s",
+          "est_wasted_usd": 0.02,
+          "job_id": "236",
+          "kind": "low-cpu",
+          "node_hours": 0.02,
+          "partition": "gpul4",
+          "suggestion": "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).",
+          "user": "alice_ucr_edu",
+          "wasted_node_hours": 0.02
+        },
+        {
+          "detail": "allocated but load 0.00, up 19.6 h (a warm or sleeping job holds it)",
+          "kind": "allocated-idle-node",
+          "node": "ucrslurmcl-c3nodeset-0",
+          "node_hours": 19.63,
+          "partition": "computehigh",
+          "suggestion": "A job holds the node without computing. If it is a warm worker kept on purpose, weigh its hourly price against start-up latency; otherwise cancel it.",
+          "wasted_node_hours": 0
+        }
+      ],
+      "jobs_scanned": 12,
+      "notes": [
+        "Wasted node-hours = billed node-hours x (1 - CPU efficiency over the allocated cores): an upper bound, because some programs are I/O- or GPU-bound by design. On shared partitions only the share of the node a job held is billed.",
+        "Running jobs have no CPU totals until they end; they appear only through node load (allocated-idle-node).",
+        "allocated-idle-node and oversized-memory are listed with 0 wasted hours: they need a person's judgment.",
+        "warm-worker items are keep-warm jobs (name contains warm/keepalive): idle by design; their hours are the cost of fast starts."
+      ],
+      "scope": "alice_ucr_edu",
+      "since": "2026-09-01",
+      "thresholds": {
+        "cpu_efficiency_percent": 50,
+        "min_node_hours": 0.01
+      },
+      "total_est_wasted_usd": 5.42,
+      "total_wasted_node_hours": 3.12
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "bash -c 'SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"' clusterwand -u alice_ucr_edu -S 2026-09-01",
+        "cat -- /apps/docs/catalog.json",
+        "scontrol show nodes --json"
+      ]
+    }
+  }
+}

@@ -543,14 +543,11 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 // partitionTrouble reports recent boot failures (stockouts) on a partition and
 // suggests a partition with a node already up or no failures, or "" when fine.
 func (s *Service) partitionTrouble(ctx context.Context, part string) string {
-	b, err := s.run(ctx, backend.Nodes())
+	ns, _, err := s.nodes(ctx)
 	if err != nil {
 		return ""
 	}
-	var nr slurm.NodesResponse
-	if slurm.Decode(b, &nr) != nil {
-		return ""
-	}
+	nr := slurm.NodesResponse{Nodes: ns}
 	bad, stockout := 0, false
 	upIdle := map[string]bool{}
 	troubled := map[string]bool{}
@@ -862,7 +859,8 @@ func (s *Service) invalidateQueue() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for k := range s.cache {
-		if strings.HasPrefix(k, "squeue") || strings.HasPrefix(k, "sacct") || strings.HasPrefix(k, "scontrol show nodes") {
+		if strings.HasPrefix(k, "squeue") || strings.HasPrefix(k, "sacct") || strings.HasPrefix(k, "scontrol show nodes") ||
+			strings.Contains(k, "exec squeue ") || strings.Contains(k, "exec sacct ") || strings.Contains(k, "scontrol -o show nodes") {
 			delete(s.cache, k)
 		}
 	}

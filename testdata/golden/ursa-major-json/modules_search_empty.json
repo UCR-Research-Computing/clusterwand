@@ -1,0 +1,1354 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "how_to_load": "module load \u003cname\u003e[/\u003cversion\u003e]; MPI-built packages appear after `module load openmpi` (or mpich / intel-oneapi-mpi). Compilers: gcc/13.5.0 is the default toolchain of the Spack stack. `module spider \u003cname\u003e` shows how to reach any module.",
+      "matches": [
+        {
+          "name": "adios2",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "2.12.1"
+          ]
+        },
+        {
+          "name": "adios2",
+          "requires": "module load mpich",
+          "versions": [
+            "2.12.1"
+          ]
+        },
+        {
+          "name": "adios2",
+          "requires": "module load openmpi",
+          "versions": [
+            "2.12.1"
+          ]
+        },
+        {
+          "name": "aria2",
+          "versions": [
+            "1.37.0"
+          ]
+        },
+        {
+          "name": "arpack-ng",
+          "versions": [
+            "3.9.1"
+          ]
+        },
+        {
+          "name": "arpack-ng",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.9.1"
+          ]
+        },
+        {
+          "name": "bamtools",
+          "versions": [
+            "2.5.2"
+          ]
+        },
+        {
+          "name": "bcftools",
+          "versions": [
+            "1.23.1"
+          ]
+        },
+        {
+          "name": "bedops",
+          "versions": [
+            "2.4.42"
+          ]
+        },
+        {
+          "name": "bedtools2",
+          "versions": [
+            "2.31.1"
+          ]
+        },
+        {
+          "name": "blast-plus",
+          "versions": [
+            "2.17.0"
+          ]
+        },
+        {
+          "name": "boost",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "1.90.0"
+          ]
+        },
+        {
+          "name": "bowtie2",
+          "versions": [
+            "2.5.5"
+          ]
+        },
+        {
+          "name": "busco",
+          "versions": [
+            "6.1.0"
+          ]
+        },
+        {
+          "name": "bwa",
+          "versions": [
+            "0.7.19"
+          ]
+        },
+        {
+          "name": "calculix",
+          "versions": [
+            "2.20"
+          ]
+        },
+        {
+          "name": "cdhit",
+          "versions": [
+            "4.8.1"
+          ]
+        },
+        {
+          "name": "cdo",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "2.6.4"
+          ]
+        },
+        {
+          "name": "cfitsio",
+          "versions": [
+            "4.6.3"
+          ]
+        },
+        {
+          "name": "clustal-omega",
+          "versions": [
+            "1.2.4"
+          ]
+        },
+        {
+          "name": "cmake",
+          "versions": [
+            "3.31.12"
+          ]
+        },
+        {
+          "name": "cp2k",
+          "requires": "module load openmpi",
+          "usage_card": "CP2K 2026.2 (openmpi): cp2k.psmp; set OMP_NUM_THREADS and ranks so ranks*threads \u003c= cores.",
+          "versions": [
+            "2026.2"
+          ]
+        },
+        {
+          "name": "darshan-runtime",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.5.0"
+          ]
+        },
+        {
+          "name": "darshan-runtime",
+          "requires": "module load mpich",
+          "versions": [
+            "3.5.0"
+          ]
+        },
+        {
+          "name": "darshan-runtime",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.5.0"
+          ]
+        },
+        {
+          "name": "darshan-util",
+          "versions": [
+            "3.5.0"
+          ]
+        },
+        {
+          "name": "dealii",
+          "requires": "module load openmpi",
+          "versions": [
+            "9.7.1"
+          ]
+        },
+        {
+          "name": "diamond",
+          "versions": [
+            "2.1.10"
+          ]
+        },
+        {
+          "name": "eigen",
+          "versions": [
+            "5.0.1"
+          ]
+        },
+        {
+          "name": "elmerfem",
+          "requires": "module load openmpi",
+          "versions": [
+            "26.2.1"
+          ]
+        },
+        {
+          "name": "elpa",
+          "requires": "module load openmpi",
+          "versions": [
+            "2026.02.002"
+          ]
+        },
+        {
+          "name": "esmf",
+          "requires": "module load openmpi",
+          "versions": [
+            "8.9.1"
+          ]
+        },
+        {
+          "name": "fastp",
+          "versions": [
+            "1.0.1"
+          ]
+        },
+        {
+          "name": "fastqc",
+          "versions": [
+            "0.12.1"
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "versions": [
+            "8.1"
+          ]
+        },
+        {
+          "name": "fftw",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.3.11"
+          ]
+        },
+        {
+          "name": "fftw",
+          "requires": "module load mpich",
+          "versions": [
+            "3.3.11"
+          ]
+        },
+        {
+          "name": "fftw",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.3.11"
+          ]
+        },
+        {
+          "name": "freebayes",
+          "versions": [
+            "1.3.6"
+          ]
+        },
+        {
+          "name": "gatk",
+          "versions": [
+            "4.5.0.0"
+          ]
+        },
+        {
+          "name": "gcc",
+          "usage_card": "gcc/13.5.0 default (also 12.2.1, 14.4.0, 15.3.0, 16.2.0). -march=x86-64-v3 is safe on every partition.",
+          "versions": [
+            "12.2.1",
+            "13.5.0",
+            "14.4.0",
+            "15.3.0",
+            "16.2.0"
+          ]
+        },
+        {
+          "name": "gdal",
+          "versions": [
+            "3.13.3"
+          ]
+        },
+        {
+          "name": "gdb",
+          "versions": [
+            "17.1"
+          ]
+        },
+        {
+          "name": "geant4",
+          "requires": "module load openmpi",
+          "versions": [
+            "11.4.2"
+          ]
+        },
+        {
+          "name": "geos",
+          "versions": [
+            "3.15.0"
+          ]
+        },
+        {
+          "name": "git",
+          "versions": [
+            "2.55.0"
+          ]
+        },
+        {
+          "name": "git-lfs",
+          "versions": [
+            "3.7.1"
+          ]
+        },
+        {
+          "name": "gmsh",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "4.15.1"
+          ]
+        },
+        {
+          "name": "go",
+          "versions": [
+            "1.27.1"
+          ]
+        },
+        {
+          "gpu": true,
+          "name": "gromacs",
+          "requires": "module load openmpi",
+          "usage_card": "GROMACS 2026.1: gmx_mpi (openmpi build) and gmx; -cuda module for GPUs. Keep -ntomp x ranks free of large prime factors (22 cores: use 20 or 16), or domain decomposition aborts.",
+          "versions": [
+            "2026.1",
+            "2026.1-cuda"
+          ]
+        },
+        {
+          "name": "gsl",
+          "versions": [
+            "2.8"
+          ]
+        },
+        {
+          "name": "hdf5",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "1.14.6"
+          ]
+        },
+        {
+          "name": "hdf5",
+          "requires": "module load mpich",
+          "versions": [
+            "1.14.6"
+          ]
+        },
+        {
+          "name": "hdf5",
+          "requires": "module load openmpi",
+          "versions": [
+            "1.14.6"
+          ]
+        },
+        {
+          "name": "hisat2",
+          "versions": [
+            "2.2.1"
+          ]
+        },
+        {
+          "name": "hmmer",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.4"
+          ]
+        },
+        {
+          "name": "hpctoolkit",
+          "versions": [
+            "2026.0.1"
+          ]
+        },
+        {
+          "name": "htop",
+          "versions": [
+            "3.4.1"
+          ]
+        },
+        {
+          "name": "htslib",
+          "versions": [
+            "1.24"
+          ]
+        },
+        {
+          "name": "hypre",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.2.0"
+          ]
+        },
+        {
+          "name": "hypre",
+          "requires": "module load mpich",
+          "versions": [
+            "3.2.0"
+          ]
+        },
+        {
+          "name": "hypre",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.2.0"
+          ]
+        },
+        {
+          "name": "imagemagick",
+          "versions": [
+            "7.1.1-39"
+          ]
+        },
+        {
+          "name": "intel-oneapi-compilers",
+          "versions": [
+            "2026.1.0"
+          ]
+        },
+        {
+          "name": "intel-oneapi-mkl",
+          "versions": [
+            "2026.1.0"
+          ]
+        },
+        {
+          "name": "intel-oneapi-mpi",
+          "versions": [
+            "2021.18.0"
+          ]
+        },
+        {
+          "name": "intel-oneapi-tbb",
+          "versions": [
+            "2023.1.0"
+          ]
+        },
+        {
+          "name": "iq-tree",
+          "versions": [
+            "2.4.0"
+          ]
+        },
+        {
+          "name": "jq",
+          "versions": [
+            "1.8.2"
+          ]
+        },
+        {
+          "name": "julia",
+          "versions": [
+            "1.12.7"
+          ]
+        },
+        {
+          "name": "kallisto",
+          "versions": [
+            "0.50.1"
+          ]
+        },
+        {
+          "gpu": true,
+          "name": "lammps",
+          "requires": "module load openmpi",
+          "usage_card": "LAMMPS 20250722: executable lmp (openmpi build); lammps/...-cuda for GPUs with -sf gpu -pk gpu 1. Packages: KSPACE MANYBODY MISC MOLECULE REPLICA RIGID only (no GRANULAR/DEM, no fix pour). For granular work use conda-forge lammps=2023.08.02 (has GRANULAR, runs on glibc 2.28; newer conda-forge builds need glibc 2.29+).",
+          "versions": [
+            "20250722.4",
+            "20250722.4-cuda"
+          ]
+        },
+        {
+          "name": "libaec",
+          "versions": [
+            "1.1.7"
+          ]
+        },
+        {
+          "name": "libxc",
+          "versions": [
+            "7.1.2"
+          ]
+        },
+        {
+          "name": "likwid",
+          "versions": [
+            "5.5.2"
+          ]
+        },
+        {
+          "name": "lz4",
+          "versions": [
+            "1.10.0"
+          ]
+        },
+        {
+          "name": "mafft",
+          "usage_card": "MAFFT: mafft --auto --thread $SLURM_CPUS_ON_NODE in.fa \u003e out.fa.",
+          "versions": [
+            "7.525"
+          ]
+        },
+        {
+          "name": "megahit",
+          "versions": [
+            "1.2.9"
+          ]
+        },
+        {
+          "name": "meson",
+          "versions": [
+            "1.12.0"
+          ]
+        },
+        {
+          "name": "metis",
+          "versions": [
+            "5.1.0"
+          ]
+        },
+        {
+          "name": "miniforge3",
+          "versions": [
+            "26.3.2-3"
+          ]
+        },
+        {
+          "name": "minimap2",
+          "versions": [
+            "2.30"
+          ]
+        },
+        {
+          "name": "mmseqs2",
+          "versions": [
+            "18-8cc5c"
+          ]
+        },
+        {
+          "name": "mpich",
+          "versions": [
+            "4.3.2"
+          ]
+        },
+        {
+          "name": "mumps",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "5.9.1"
+          ]
+        },
+        {
+          "name": "mumps",
+          "requires": "module load mpich",
+          "versions": [
+            "5.9.1"
+          ]
+        },
+        {
+          "name": "mumps",
+          "requires": "module load openmpi",
+          "versions": [
+            "5.9.1"
+          ]
+        },
+        {
+          "name": "muscle",
+          "versions": [
+            "3.8.1551"
+          ]
+        },
+        {
+          "name": "nco",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "5.4.0"
+          ]
+        },
+        {
+          "name": "ncview",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "2.1.11"
+          ]
+        },
+        {
+          "name": "netcdf-c",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "4.10.0"
+          ]
+        },
+        {
+          "name": "netcdf-c",
+          "requires": "module load mpich",
+          "versions": [
+            "4.10.0"
+          ]
+        },
+        {
+          "name": "netcdf-c",
+          "requires": "module load openmpi",
+          "versions": [
+            "4.10.0"
+          ]
+        },
+        {
+          "name": "netcdf-cxx4",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "4.3.1"
+          ]
+        },
+        {
+          "name": "netcdf-cxx4",
+          "requires": "module load mpich",
+          "versions": [
+            "4.3.1"
+          ]
+        },
+        {
+          "name": "netcdf-cxx4",
+          "requires": "module load openmpi",
+          "versions": [
+            "4.3.1"
+          ]
+        },
+        {
+          "name": "netcdf-fortran",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "4.6.4"
+          ]
+        },
+        {
+          "name": "netcdf-fortran",
+          "requires": "module load mpich",
+          "versions": [
+            "4.6.4"
+          ]
+        },
+        {
+          "name": "netcdf-fortran",
+          "requires": "module load openmpi",
+          "versions": [
+            "4.6.4"
+          ]
+        },
+        {
+          "name": "netlib-scalapack",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "2.2.3"
+          ]
+        },
+        {
+          "name": "netlib-scalapack",
+          "requires": "module load mpich",
+          "versions": [
+            "2.2.3"
+          ]
+        },
+        {
+          "name": "netlib-scalapack",
+          "requires": "module load openmpi",
+          "versions": [
+            "2.2.3"
+          ]
+        },
+        {
+          "name": "nextflow",
+          "versions": [
+            "26.04.6"
+          ]
+        },
+        {
+          "name": "ninja",
+          "versions": [
+            "1.13.2"
+          ]
+        },
+        {
+          "name": "node-js",
+          "versions": [
+            "26.3.0"
+          ]
+        },
+        {
+          "name": "nwchem",
+          "requires": "module load openmpi",
+          "versions": [
+            "7.3.1"
+          ]
+        },
+        {
+          "name": "octave",
+          "versions": [
+            "11.1.0"
+          ]
+        },
+        {
+          "name": "openbabel",
+          "versions": [
+            "3.2.0"
+          ]
+        },
+        {
+          "name": "openblas",
+          "versions": [
+            "0.3.34"
+          ]
+        },
+        {
+          "name": "openjdk",
+          "versions": [
+            "21.0.10_7",
+            "25.0.2_10"
+          ]
+        },
+        {
+          "gpu": true,
+          "name": "openmm",
+          "requires": "module load openmpi",
+          "versions": [
+            "8.5.2-cuda"
+          ]
+        },
+        {
+          "name": "openmpi",
+          "usage_card": "openmpi/5.0.10: launch with srun or mpirun -np $SLURM_NTASKS; MPI-built modules appear after loading it.",
+          "versions": [
+            "5.0.10"
+          ]
+        },
+        {
+          "name": "osu-micro-benchmarks",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "7.5.2"
+          ]
+        },
+        {
+          "name": "osu-micro-benchmarks",
+          "requires": "module load mpich",
+          "versions": [
+            "7.5.2"
+          ]
+        },
+        {
+          "name": "osu-micro-benchmarks",
+          "requires": "module load openmpi",
+          "versions": [
+            "7.5.2"
+          ]
+        },
+        {
+          "name": "papi",
+          "versions": [
+            "7.2.0"
+          ]
+        },
+        {
+          "name": "parallel",
+          "versions": [
+            "20240822"
+          ]
+        },
+        {
+          "name": "parallel-netcdf",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "1.14.1"
+          ]
+        },
+        {
+          "name": "parallel-netcdf",
+          "requires": "module load mpich",
+          "versions": [
+            "1.14.1"
+          ]
+        },
+        {
+          "name": "parallel-netcdf",
+          "requires": "module load openmpi",
+          "versions": [
+            "1.14.1"
+          ]
+        },
+        {
+          "name": "paraview",
+          "requires": "module load openmpi",
+          "versions": [
+            "6.1.1"
+          ]
+        },
+        {
+          "name": "parmetis",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "4.0.3"
+          ]
+        },
+        {
+          "name": "parmetis",
+          "requires": "module load mpich",
+          "versions": [
+            "4.0.3"
+          ]
+        },
+        {
+          "name": "parmetis",
+          "requires": "module load openmpi",
+          "versions": [
+            "4.0.3"
+          ]
+        },
+        {
+          "name": "perl",
+          "versions": [
+            "5.42.2"
+          ]
+        },
+        {
+          "name": "petsc",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.25.5"
+          ]
+        },
+        {
+          "name": "petsc",
+          "requires": "module load mpich",
+          "versions": [
+            "3.25.5"
+          ]
+        },
+        {
+          "name": "petsc",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.25.5"
+          ]
+        },
+        {
+          "name": "picard",
+          "versions": [
+            "3.3.0"
+          ]
+        },
+        {
+          "name": "plink",
+          "versions": [
+            "1.07"
+          ]
+        },
+        {
+          "name": "plink2",
+          "versions": [
+            "2.0.0-a.6.9"
+          ]
+        },
+        {
+          "name": "plumed",
+          "requires": "module load openmpi",
+          "versions": [
+            "2.10.1"
+          ]
+        },
+        {
+          "name": "proj",
+          "versions": [
+            "9.7.0"
+          ]
+        },
+        {
+          "name": "prokka",
+          "versions": [
+            "1.14.6"
+          ]
+        },
+        {
+          "name": "pythia8",
+          "versions": [
+            "8.317"
+          ]
+        },
+        {
+          "gpu": true,
+          "name": "python-ml",
+          "usage_card": "python-ml/2026.09: PyTorch 2.5.1+cu124 (GPU-verified on L4), transformers, scikit-learn, numpy, scipy, pandas, matplotlib, networkx (no numba). It is a venv: layer extra packages with a .pth to its site-packages, not only --system-site-packages.",
+          "versions": [
+            "2025.legacy",
+            "2026.09"
+          ]
+        },
+        {
+          "name": "python-sci",
+          "usage_card": "python-sci/2026.09: Python 3.12 with numpy, scipy, pandas, matplotlib, numba, xarray, astropy, skyfield, biopython, networkx, scikit-learn, statsmodels. Extra packages via pip in a venv layered on it. OR-Tools and other wheels bundling abseil/protobuf crash layered: use an isolated venv.",
+          "versions": [
+            "2026.09"
+          ]
+        },
+        {
+          "name": "quantum-espresso",
+          "requires": "module load openmpi",
+          "usage_card": "Quantum ESPRESSO 7.6 (openmpi): pw.x, ph.x; pseudopotentials must be downloaded into the job (e.g. SSSP from materialscloud) and pointed to with pseudo_dir.",
+          "versions": [
+            "7.6"
+          ]
+        },
+        {
+          "name": "r",
+          "versions": [
+            "4.5.3"
+          ]
+        },
+        {
+          "name": "r-biocmanager",
+          "versions": [
+            "1.30.27"
+          ]
+        },
+        {
+          "name": "r-tidyverse",
+          "versions": [
+            "2.0.0"
+          ]
+        },
+        {
+          "name": "raxml-ng",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "2.0.2"
+          ]
+        },
+        {
+          "name": "rclone",
+          "versions": [
+            "1.74.3"
+          ]
+        },
+        {
+          "name": "root",
+          "requires": "module load openmpi",
+          "versions": [
+            "6.40.04"
+          ]
+        },
+        {
+          "name": "rust",
+          "versions": [
+            "1.97.1"
+          ]
+        },
+        {
+          "name": "salmon",
+          "versions": [
+            "1.11.4"
+          ]
+        },
+        {
+          "name": "samtools",
+          "versions": [
+            "1.23.1"
+          ]
+        },
+        {
+          "name": "seqkit",
+          "versions": [
+            "2.10.0"
+          ]
+        },
+        {
+          "name": "seqtk",
+          "versions": [
+            "1.4"
+          ]
+        },
+        {
+          "name": "slepc",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.25.2"
+          ]
+        },
+        {
+          "name": "slepc",
+          "requires": "module load mpich",
+          "versions": [
+            "3.25.2"
+          ]
+        },
+        {
+          "name": "slepc",
+          "requires": "module load openmpi",
+          "versions": [
+            "3.25.2"
+          ]
+        },
+        {
+          "name": "spades",
+          "versions": [
+            "3.15.5"
+          ]
+        },
+        {
+          "name": "sra-tools",
+          "versions": [
+            "3.3.0"
+          ]
+        },
+        {
+          "name": "star",
+          "versions": [
+            "2.7.11b"
+          ]
+        },
+        {
+          "name": "su2",
+          "requires": "module load openmpi",
+          "usage_card": "SU2 8.2 (`module load openmpi su2/8.2.0`): binaries SU2_CFD, SU2_DEF, SU2_SOL. Incompressible cases: SOLVER= INC_NAVIER_STOKES with INC_* keys (not the compressible solver). OUTPUT_FILES= (RESTART, CSV) writes restart_flow.csv (PointID,x,y,Pressure,Velocity_x,Velocity_y,...); history.csv holds residuals. Mesh .su2 files: NDIME, NELEM, then NPOIN, then NMARK. mpirun -np N SU2_CFD case.cfg; give it \u003c/dev/null inside loops. SPECIFIED_INLET_PROFILE in an unsteady run reads \u003cstem\u003e_00000.dat (write it and \u003cstem\u003e.dat); format NMARK=/MARKER_TAG=/NROW=/NCOL=6 then x y T |U| nx ny. No VISC_NUM_METHOD_FLOW in 8.2.",
+          "versions": [
+            "8.2.0"
+          ]
+        },
+        {
+          "name": "subread",
+          "versions": [
+            "2.1.1"
+          ]
+        },
+        {
+          "name": "suite-sparse",
+          "versions": [
+            "7.14.1"
+          ]
+        },
+        {
+          "name": "sundials",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "7.9.0"
+          ]
+        },
+        {
+          "name": "sundials",
+          "requires": "module load mpich",
+          "versions": [
+            "7.9.0"
+          ]
+        },
+        {
+          "name": "sundials",
+          "requires": "module load openmpi",
+          "versions": [
+            "7.9.0"
+          ]
+        },
+        {
+          "name": "superlu-dist",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "9.2.1"
+          ]
+        },
+        {
+          "name": "superlu-dist",
+          "requires": "module load mpich",
+          "versions": [
+            "9.2.1"
+          ]
+        },
+        {
+          "name": "superlu-dist",
+          "requires": "module load openmpi",
+          "versions": [
+            "9.2.1"
+          ]
+        },
+        {
+          "name": "tmux",
+          "versions": [
+            "3.6a"
+          ]
+        },
+        {
+          "name": "trilinos",
+          "requires": "module load openmpi",
+          "versions": [
+            "17.2.1"
+          ]
+        },
+        {
+          "name": "trimmomatic",
+          "versions": [
+            "0.39"
+          ]
+        },
+        {
+          "name": "trinity",
+          "versions": [
+            "2.15.1.FULL"
+          ]
+        },
+        {
+          "name": "valgrind",
+          "requires": "module load intel-oneapi-mpi",
+          "versions": [
+            "3.27.1"
+          ]
+        },
+        {
+          "name": "vcftools",
+          "versions": [
+            "0.1.17"
+          ]
+        },
+        {
+          "name": "wrf",
+          "requires": "module load openmpi",
+          "versions": [
+            "4.7.1"
+          ]
+        },
+        {
+          "name": "xtb",
+          "versions": [
+            "6.5.1"
+          ]
+        },
+        {
+          "name": "zstd",
+          "versions": [
+            "1.5.7"
+          ]
+        }
+      ],
+      "recipes": [
+        {
+          "field": "molecular dynamics",
+          "load": [
+            "openmpi",
+            "gromacs/2026.1"
+          ],
+          "name": "GROMACS (CPU, MPI)",
+          "notes": "Use thread/rank counts with small prime factors (16, 20), not 22.",
+          "partition": "computehigh",
+          "run": "srun gmx_mpi mdrun -deffnm md -ntomp $SLURM_CPUS_PER_TASK"
+        },
+        {
+          "field": "molecular dynamics",
+          "gpus": 1,
+          "load": [
+            "openmpi",
+            "gromacs/2026.1-cuda"
+          ],
+          "name": "GROMACS (GPU)",
+          "partition": "gpul4",
+          "run": "gmx_mpi mdrun -deffnm md -nb gpu -pme gpu"
+        },
+        {
+          "field": "molecular dynamics / materials",
+          "load": [
+            "openmpi",
+            "lammps/20250722.4"
+          ],
+          "name": "LAMMPS (CPU, MPI)",
+          "partition": "computehigh",
+          "run": "srun lmp -in in.script"
+        },
+        {
+          "field": "molecular dynamics / materials",
+          "gpus": 1,
+          "load": [
+            "openmpi",
+            "lammps/20250722.4-cuda"
+          ],
+          "name": "LAMMPS (GPU)",
+          "partition": "gpul4",
+          "run": "lmp -sf gpu -pk gpu 1 -in in.script"
+        },
+        {
+          "field": "molecular dynamics",
+          "gpus": 1,
+          "load": [
+            "openmm/8.5.2-cuda"
+          ],
+          "name": "OpenMM (GPU)",
+          "partition": "gpul4",
+          "run": "python sim.py  # platform='CUDA'"
+        },
+        {
+          "field": "electronic structure / DFT",
+          "load": [
+            "openmpi",
+            "quantum-espresso/7.6"
+          ],
+          "name": "Quantum ESPRESSO",
+          "partition": "computehigh",
+          "run": "srun pw.x -in scf.in \u003e scf.out"
+        },
+        {
+          "field": "electronic structure / ab initio MD",
+          "load": [
+            "openmpi",
+            "cp2k/2026.2"
+          ],
+          "name": "CP2K",
+          "partition": "computehigh",
+          "run": "srun cp2k.psmp -i input.inp -o out.log"
+        },
+        {
+          "field": "chemistry",
+          "load": [
+            "xtb/6.5.1"
+          ],
+          "name": "xtb (semi-empirical QM)",
+          "partition": "standard",
+          "run": "xtb mol.xyz --opt --gfn 2"
+        },
+        {
+          "field": "numerical PDEs",
+          "load": [
+            "openmpi",
+            "petsc/3.25.5"
+          ],
+          "name": "PETSc / Trilinos (build your own solver)",
+          "partition": "computehigh",
+          "run": "mpicc solver.c $(pkg-config --cflags --libs PETSc) \u0026\u0026 srun ./a.out"
+        },
+        {
+          "field": "data analysis / scientific Python",
+          "load": [
+            "python-sci"
+          ],
+          "name": "Scientific Python (site env, CPU)",
+          "notes": "Python 3.12 with numpy scipy pandas matplotlib seaborn scikit-learn statsmodels sympy numba xarray netCDF4 h5py zarr dask polars pyarrow astropy astroquery skyfield sunpy cartopy geopandas rasterio networkx biopython pysam scikit-image opencv jupyterlab; cutadapt, multiqc, snakemake. Extra packages: uv venv --system-site-packages $TMPDIR/v. Every package is import-tested together. Do not combine with other Python modules.",
+          "partition": "standard",
+          "run": "python analysis.py"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "busco/6.1.0"
+          ],
+          "name": "BUSCO (genome completeness)",
+          "partition": "standard",
+          "run": "busco -i asm.fa -m genome -l bacteria_odb12 -c $SLURM_CPUS_ON_NODE --download_path $SCRATCH/busco_downloads"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "prokka/1.14.6"
+          ],
+          "name": "Prokka (prokaryote annotation)",
+          "partition": "standard",
+          "run": "prokka --cpus $SLURM_CPUS_ON_NODE --outdir ann --prefix x asm.fa"
+        },
+        {
+          "field": "machine learning",
+          "gpus": 1,
+          "load": [
+            "python-ml"
+          ],
+          "name": "PyTorch (site env, CUDA 12.4)",
+          "notes": "Python 3.12, torch 2.5.1+cu124, numpy, scipy, pandas, scikit-learn, transformers, JupyterLab.",
+          "partition": "gpul4",
+          "run": "python train.py"
+        },
+        {
+          "field": "machine learning",
+          "gpus": 1,
+          "load": [],
+          "name": "Current PyTorch (CUDA 13)",
+          "notes": "Driver 580 runs CUDA \u003c= 13.0 wheels.",
+          "partition": "gpul4",
+          "run": "uv venv $TMPDIR/v \u0026\u0026 . $TMPDIR/v/bin/activate \u0026\u0026 uv pip install torch --index-url https://download.pytorch.org/whl/cu130"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "blast-plus"
+          ],
+          "name": "BLAST+",
+          "partition": "standard",
+          "run": "blastn -query q.fa -db db -outfmt 6 -num_threads $SLURM_CPUS_ON_NODE"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "bwa",
+            "samtools/1.23.1",
+            "bcftools/1.23.1"
+          ],
+          "name": "Read mapping + variant calling",
+          "partition": "standard",
+          "run": "bwa mem -t $SLURM_CPUS_ON_NODE ref.fa r1.fq r2.fq | samtools sort -o aln.bam; bcftools mpileup -f ref.fa aln.bam | bcftools call -mv"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "gatk/4.5.0.0"
+          ],
+          "name": "GATK",
+          "partition": "standard",
+          "run": "gatk HaplotypeCaller ..."
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "spades/3.15.5"
+          ],
+          "name": "SPAdes assembly",
+          "partition": "highmem",
+          "run": "spades.py -1 r1.fq -2 r2.fq -o asm -t $SLURM_CPUS_ON_NODE -m 480"
+        },
+        {
+          "field": "statistics",
+          "load": [
+            "r/4.5.3"
+          ],
+          "name": "R",
+          "notes": "Or /apps/containers/r-tidyverse-4.5.sif.",
+          "partition": "standard",
+          "run": "Rscript analysis.R"
+        },
+        {
+          "field": "HPC",
+          "load": [
+            "gcc/13.5.0",
+            "openmpi/5.0.10"
+          ],
+          "name": "Multi-node MPI (your own code)",
+          "notes": "Also mpich and intel-oneapi-mpi.",
+          "partition": "computehigh",
+          "run": "mpicc prog.c -O3 -march=x86-64-v3 -o prog \u0026\u0026 srun ./prog"
+        }
+      ]
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json"
+      ]
+    }
+  }
+}

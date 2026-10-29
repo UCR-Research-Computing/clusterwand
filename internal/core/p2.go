@@ -176,9 +176,9 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 	// 3. Powered-up nodes with no job, and long-running jobs using no CPU now
 	// (cloud sites only: a fixed node bills the same idle or not).
 	if !s.Site.CloudNodes {
-	} else if nb, err := s.run(ctx, backend.Nodes()); err == nil {
-		var nr slurm.NodesResponse
-		if slurm.Decode(nb, &nr) == nil {
+	} else if ns, _, err := s.nodes(ctx); err == nil {
+		nr := slurm.NodesResponse{Nodes: ns}
+		{
 			now := s.Now().Unix()
 			for _, n := range nr.Nodes {
 				if !n.PoweredUp() {
@@ -311,14 +311,11 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 	add := func(i HealthIssue) { h.Issues = append(h.Issues, i) }
 	now := s.Now().Unix()
 
-	var nr slurm.NodesResponse
-	b, err := s.run(ctx, backend.Nodes())
+	ns, _, err := s.nodes(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := slurm.Decode(b, &nr); err != nil {
-		return nil, err
-	}
+	nr := slurm.NodesResponse{Nodes: ns}
 	for _, n := range nr.Nodes {
 		since := numTS(n.ReasonAt)
 		reason := n.Reason
@@ -345,11 +342,7 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 	}
 
 	var q slurm.QueueResponse
-	b, err = s.run(ctx, backend.SqueueAll())
-	if err != nil {
-		return nil, err
-	}
-	if err := slurm.Decode(b, &q); err != nil {
+	if q.Jobs, err = s.queue(ctx, queueSel{all: true}); err != nil {
 		return nil, err
 	}
 	for _, j := range q.Jobs {

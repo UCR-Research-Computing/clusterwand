@@ -711,10 +711,10 @@ func TestJobsListByIDsIsFresh(t *testing.T) {
 	}
 	var sq, sa int
 	for _, c := range fx.Calls {
-		if strings.HasPrefix(c, "squeue --json -j 229,260") {
+		if strings.Contains(c, "exec squeue ") && strings.HasSuffix(c, "-j 229,260") {
 			sq++
 		}
-		if strings.HasPrefix(c, "sacct --json -j 229,260") {
+		if strings.Contains(c, "exec sacct ") && strings.HasSuffix(c, "-j 229,260") {
 			sa++
 		}
 		if strings.Contains(c, " -u ") || strings.Contains(c, " -a") {

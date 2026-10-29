@@ -103,6 +103,7 @@ type goldenSite struct {
 	gpuPartition string
 	home         string
 	scratch      string
+	json         bool // read Slurm with --json (site slurm.json) instead of text
 }
 
 var ursaGolden = goldenSite{
@@ -145,6 +146,7 @@ func goldenService(t *testing.T, gs goldenSite, tiers []string) *core.Service {
 		t.Fatal(err)
 	}
 	s.Now = func() time.Time { return goldenNow }
+	s.Site.Slurm.JSON = gs.json
 	fx := s.Backend.(*backend.Fixture)
 	jobDir := gs.home + "/deep-research-lab/run_76"
 	fx.Files = map[string]map[string]string{jobDir: {
@@ -327,6 +329,49 @@ func runGolden(t *testing.T, gs goldenSite) string {
 
 func TestGoldenUrsaMajor(t *testing.T) {
 	runGolden(t, ursaGolden)
+}
+
+// F2: the same site read through --json (slurm.json: true) answers
+// byte-identically to the pre-F2 code: testdata/golden/ursa-major-json holds the
+// v0.2.0 goldens unchanged. The text path (TestGoldenUrsaMajor) differs from them
+// only in source.commands (TestGoldenTextMatchesJSON).
+func TestGoldenUrsaMajorJSON(t *testing.T) {
+	gs := ursaGolden
+	gs.name, gs.json = "ursa-major-json", true
+	runGolden(t, gs)
+}
+
+// TestGoldenTextMatchesJSON: every answer's data is identical whichever path read
+// Slurm; only the commands listed in source differ.
+func TestGoldenTextMatchesJSON(t *testing.T) {
+	dir := filepath.Join("..", "..", "testdata", "golden")
+	files, _ := filepath.Glob(filepath.Join(dir, "ursa-major-json", "*.json"))
+	if len(files) < 40 {
+		t.Fatalf("only %d json goldens", len(files))
+	}
+	strip := func(b []byte) string {
+		var v any
+		if err := json.Unmarshal(b, &v); err != nil {
+			t.Fatal(err)
+		}
+		if m, ok := v.(map[string]any); ok {
+			if r, ok := m["result"].(map[string]any); ok {
+				delete(r, "source")
+			}
+		}
+		out, _ := json.Marshal(v)
+		return string(out)
+	}
+	for _, f := range files {
+		j, _ := os.ReadFile(f)
+		x, err := os.ReadFile(filepath.Join(dir, "ursa-major", filepath.Base(f)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strip(j) != strip(x) {
+			t.Errorf("%s: text and JSON paths give different answers", filepath.Base(f))
+		}
+	}
 }
 
 // bigGolden is a synthetic second site (scripts/make_second_site.py): another

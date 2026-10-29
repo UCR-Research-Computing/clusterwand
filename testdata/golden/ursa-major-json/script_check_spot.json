@@ -1,0 +1,47 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "cores": {
+        "cores_asked": true,
+        "cores_per_node": 16,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 126976,
+        "node_share": 1
+      },
+      "est_max_cost_usd": 0.74,
+      "issues": [
+        {
+          "message": "GPUs requested on spot, which has no GPUs; use gpul4",
+          "severity": "error"
+        },
+        {
+          "message": "spot nodes can be reclaimed with ~30 s notice; add #SBATCH --requeue and make the job restartable",
+          "severity": "warning"
+        },
+        {
+          "message": "calls python without loading python-sci/python-ml or an environment (system Python 3.6 on Rocky 8)",
+          "severity": "warning"
+        }
+      ],
+      "modules": [],
+      "note": "Static check only; nothing was submitted. spot gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": false,
+      "partition": "spot",
+      "request": {
+        "cpus-per-task": "4",
+        "gres": "gpu:1",
+        "partition": "spot",
+        "time": "1:00:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

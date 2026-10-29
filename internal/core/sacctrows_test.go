@@ -72,7 +72,8 @@ func TestSacctSummaryFields(t *testing.T) {
 	}
 }
 
-// List-type reads use the plain-text summary; one-job and job_ids reads keep --json.
+// List-type reads use the plain-text summary; one-job and job_ids reads read the
+// full per-job record (text by default, --json when the site sets slurm.json).
 func TestListReadsUseTheSummary(t *testing.T) {
 	s, fx := newTestService(t, "R1", "R2")
 	ctx := context.Background()
@@ -86,8 +87,8 @@ func TestListReadsUseTheSummary(t *testing.T) {
 			switch {
 			case strings.Contains(c, "sacct -n -P --noconvert"):
 				summary++
-			case strings.HasPrefix(c, "sacct --json"):
-				jsonAcct++
+			case strings.HasPrefix(c, "sacct --json"), strings.Contains(c, "exec sacct -P --noconvert --delimiter"):
+				jsonAcct++ // a full per-job record (JSON or text)
 			}
 		}
 		return

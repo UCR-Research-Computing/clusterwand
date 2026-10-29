@@ -33,8 +33,8 @@
     "source": {
       "backend": "fixture:testdata",
       "commands": [
-        "scontrol show nodes --json",
-        "squeue --json",
+        "bash -c 'scontrol --version; SLURM_TIME_FORMAT=%s exec scontrol -o show nodes' clusterwand",
+        "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand",
         "cat -- /apps/docs/catalog.json",
         "sinfo -h -o '%R|%h'"
       ]

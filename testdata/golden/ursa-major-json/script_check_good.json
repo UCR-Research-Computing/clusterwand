@@ -1,0 +1,36 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "cores": {
+        "cores_asked": false,
+        "cores_per_node": 22,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 87040,
+        "node_share": 1
+      },
+      "est_max_cost_usd": 1.87,
+      "issues": [],
+      "modules": [
+        "python-sci"
+      ],
+      "note": "Static check only; nothing was submitted. computehigh gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": true,
+      "partition": "computehigh",
+      "request": {
+        "job-name": "hello",
+        "nodes": "1",
+        "partition": "computehigh",
+        "time": "01:00:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

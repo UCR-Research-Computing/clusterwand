@@ -35,7 +35,7 @@
         "sinfo -h -o '%R|%h'",
         "sinfo -h -o '%R|%h'",
         "sbatch --test-only --partition=computehigh --nodes=1 --time=60 --comment=clusterwand:c9466d01bd6e --job-name=hello",
-        "scontrol show nodes --json"
+        "bash -c 'scontrol --version; SLURM_TIME_FORMAT=%s exec scontrol -o show nodes' clusterwand"
       ]
     }
   }
