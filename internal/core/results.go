@@ -45,6 +45,7 @@ type Results struct {
 	PreviewOf  string            `json:"preview_of,omitempty"`
 	Chunk      *ChunkInfo        `json:"chunk,omitempty"`
 	Grep       *GrepResult       `json:"grep,omitempty"`
+	LeftOut    int               `json:"left_out,omitempty"` // hidden or credential-like files not shown
 	Notes      []string          `json:"notes"`
 }
 
@@ -88,20 +89,37 @@ func (s *Service) jobFolder(ctx context.Context, jobID string) (*JobDetail, stri
 	return d, dir, nil
 }
 
-// listJob returns every regular file in a job folder (up to MaxTreeFiles).
-func (s *Service) listJob(ctx context.Context, dir string) ([]ResultFile, bool, error) {
+// hiddenRel reports whether any component of a job-folder relative path is
+// hidden or credential-like (SPEC 18.4: never listed, read or downloaded).
+func hiddenRel(rel string) bool {
+	for _, part := range strings.Split(rel, "/") {
+		if hiddenOrSensitive(part) {
+			return true
+		}
+	}
+	return false
+}
+
+// listJob returns every regular file in a job folder (up to MaxTreeFiles),
+// leaving out hidden and credential-like ones (their count is returned).
+func (s *Service) listJob(ctx context.Context, dir string) ([]ResultFile, bool, int, error) {
 	lc, err := backend.ListTree(dir)
 	if err != nil {
-		return nil, false, err
+		return nil, false, 0, err
 	}
 	out, err := s.run(ctx, lc)
 	if err != nil {
-		return nil, false, fmt.Errorf("listing %s: %w", dir, err)
+		return nil, false, 0, fmt.Errorf("listing %s: %w", dir, err)
 	}
 	var files []ResultFile
+	left := 0
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		parts := strings.SplitN(line, "\t", 3)
 		if len(parts) != 3 {
+			continue
+		}
+		if hiddenRel(parts[2]) {
+			left++
 			continue
 		}
 		n, _ := strconv.ParseInt(parts[0], 10, 64)
@@ -113,7 +131,7 @@ func (s *Service) listJob(ctx context.Context, dir string) ([]ResultFile, bool, 
 		files, cut = files[:backend.MaxTreeFiles], true
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return files, cut, nil
+	return files, cut, left, nil
 }
 
 func matchResult(f ResultFile, prefix, pattern string) bool {
@@ -156,9 +174,13 @@ func (s *Service) JobResults(ctx context.Context, in ResultsInput) (*Results, er
 		return nil, err
 	}
 	r := &Results{JobID: in.JobID, State: d.State, Folder: dir, Files: []ResultFile{}, Notes: []string{}}
-	all, cut, err := s.listJob(ctx, dir)
+	all, cut, left, err := s.listJob(ctx, dir)
 	if err != nil {
 		return nil, err
+	}
+	if left > 0 {
+		r.LeftOut = left
+		r.Notes = append(r.Notes, fmt.Sprintf("%d hidden or credential-like file(s) are not shown (clusterwand never reads or downloads those).", left))
 	}
 	if cut {
 		r.Notes = append(r.Notes, fmt.Sprintf("The folder has more than %d files; only the first %d were listed.", backend.MaxTreeFiles, backend.MaxTreeFiles))
@@ -291,6 +313,9 @@ func (s *Service) download(ctx context.Context, dir, jobID string, files []strin
 		}
 		if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {
 			return "", nil, fmt.Errorf("refusing unsafe path in archive: %q", h.Name)
+		}
+		if hiddenRel(name) {
+			continue // hidden or credential-like: never written to this machine
 		}
 		target := filepath.Join(dest, filepath.FromSlash(name))
 		if !strings.HasPrefix(target, dest+string(os.PathSeparator)) {

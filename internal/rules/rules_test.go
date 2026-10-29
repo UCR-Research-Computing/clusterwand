@@ -185,6 +185,8 @@ func TestEachLogRuleFires(t *testing.T) {
 		"permission":          "bash: ./run.sh: Permission denied",
 		"command-not-found":   "line 4: gmx_mpi: command not found",
 		"python-error":        "Traceback (most recent call last):\n  File \"r.py\", line 222\nNameError: name 'd3_fp32_mlups' is not defined. Did you mean: 'fp32_mlups'?",
+		// real tail of a failed source build (anonymised, Ursa job 1588, F4)
+		"build-failure": "[ 96%] Linking Fortran executable pmemd.cuda_SPFP\n/apps/gcc/13.5.0/libexec/gcc/x86_64-pc-linux-gnu/13.5.0/ld: xray/cuda/libpmemd_xray_cuda.a(xray_non_bulk.cpp.o): in function `pmemd_xray_non_bulk_init_gpu':\nxray_non_bulk.cpp:(.text+0x71b2): undefined reference to `xray::NonBulkGPU<(xray::NonBulkKernelVersion)1, (xray::KernelPrecision)0>::NonBulkGPU(int, int const*)'\ncollect2: error: ld returned 1 exit status\nmake[2]: *** [src/pmemd/src/CMakeFiles/pmemd.cuda_SPFP.dir/build.make:374: src/pmemd/src/pmemd.cuda_SPFP] Error 1",
 	}
 	for _, r := range logRules {
 		s, ok := samples[r.id]

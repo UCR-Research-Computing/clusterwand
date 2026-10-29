@@ -5,6 +5,23 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.5.0 - 2026-10-29
+
+- **Live campaign on Ursa Major over plain SSH** ([docs/LIVE_CAMPAIGN_F4.md](docs/LIVE_CAMPAIGN_F4.md)):
+  every R1, R2 and A1 tool through the CLI and the stdio MCP server, 25 negative cases
+  (injected job ids, path escapes, hidden and credential files, bad module/command/user
+  names, over-cap submit, bogus and reused confirm tokens), a 10-call parallel burst, one
+  real two-step submit on `check` read back with the tools, and `discover` run live.
+- **Fix: `job_results` honours the hidden/credential rule.** It used to list, read and
+  download files such as `.gitignore`, `.git/*`, macOS `._*` files or `id_*` keys inside a
+  job folder, which `files_read` refuses. They are now left out (counted in `left_out`), and
+  a whole-folder download skips them.
+- **New diagnosis rule `build-failure`:** compiler and linker errors (`undefined reference`,
+  `collect2: error: ld returned`, `file.c:12:3: error:`) with build advice. Sample is the
+  real log tail of a failed source build on Ursa.
+- Confirm-token errors no longer read "[REDACTED] the action again" in the audit log.
+- **Mutation check:** 3 new guards (f4*).
+
 ## v0.4.0 - 2026-10-29
 
 - **`clusterwand discover --site <name> --host <ssh alias>`.** Read-only probes on the
