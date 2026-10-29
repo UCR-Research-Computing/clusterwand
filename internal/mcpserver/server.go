@@ -267,6 +267,26 @@ var envelopeSchema = &jsonschema.Schema{
 	Required: []string{"data", "source", "as_of"},
 }
 
+// clusterStatusDesc words cluster_status for what this caller will see: the
+// $/hour burn only when answers carry dollars (site text keys
+// tool_cluster_status, and tool_cluster_status_nocost when they do not).
+func clusterStatusDesc(s *core.Service) string {
+	if s.CanSeeCost() {
+		return s.Site.Text("tool_cluster_status", "Live state of every partition: nodes powered up/down, allocated, idle-but-billing, down/drained; running and pending jobs; estimated $/hour being spent right now.")
+	}
+	return s.Site.Text("tool_cluster_status_nocost", "Live state of every partition: nodes powered up/down, allocated, idle, down/drained; running and pending jobs.")
+}
+
+// partitionsDesc words partitions for what this caller will see: a price per
+// node-hour only when answers carry charge figures (site text keys
+// tool_partitions, and tool_partitions_nocost when they do not).
+func partitionsDesc(s *core.Service) string {
+	if s.CanSeeCharge() {
+		return s.Site.Text("tool_partitions", "Partitions from the cluster catalog: nodes, cores and memory per node, GPUs, time limit, CPU instruction set, price per node-hour (when the site charges), preemptible (spot), what each is for, and the default.")
+	}
+	return s.Site.Text("tool_partitions_nocost", "Partitions from the cluster catalog: nodes, cores and memory per node, GPUs, time limit, CPU instruction set, preemptible (spot), what each is for, and the default.")
+}
+
 // New builds the MCP server over a core.Service.
 func New(s *core.Service) *mcp.Server {
 	sp := s.Site
@@ -277,15 +297,13 @@ func New(s *core.Service) *mcp.Server {
 		return &mcp.Tool{Name: name, Description: desc, Annotations: readOnly(title), OutputSchema: envelopeSchema}
 	}
 
-	mcp.AddTool(srv, addR1("cluster_status", "Cluster status",
-		sp.Text("tool_cluster_status", "Live state of every partition: nodes powered up/down, allocated, idle-but-billing, down/drained; running and pending jobs; estimated $/hour being spent right now.")),
+	mcp.AddTool(srv, addR1("cluster_status", "Cluster status", clusterStatusDesc(s)),
 		func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, envelope, error) {
 			r, err := core.Call(ctx, s, clientName(req), "cluster_status", "R1", nil, true, s.ClusterStatus)
 			return nil, toEnvelope(r), err
 		})
 
-	mcp.AddTool(srv, addR1("partitions", "Partitions",
-		sp.Text("tool_partitions", "Partitions from the cluster catalog: nodes, cores and memory per node, GPUs, time limit, CPU instruction set, price per node-hour (when the site charges), preemptible (spot), what each is for, and the default.")),
+	mcp.AddTool(srv, addR1("partitions", "Partitions", partitionsDesc(s)),
 		func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, envelope, error) {
 			r, err := core.Call(ctx, s, clientName(req), "partitions", "R1", nil, true, s.Partitions)
 			return nil, toEnvelope(r), err

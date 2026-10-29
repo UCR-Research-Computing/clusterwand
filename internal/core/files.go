@@ -1,6 +1,6 @@
 package core
 
-// Paged reads, searches and the user-file tools (SPEC section 18.3, 18.4).
+// Paged reads, searches and the user-file tools (SPEC sections 11.4, 11.5).
 
 import (
 	"bytes"

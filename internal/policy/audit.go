@@ -14,11 +14,11 @@ import (
 // Record is one audit line.
 type Record struct {
 	Time       time.Time      `json:"time"`
-	Caller     string         `json:"caller"` // local OS user (personal phase)
+	Caller     string         `json:"caller"` // local OS user
 	Client     string         `json:"client"` // mcp client name or "cli"
 	Tool       string         `json:"tool"`
 	Args       map[string]any `json:"args,omitempty"`
-	Decision   string         `json:"decision"` // allowed | denied | error | rate_limited | busy
+	Decision   string         `json:"decision"` // allowed | denied | error | rate_limited
 	Reason     string         `json:"reason,omitempty"`
 	Commands   []string       `json:"commands,omitempty"`
 	Bytes      int            `json:"bytes"`

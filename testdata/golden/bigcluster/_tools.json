@@ -6,7 +6,7 @@
       "readOnlyHint": true,
       "title": "Cluster status"
     },
-    "description": "Live state of every partition: nodes powered up/down, allocated, idle-but-billing, down/drained; running and pending jobs; estimated $/hour being spent right now.",
+    "description": "Live state of every partition: nodes powered up/down, allocated, idle, down/drained; running and pending jobs.",
     "inputSchema": {
       "additionalProperties": false,
       "type": "object"

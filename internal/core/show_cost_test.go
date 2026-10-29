@@ -95,7 +95,6 @@ func TestShowCostTiers(t *testing.T) {
 		callerTiers   []string
 		showCostTiers []string
 		showCost      bool
-		ownCaps       bool
 		wantDollars   bool
 	}{
 		{
@@ -103,7 +102,6 @@ func TestShowCostTiers(t *testing.T) {
 			callerTiers:   []string{"R1"},
 			showCostTiers: []string{"R2"},
 			showCost:      true,
-			ownCaps:       false,
 			wantDollars:   false,
 		},
 		{
@@ -111,7 +109,6 @@ func TestShowCostTiers(t *testing.T) {
 			callerTiers:   []string{"R1", "R2"},
 			showCostTiers: []string{"R2"},
 			showCost:      true,
-			ownCaps:       false,
 			wantDollars:   true,
 		},
 		{
@@ -119,15 +116,6 @@ func TestShowCostTiers(t *testing.T) {
 			callerTiers:   []string{"R1"},
 			showCostTiers: nil,
 			showCost:      true,
-			ownCaps:       false,
-			wantDollars:   true,
-		},
-		{
-			name:          "program client with own A1 caps always gets dollars",
-			callerTiers:   []string{"R1"},
-			showCostTiers: []string{"R2"},
-			showCost:      true,
-			ownCaps:       true,
 			wantDollars:   true,
 		},
 		{
@@ -135,7 +123,6 @@ func TestShowCostTiers(t *testing.T) {
 			callerTiers:   []string{"R1", "R2"},
 			showCostTiers: []string{"R2"},
 			showCost:      false,
-			ownCaps:       false,
 			wantDollars:   false,
 		},
 	}
@@ -146,7 +133,6 @@ func TestShowCostTiers(t *testing.T) {
 			s.Cfg.Tiers = tt.callerTiers
 			s.Cfg.ShowCostTiers = tt.showCostTiers
 			s.Cfg.ShowCost = tt.showCost
-			s.ProgramOwnCaps = tt.ownCaps
 
 			for _, tool := range tools {
 				b := callTool(t, s, tool)

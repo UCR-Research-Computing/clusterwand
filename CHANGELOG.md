@@ -1,9 +1,31 @@
 # Changelog
 
 All notable changes. Versions follow [semver](https://semver.org); every release is a git
-tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC.md).
+tag and a GitHub release. The design is in [docs/SPEC.md](docs/SPEC.md); the inherited ursa-bifrost history is in [docs/history/URSA_BIFROST_SPEC_v0.10.1.md](docs/history/URSA_BIFROST_SPEC_v0.10.1.md).
 
 ## Unreleased
+
+## v0.6.0 - 2026-10-29
+
+Cleanup: ClusterWand's core and spec now describe only what ClusterWand is.
+
+- **Removed dead hosted-mode plumbing from the core.** None of it was reachable from the
+  CLI or the stdio MCP server: the cross-user shared cache and single-flight
+  (`SharedCache`, `Command.public`), the per-caller in-flight cap and server-wide
+  accounting gate (`MaxInFlight`, `Gate`), program clients (`Program`, `ProgramOwnCaps`,
+  `Principal`), sealed A1 state (`StateSealer`) and the remote-service download refusal.
+  Every CLI command and MCP tool answers as before: the Ursa Major goldens are unchanged.
+- **Fix: tool descriptions follow cost visibility.** `cluster_status` no longer promises
+  "$/hour" and `partitions` no longer promises a price to a caller who cannot see them
+  (`show_cost: false`, a tier outside `show_cost_tiers`, or a site not charged in
+  dollars). Sites can word both variants (`tool_cluster_status_nocost`,
+  `tool_partitions_nocost`); Ursa Major does. The synthetic SU site's `cluster_status`
+  description changed accordingly (its only golden change).
+- **Docs:** [docs/SPEC.md](docs/SPEC.md) rewritten as a ClusterWand spec (what it is,
+  SSH-only identity, site profiles, Slurm adapter, discover, tool catalog as built,
+  safety model, config, testing, roadmap). The inherited ursa-bifrost spec moved unchanged
+  to [docs/history/URSA_BIFROST_SPEC_v0.10.1.md](docs/history/URSA_BIFROST_SPEC_v0.10.1.md).
+- **Mutation check:** 14 guards for removed code dropped, 2 new (v060*).
 
 ## v0.5.1 - 2026-10-29
 

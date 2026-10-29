@@ -1,6 +1,6 @@
 package core
 
-// Helper tools that stand in for a shell (SPEC section 18.4): storage_usage,
+// Helper tools that stand in for a shell (SPEC section 11.4): storage_usage,
 // env_check, interactive_help. Each runs fixed, validated commands as the
 // person, or nothing at all.
 

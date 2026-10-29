@@ -62,7 +62,8 @@ tools behave as before. Since v0.2.0 everything site-specific lives in a site pr
 since v0.3.0 Slurm is read as plain text (works on Slurm 21.08 to 25.11; `--json` is an
 opt-in per site) and partitions locked to some accounts or groups are only offered to
 people who may use them. Since v0.4.0 `clusterwand discover` drafts a profile for a new
-cluster from a read-only look at its login node (see below).
+cluster from a read-only look at its login node (see below). v0.6.0 removed the last
+hosted-mode plumbing from the core.
 
 ## 60-second demo
 
@@ -246,7 +247,7 @@ occasionally be manipulated by text it reads.
   connection, no background polling, and no compute on the login node.
 - **Other users' jobs** are denied without tier R2.
 
-Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
+Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 11.
 
 ## Architecture
 
@@ -280,11 +281,12 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 
 | Phase | What | Status |
 |---|---|---|
-| F0 | Fork and polish: renamed module, binary and paths; docs; CI | v0.1.0 |
+| F0 | Fork and polish: renamed module, binary and paths; docs; CI | done, v0.1.0 |
 | F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | done, v0.2.0 |
 | F2 | Slurm adapter: plain-text reads as the primary path (Slurm 21.08 to 25.11), JSON behind a site flag; lab-locked partitions (AllowAccounts/AllowGroups) | done, v0.3.0 |
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey; host-key pin; review gate | done, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH ([report](docs/LIVE_CAMPAIGN_F4.md)) | done, v0.5.0 |
+| Cleanup | Dead hosted-mode plumbing removed from core; [docs/SPEC.md](docs/SPEC.md) rewritten for ClusterWand | done, v0.6.0 |
 | Later | Multi-cluster configs | not started |
 
 ## Development
@@ -297,8 +299,8 @@ scripts/mcp_smoke.py        # drives `clusterwand mcp` over stdio like a real cl
 
 Tests run against anonymized recordings of real cluster output in `testdata/`. Read
 [CONTRIBUTING.md](CONTRIBUTING.md) first; the no-shell and two-step rules are not
-negotiable. Changes: [CHANGELOG.md](CHANGELOG.md). Design and history:
-[docs/SPEC.md](docs/SPEC.md).
+negotiable. Changes: [CHANGELOG.md](CHANGELOG.md). Design: [docs/SPEC.md](docs/SPEC.md);
+inherited ursa-bifrost history: [docs/history/](docs/history/URSA_BIFROST_SPEC_v0.10.1.md).
 
 ## Credits
 

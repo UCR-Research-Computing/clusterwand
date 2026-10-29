@@ -52,7 +52,7 @@ type Results struct {
 // ResultsInput selects a results action.
 type ResultsInput struct {
 	JobID string
-	// listing page (SPEC 18.3)
+	// listing page (SPEC 11.5)
 	Prefix  string // only files under this subfolder
 	Pattern string // glob on the relative path (or the base name when it has no "/")
 	Offset  int
@@ -129,7 +129,7 @@ func (s *Service) checkJobDir(dir, owner string) error {
 }
 
 // hiddenRel reports whether any component of a job-folder relative path is
-// hidden or credential-like (SPEC 18.4: never listed, read or downloaded).
+// hidden or credential-like (SPEC 11.4: never listed, read or downloaded).
 func hiddenRel(rel string) bool {
 	for _, part := range strings.Split(rel, "/") {
 		if hiddenOrSensitive(part) {
@@ -193,9 +193,6 @@ func matchResult(f ResultFile, prefix, pattern string) bool {
 // caller's own jobs; the folder is the job's working directory from the
 // accounting record and must sit under the caller's allowed roots.
 func (s *Service) JobResults(ctx context.Context, in ResultsInput) (*Results, error) {
-	if in.Download && s.Remote {
-		return nil, errors.New("download is not available in this mode; use read")
-	}
 	if in.Prefix != "" {
 		in.Prefix = strings.TrimSuffix(in.Prefix, "/")
 		if err := backend.ValidRelPath(in.Prefix); err != nil {

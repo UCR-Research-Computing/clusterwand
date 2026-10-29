@@ -9,7 +9,7 @@ import (
 // sacctRowsFromJSON prints a recorded `sacct --json` answer the way
 // `sacct -n -P --noconvert -o <SacctFields>` with SLURM_TIME_FORMAT=%s prints
 // the same jobs on Slurm 25.11 (checked field by field against 745 live jobs,
-// SPEC section 23): a job row, then one row per step.
+// SPEC section 7.1): a job row, then one row per step.
 func sacctRowsFromJSON(b []byte) ([]byte, error) {
 	type num struct {
 		Set    bool    `json:"set"`
