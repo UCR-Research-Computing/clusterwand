@@ -208,3 +208,51 @@ func TestSitePathsAreTheRoots(t *testing.T) {
 		t.Errorf("no catalog: %v", err)
 	}
 }
+
+// Without a charge model nobody sees charge figures, even with show_cost on.
+func TestNoChargeHidesFigures(t *testing.T) {
+	s, _ := siteService(t, "name: free\napproved: true\ncatalog: /apps/docs/catalog.json\npartitions: {probe: check}\n")
+	if s.canSeeCharge() || s.canSeeCost() {
+		t.Error("a site without a charge model shows charge figures")
+	}
+	s2, _ := siteService(t, suSite)
+	if !s2.canSeeCharge() || s2.canSeeCost() {
+		t.Error("an SU site: charge figures yes, dollars no")
+	}
+}
+
+// stripCostFields hides SU estimates and catalog prices from tiers outside
+// show_cost_tiers (the catalog resource and script_check both carry them).
+func TestStripHidesNewFields(t *testing.T) {
+	s, _ := newTestService(t, "R1")
+	s.Cfg.ShowCostTiers = []string{"R2"}
+	ctx := context.Background()
+	r, err := Call(ctx, s, "test", "resource:catalog", "R1", nil, false, s.Catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range r.Data.Partitions {
+		if p.USDPerNodeHr != nil {
+			t.Errorf("catalog resource shows %s price to R1", p.Name)
+		}
+	}
+	// the cached catalog itself is untouched (the strip works on a copy)
+	if cat, _ := s.Catalog(ctx); cat.Partitions[0].USDPerNodeHr == nil {
+		t.Error("strip changed the cached catalog")
+	}
+	c := 1.5
+	sc := &ScriptCheck{EstCostUSD: &c}
+	stripCostFields(s, sc)
+	if sc.EstCostUSD != nil {
+		t.Error("script_check dollars shown to R1")
+	}
+}
+
+// Site names are validated before any lookup.
+func TestSiteNameValidated(t *testing.T) {
+	c := config.Default()
+	c.Site = "Ursa_Major"
+	if _, _, err := ResolveSite(c); err == nil || !strings.Contains(err.Error(), "not valid") {
+		t.Errorf("bad site name: %v", err)
+	}
+}

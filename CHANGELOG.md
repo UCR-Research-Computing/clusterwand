@@ -5,6 +5,28 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.2.0 - 2026-10-28
+
+- **Site profiles.** Everything ClusterWand knows about a cluster beyond plain Slurm now
+  lives in a site profile (`internal/site`): paths, partition roles and fallbacks, CPU notes,
+  catalog location, cloud-node wording, charge model and site wording. Ursa Major's is
+  `sites/ursa-major/site.yaml` (shipped in the binary; `site: ursa-major`). Your own:
+  `site_file: ~/.config/clusterwand/mysite.yaml` with `approved: true`. No profile: a generic
+  one (home only, no catalog, no charges, no env_check partition).
+- **Charge models.** `usd_per_node_hour` (as before), `su_per_core_hour` (service units per
+  core-hour per partition, SU caps per job and per day; refuses submits without caps or to
+  an unpriced partition), `none` (no cost figures; node, hour and submit caps still hold).
+- **Upgrade note.** The default `cluster` is no longer `ursa-major`. Ursa users add
+  `site: ursa-major` (or keep `cluster: ursa-major`, which selects the profile).
+  `config init` writes `site: ursa-major` as an example.
+- **Tests.** Golden tests for every MCP tool, prompt and resource and every CLI renderer:
+  byte-identical to v0.1.0 on the Ursa fixtures. A synthetic second site (SU charges, other
+  partitions and paths) checks that no Ursa string or dollar figure leaks.
+- **Fixed:** on a non-dollar site, partition prices, job cost, waste and allocation no longer
+  show figures in `usd` fields.
+- **Mutation check:** 167 guards (12 repointed to moved code, 19 new for site validation and
+  charge models).
+
 ## v0.1.0 - 2026-10-28
 
 ClusterWand: the Bifrost between AI and your HPC cluster. First release, forked from

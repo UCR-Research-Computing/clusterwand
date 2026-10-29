@@ -310,4 +310,12 @@ func TestWasteComputehighPointsAtStandard(t *testing.T) {
 	if !found {
 		t.Fatalf("job 45 not reported as low-cpu: %+v", r.Items)
 	}
+	// a tier outside show_cost_tiers gets the advice without dollar figures (F1)
+	s.Cfg.Tiers, s.Cfg.ShowCostTiers = []string{"R1"}, []string{"R2"}
+	r, _ = s.Waste(context.Background(), WasteInput{Since: "now-30days"})
+	for _, it := range r.Items {
+		if it.JobID == "45" && strings.Contains(it.Suggestion, "$") {
+			t.Errorf("dollars shown to a tier outside show_cost_tiers: %q", it.Suggestion)
+		}
+	}
 }

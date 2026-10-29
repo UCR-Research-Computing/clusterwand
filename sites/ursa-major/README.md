@@ -18,6 +18,11 @@ What changed in F0 (v0.1.0):
 - `scripts/onboard_lab.py` was removed: it edits the live ursa-bifrost users file and Cloud
   Run service, which ClusterWand must never touch.
 
-Coming in F1 (v0.2.0): `site.yaml` here holds every Ursa constant (partitions and roles,
-paths, the `check` partition, the $/node-hour model, the catalog pointer) that is still
-compiled into `internal/` today.
+F1 (v0.2.0): [`site.yaml`](site.yaml) holds every Ursa constant that used to be compiled
+into `internal/`: partition roles and fallbacks, AVX2/e2 advice, paths (`/home`, `/scratch`,
+`/apps/docs/catalog.json`, `/data/shared` wording), the `check` probe partition, the
+$/node-hour charge model, cloud-node wording and stock-out reasons. Select it with
+`site: ursa-major` in `~/.config/clusterwand/config.yaml`. `TestGoldenUrsaMajor` checks that
+every tool answers byte-identically to ursa-bifrost v0.10.1 on the recorded fixtures with
+this profile loaded. Partition limits (MaxTime, SuspendTime) come from Slurm and the
+catalog at run time; the values checked live on 2026-10-28 are in the file's header.

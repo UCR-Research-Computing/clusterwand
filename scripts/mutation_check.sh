@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go"
+FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -200,8 +200,8 @@ mutate "v097 own acct rows only"   internal/core/jobs.go '		if byID && j.User !=
 mutate "v097 job list validated"   internal/backend/command.go '		if err := ValidJobID(id); err != nil {
 			return "", err' '		if false {
 			return "", nil'
-mutate "v098 idle alt order"       internal/core/a1.go '	for _, p := range s.Site.Partitions.FallbackIdle {' '	for _, p := range s.Site.Partitions.FallbackCold {'
-mutate "v098 cold alt order"       internal/core/a1.go '		for _, p := range s.Site.Partitions.FallbackCold {' '		for _, p := range s.Site.Partitions.FallbackIdle {'
+mutate "v098 idle alt order"       sites/ursa-major/site.yaml '  fallback_idle: [standard, spot, computehigh, nvmescratch, highmem]' '  fallback_idle: [computehigh, standard, spot, nvmescratch, highmem]'
+mutate "v098 cold alt order"       sites/ursa-major/site.yaml '  fallback_cold: [standard, spot, computehigh]' '  fallback_cold: [computehigh, standard, spot]'
 mutate "v099 time over MaxTime"     internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); false && ok && hasTime && maxMin > 0 && mins > maxMin {'
 mutate "v099 time unlimited ok"    internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); hasTime && mins > maxMin && ok || p.TimeLimit == "infinite" {'
 mutate "v099 avx partitions"       internal/core/cluster.go '		if s.Site.AVX2Only(part) {' '		if true {'

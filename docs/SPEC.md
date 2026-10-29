@@ -7,6 +7,13 @@
 > `~/.local/share/clusterwand` and `~/clusterwand-results`. ClusterWand changes are logged
 > in the change log at the end, starting with v0.1.0.
 >
+> **Site profiles (ClusterWand v0.2.0).** Ursa Major names in the sections below
+> (partitions computehigh, standard, spot, gpul4, highmem, check; /home, /scratch,
+> /apps/docs/catalog.json, /data/shared; $/node-hour pricing; Google Cloud node wording) are
+> no longer in the code. They live in `sites/ursa-major/site.yaml`, loaded with
+> `site: ursa-major`; other clusters get their own profile or a generic one. Section 25
+> describes the profile.
+>
 > **SSH only.** ClusterWand runs on the user's own machine (CLI and stdio MCP) and reaches
 > clusters only through the user's own OpenSSH config, keys and agent (docs/SSH.md). The
 > sections below that describe the hosted server (`bifrost serve`, Google sign-in, OAuth,
@@ -1241,10 +1248,46 @@ why"; "uses the whole node / the share it holds"; the worst case is quoted only 
   - Warning text is generated when a job could push personal or lab allocation to >= 80% or >= 100% (e.g., `'This job could take your lab to 104% of its Ursa allocation. Allocations are warn-only for now; it will still run.'`).
   - Allocations NEVER block job submission: confirm tokens are still returned and `job_submit_confirm` succeeds unchanged.
 
+## 25. Site profiles (ClusterWand v0.2.0)
+
+A site profile (`internal/site`) holds everything about one cluster that is not plain Slurm.
+Shipped profiles are embedded from `sites/<name>/site.yaml`; a user's own is `site_file:`.
+Selection: `site_file`, else `site`, else a `cluster` name matching a shipped profile, else
+the generic profile. An unknown or unapproved profile is an error, never silently generic.
+
+- Fields: `name`, `title`, `description`, `approved` (must be true), `help` (who to ask),
+  `catalog` (absolute .json path), `paths.home` / `paths.scratch` (absolute, one `{user}`),
+  `paths.log_roots` (default: home and scratch), `cloud_nodes` (nodes boot on demand and bill
+  while up), `stockout_reasons`, `partitions` (`probe` for env_check, `gpu`, `highmem`,
+  `general`, `fast`, `fallback_idle`, `fallback_cold`, `avx2_only`, per-partition `cpu`
+  notes, `cpu_default`), `modules` (`python`, `gpu`), `charge`, `texts` (site wording by key,
+  with `{help}`, `{title}`, `{probe}`, `{gpu}` placeholders). Unknown fields are refused;
+  every partition name is checked against the Slurm name pattern.
+- Charge models: `usd_per_node_hour` (catalog or config prices, dollar caps, as before);
+  `su_per_core_hour` (`charge.rates` per partition times cores per node; job and day caps in
+  SU from `charge.max_su_per_job` / `max_su_per_day` or config `caps.max_su_per_job` /
+  `max_su_per_day`; a submit with no SU caps or to an unpriced partition is refused; figures
+  appear as `est_charge` / `charge_unit`, never in `*_usd` fields); `none` (no figures, no cost
+  caps; node, hour and submit-count caps still hold).
+- Config values (`catalog_path`, `log_roots`, `env_check_partition`, `usd_per_node_hour`) win
+  over the profile. With no probe partition env_check refuses (it never runs on the login
+  node); with no catalog the catalog tools say so.
+- Tests: `TestGoldenUrsaMajor` (every MCP tool, prompt and resource, and every CLI text
+  renderer, on the fixtures) is byte-identical to the pre-profile code (recorded in
+  9e7cd68). `TestGoldenSecondSite` runs the same calls against a synthetic site
+  (`testdata/sites/bigcluster`, built by `scripts/make_second_site.py`: other partition
+  names, paths, user; SU charge; no cloud nodes) and fails on any Ursa string or dollar
+  figure in an answer.
+- Ursa limits checked live on 2026-10-28 (`scontrol show partition`, after
+  ucr-slurm-production PR #27): MaxTime 30 days on standard, computehigh, highmem, gpul4,
+  nvmescratch, amd112, amd56, gpu1v1; spot 7 days; arm, tpu, tpuspot 1 day; check 15 min.
+  These come from Slurm and the catalog at run time, not the profile.
+
 ## Change log
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-28 | ClusterWand v0.2.0 | Site profiles (section 25): every Ursa constant moved from `internal/` to `sites/ursa-major/site.yaml`; charge models `usd_per_node_hour`, `su_per_core_hour` (SU caps), `none`; generic profile when none is set; Ursa golden tests byte-identical to v0.1.0; synthetic second site proves no Ursa strings or dollar figures leak. Fixed on the way: SU prices showing in `usd` fields of partitions, job cost, waste and allocation. Mutation guards: 12 repointed to moved code, 19 new (167) |
 | 2026-10-28 | ClusterWand v0.1.0 | Forked from ursa-bifrost v0.10.1 (77cb4cd) as ClusterWand. Module `github.com/UCR-Research-Computing/clusterwand`, binary `clusterwand` (+ `wand` alias in installers and release archives), config `~/.config/clusterwand`, state `~/.local/share/clusterwand`, results `~/clusterwand-results`, env prefix `CLUSTERWAND_`, MCP server name `clusterwand`, remote job folder `clusterwand-jobs`, sbatch comment `clusterwand:<hash>`, env_check job `clusterwand-env-check`. SSH only: removed the hosted server (`serve`, internal/server, OAuth, Google sign-in), the IAP/OS Login backend and `ssh.gcloud` mode, Cloud Storage staging (`results_link`, `upload_prepare`, `uploads_list`, `job_submit` inputs), ursa-agent, the Cloud Run deploy, prototypes, the Dockerfile and `scripts/onboard_lab.py`; 71 mutation guards for removed code dropped (148 remain). Local tools otherwise unchanged. New docs/SSH.md |
 | 2026-10-27 | v0.10.1 | `my_allocation` notes always `[]`, never null (first live call). Live: hosted RC pilot lab `rc` $500/month, forsythc $300/month; `show_cost_tiers: [R2]` |
 | 2026-10-27 | agent 0.5.0 | Section 24: allocation framing (dashboard part). Researcher views lead with work; dollars moved to staff (R2); My allocation panel fed by my_allocation; daily safety limit and allocation impact on plan cards |
