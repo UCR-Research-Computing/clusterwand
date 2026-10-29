@@ -5,6 +5,26 @@ tag and a GitHub release. The full design history is in [docs/SPEC.md](docs/SPEC
 
 ## Unreleased
 
+## v0.3.0 - 2026-10-28
+
+- **Slurm text adapter.** Scheduler reads use plain-text formats by default (`squeue -O`,
+  `sacct -P` with a header, `scontrol -o show nodes|partition`, `sacct -B` for stored
+  scripts), which read the same on Slurm 21.08 to 25.11. `--json` (Slurm 25.11's
+  data_parser) is opt-in per site: `slurm: {json: true}` in the site profile. Answers are
+  identical either way: on the fixtures (every tool, field by field) and live on Ursa Major.
+  Slurm 21.08 works without `Restarts`/`StdOut` (a finished job's log path is then unknown,
+  never guessed). `doctor` reports the Slurm release instead of probing `sinfo --json`.
+- **Lab-locked partitions.** Partitions limited by `AllowAccounts`, `DenyAccounts` or
+  `AllowGroups` are read live with your associations (`sacctmgr show user <you>
+  withassoc`) and groups. `partitions` lists only those you may use (`restricted_to` marks
+  limited ones); `script_check` and `job_submit` refuse a partition your account may not
+  use and name one of your accounts that may (`#SBATCH --account=...`); `interactive_help`
+  and the stockout advice skip them. Unreadable limits hide or refuse nothing.
+- **Tests.** Real text recordings from Slurm 25.11.4 (Ursa, anonymized) and 21.08.6
+  (container); JSON/text parity tests; the v0.2.0 goldens kept as the JSON-path golden;
+  optional `slurm` workflow runs every text read against containerised Slurm 21.08.
+- **Mutation check:** 30 new guards (text reads, parsers, lab-lock rules).
+
 ## v0.2.0 - 2026-10-28
 
 - **Site profiles.** Everything ClusterWand knows about a cluster beyond plain Slurm now

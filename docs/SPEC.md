@@ -14,6 +14,11 @@
 > `site: ursa-major`; other clusters get their own profile or a generic one. Section 25
 > describes the profile.
 >
+> **Slurm text adapter (ClusterWand v0.3.0).** Where the sections below say `squeue --json`,
+> `sacct --json` or `scontrol show nodes --json`, ClusterWand now reads the plain-text
+> formats by default (section 26); `--json` is used only when the site profile sets
+> `slurm.json: true`.
+>
 > **SSH only.** ClusterWand runs on the user's own machine (CLI and stdio MCP) and reaches
 > clusters only through the user's own OpenSSH config, keys and agent (docs/SSH.md). The
 > sections below that describe the hosted server (`bifrost serve`, Google sign-in, OAuth,
@@ -1283,10 +1288,67 @@ the generic profile. An unknown or unapproved profile is an error, never silentl
   nvmescratch, amd112, amd56, gpu1v1; spot 7 days; arm, tpu, tpuspot 1 day; check 15 min.
   These come from Slurm and the catalog at run time, not the profile.
 
+## 26. Slurm text adapter and lab-locked partitions (ClusterWand v0.3.0)
+
+ClusterWand reads Slurm as plain text by default. `--json` needs the data_parser of the
+Slurm release that prints it (25.11: v0.0.44); text formats read the same on Slurm 21.08
+to 25.11. JSON stays available per site: `slurm: {json: true}` in the site profile.
+
+- Reads (internal/backend/command.go, parsers in internal/slurm/text.go; one place in
+  core, internal/core/slurmread.go): `squeue -h -O <fields>` (fields split by \x1f,
+  epoch times), `sacct -P --noconvert --delimiter=\x1f -o <fields>` with a header line
+  (columns mapped by name; JobName last), `scontrol --version; scontrol -o show nodes`,
+  `scontrol -o show partition`, `sacct -n -B -j <id>` (the stored script for
+  `include_script`), `sacctmgr -n -P show user <me> withassoc
+  format=DefaultAccount,Account,Partition`, `id -Gn`, `sinfo --version` (doctor). All are
+  fixed templates or fixed argv; selections are validated and arrive as positional
+  parameters. The list summary (section 23) is unchanged except for Slurm 21.08, which has
+  no `Restarts` field: there the template asks without it and puts an empty column back.
+  The per-job sacct read falls back the same way (21.08 has no `StdOut`/`StdErr`: a finished
+  job's log path is then unknown and job_log_tail says so; it is never guessed).
+- Paths: squeue and sacct print the `--output` pattern; clusterwand expands it as Slurm
+  does (`%j %A %a %u %x %N %%`, zero padding, relative to the working directory) to the path
+  `--json` reports as `stdout_expanded`.
+- Parity: the fixture prints its recorded `--json` answers as the text commands would
+  (formats checked against Slurm 25.11.4 on Ursa Major and 21.08.6 in a container).
+  `TestTextMatchesJSON{Queue,Acct,Nodes}` compare every recorded job and node field by
+  field; `TestGoldenUrsaMajorJSON` (site `slurm.json: true`) keeps the v0.2.0 answers and
+  `TestGoldenTextMatchesJSON` shows the text path's answers are identical (only
+  `source.commands` differ). Real recordings in `testdata/slurm-text/{21.08,25.11}`
+  (25.11 anonymized by `scripts/make_text_fixtures.py`) parse in `TestTextRecordingsParse`.
+  `.github/workflows/slurm.yml` (optional, not a required check) starts Slurm 21.08.6 in a
+  container (giovtorres/docker-centos7-slurm) and runs every text read through the same
+  parsers (`go test -tags slurmlive -run Live`). Other releases (22.05, 23.11, 24.05) are
+  not containerised: no maintained image was found in the time box; their text formats
+  are the same fields, and the header-mapped sacct parser tolerates a shorter field list.
+- Live check 2026-10-28 (Ursa Major, read-only): `status`, `partitions`, `jobs`,
+  `job show`, `job explain` give byte-identical data through the text and the JSON path.
+
+Lab-locked partitions. A partition may be limited by `AllowAccounts`, `DenyAccounts` or
+`AllowGroups` (on Ursa: amd112/amd56 `staff,<lab>`, gpu1v1 `staff,<lab>`, arm/tpu/tpuspot
+`staff`). Slurm rejects anyone else's job ("Invalid account or account/partition
+combination"). ClusterWand reads the limits live and, only when some partition is limited,
+the caller's associations and groups (internal/core/access.go):
+
+- `partitions` lists only partitions the caller may use (with any account they hold), and
+  marks limited ones with `restricted_to`.
+- `script_check` refuses (error) a partition, or a member of a partition list, that the
+  caller's default account or the script's `--account` may not use, or that their groups
+  exclude; it names an account of theirs that would work (`#SBATCH --account=<acct>`). A
+  `--account` the caller has no association with is refused. `job_submit` blocks on these
+  errors, including for an override partition.
+- `interactive_help` refuses such a partition (or adds `--account=`); the stockout fallback
+  never suggests one.
+- An association scoped to one partition counts only there. When `scontrol`, `sacctmgr` or
+  `id` cannot be read the limit is unknown: nothing is hidden or refused on a guess (Slurm
+  still enforces its rule at submit time).
+- Mutation check: 30 new guards (f2*).
+
 ## Change log
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-28 | ClusterWand v0.3.0 | Section 26: plain-text Slurm reads are the primary path (squeue -O, sacct -P with header, scontrol -o, sacct -B), JSON behind site `slurm.json`; text and JSON answers identical on the fixtures and live on Ursa; Slurm 21.08 field fallbacks; output-path pattern expansion. Lab-locked partitions (AllowAccounts/DenyAccounts/AllowGroups) read live: hidden from `partitions`, refused with a working `--account` in `script_check`/`job_submit`/`interactive_help`, skipped in fallback advice. Real 21.08 and 25.11 text fixtures; optional containerised Slurm 21.08 workflow. 30 new mutation guards |
 | 2026-10-28 | ClusterWand v0.2.0 | Site profiles (section 25): every Ursa constant moved from `internal/` to `sites/ursa-major/site.yaml`; charge models `usd_per_node_hour`, `su_per_core_hour` (SU caps), `none`; generic profile when none is set; Ursa golden tests byte-identical to v0.1.0; synthetic second site proves no Ursa strings or dollar figures leak. Fixed on the way: SU prices showing in `usd` fields of partitions, job cost, waste and allocation. Mutation guards: 12 repointed to moved code, 19 new (167) |
 | 2026-10-28 | ClusterWand v0.1.0 | Forked from ursa-bifrost v0.10.1 (77cb4cd) as ClusterWand. Module `github.com/UCR-Research-Computing/clusterwand`, binary `clusterwand` (+ `wand` alias in installers and release archives), config `~/.config/clusterwand`, state `~/.local/share/clusterwand`, results `~/clusterwand-results`, env prefix `CLUSTERWAND_`, MCP server name `clusterwand`, remote job folder `clusterwand-jobs`, sbatch comment `clusterwand:<hash>`, env_check job `clusterwand-env-check`. SSH only: removed the hosted server (`serve`, internal/server, OAuth, Google sign-in), the IAP/OS Login backend and `ssh.gcloud` mode, Cloud Storage staging (`results_link`, `upload_prepare`, `uploads_list`, `job_submit` inputs), ursa-agent, the Cloud Run deploy, prototypes, the Dockerfile and `scripts/onboard_lab.py`; 71 mutation guards for removed code dropped (148 remain). Local tools otherwise unchanged. New docs/SSH.md |
 | 2026-10-27 | v0.10.1 | `my_allocation` notes always `[]`, never null (first live call). Live: hosted RC pilot lab `rc` $500/month, forsythc $300/month; `show_cost_tiers: [R2]` |

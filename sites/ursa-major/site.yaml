@@ -12,6 +12,10 @@
 # 1 day; check 15 min. SuspendTime 1800 s (general) / 3600 s (labs, check), 300 s
 # (spot, arm, tpu*). Those limits come from the cluster catalog and Slurm at run
 # time, not from this file.
+#
+# Lab-locked partitions (AllowAccounts, read live by clusterwand since v0.3.0, not
+# set here): amd112, amd56 and gpu1v1 take staff plus one lab account each; arm, tpu
+# and tpuspot take staff only.
 name: ursa-major
 title: Ursa Major
 description: UCR Research Computing, Google Cloud
@@ -54,6 +58,12 @@ partitions:
 modules:
   python: [python-sci, python-ml]
   gpu: [python-ml]
+
+# Slurm is read as plain text (squeue -O, sacct -P, scontrol -o). Ursa runs Slurm
+# 25.11, whose --json clusterwand also understands; text is the default and gives
+# the same answers.
+slurm:
+  json: false
 
 # Dollars per node-hour from the catalog (cloud list prices).
 charge:
