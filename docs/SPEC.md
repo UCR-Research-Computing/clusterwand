@@ -1406,10 +1406,14 @@ the person can reach with their own SSH (internal/discover, cmd/clusterwand/disc
     adds MPI-dependent modules only visible after `module load <mpi>`.
   - by hand only: charge model and prices, the published catalog itself, `fast`,
     fallbacks, CPU notes, stockout reasons, help, 65 wording keys.
-  The live run against `ursa-login` on 2026-10-29 could not connect (the IAP tunnel's
-  gcloud credentials had expired on the laptop; ClusterWand does not run gcloud); the
-  recording was taken through the same read-only commands the evening before (F2/F3
-  session). Host-key discovery was checked against `ursa-login`'s entry in the user's own
+  Provenance: `sinfo --version`, `scontrol show config`, the environment and `module -t
+  avail` were read live over `ssh ursa-login` on 2026-10-29 ~00:20 EDT with the same
+  read-only commands; partitions and nodes are the anonymised Slurm 25.11.4 recording from
+  F2 (2026-10-28, unchanged since: same MaxTime values). The end-to-end `discover --host
+  ursa-login` run then could not connect: the IAP tunnel's gcloud login on the laptop had
+  expired (`gcloud auth login` needed; ClusterWand never runs gcloud and the build may not),
+  so the draft above was built with `discover --from` on that recording. Re-run it with
+  `--host` once the login is renewed. Host-key discovery was checked against `ursa-login`'s entry in the user's own
   known_hosts (1 ed25519 key).
 - Mutation check: 23 new guards (f3*).
 
