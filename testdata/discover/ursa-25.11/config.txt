@@ -1,0 +1,14 @@
+AccountingStorageEnforce = associations,limits,safe
+AccountingStorageTRES = cpu,mem,energy,node,billing,fs/disk,vmem,pages,gres/gpu,gres/gpumem,gres/gpuutil
+AccountingStoreFlags = job_comment
+ClusterName = ucrslurmcl
+JobSubmitPlugins = (null)
+MaxArraySize = 1001
+PriorityType = priority/multifactor
+PrivateData = none
+ResumeProgram = /slurm/scripts/resume_wrapper.sh
+SelectType = select/cons_tres
+SelectTypeParameters = CR_CORE_MEMORY
+SLURM_VERSION = 25.11.4
+SuspendProgram = /slurm/scripts/suspend_wrapper.sh
+SuspendTime = INFINITE

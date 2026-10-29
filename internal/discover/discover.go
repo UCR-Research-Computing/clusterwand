@@ -17,6 +17,7 @@ package discover
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -223,8 +224,8 @@ func parsePartitions(text string, nodes []node) ([]Partition, error) {
 			if first || n.cpus < p.CPUsPerNode {
 				p.CPUsPerNode = n.cpus
 			}
-			if first || float64(n.memMB/1024) < p.MemGBPerNode {
-				p.MemGBPerNode = float64(n.memMB / 1024)
+			if gb := math.Round(float64(n.memMB) / 1024); first || gb < p.MemGBPerNode {
+				p.MemGBPerNode = gb
 			}
 			if first || n.gpus < p.GPUsPerNode {
 				p.GPUsPerNode = n.gpus

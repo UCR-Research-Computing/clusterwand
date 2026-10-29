@@ -13,7 +13,7 @@ func sortStrings(xs []string) { sort.Strings(xs) }
 var userHome = os.UserHomeDir
 
 // FakeUser replaces the real user name in recorded fixtures.
-const FakeUser = "alice"
+const FakeUser = "alice_ucr_edu"
 
 var (
 	// private IPv4 ranges (10/8, 172.16/12, 192.168/16, 100.64/10)

@@ -256,3 +256,21 @@ func TestSiteNameValidated(t *testing.T) {
 		t.Errorf("bad site name: %v", err)
 	}
 }
+
+// A site with host_keys gets a pinned SSH backend (F3).
+func TestNewPinsHostKeys(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "s.yaml")
+	_ = os.WriteFile(p, []byte("name: pinned\napproved: true\nhost_keys: [\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\"]\n"), 0o600)
+	cfg := config.Default()
+	cfg.SiteFile, cfg.SSH.Host = p, "login"
+	cfg.AuditPath, cfg.StatePath = filepath.Join(dir, "a.jsonl"), filepath.Join(dir, "state", "a1.json")
+	s, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ssh, ok := s.Backend.(*backend.SSH)
+	if !ok || ssh.Pinned() != filepath.Join(dir, "state", "known_hosts", "pinned") {
+		t.Fatalf("not pinned: %T %v", s.Backend, ok)
+	}
+}

@@ -264,9 +264,15 @@ func Embedded(name string) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseEmbedded(b)
+}
+
+// parseEmbedded parses a shipped profile: catalog_file (a file next to the
+// profile) has no meaning inside the binary and is refused.
+func parseEmbedded(b []byte) (*Profile, error) {
 	sp, err := Parse(b)
 	if err == nil && sp.CatalogFile != "" {
-		return nil, fmt.Errorf("site profile %s: catalog_file only works in your own site_file profile", name)
+		return nil, fmt.Errorf("site profile %s: catalog_file only works in your own site_file profile", sp.Name)
 	}
 	return sp, err
 }
