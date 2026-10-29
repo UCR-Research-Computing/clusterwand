@@ -10,6 +10,7 @@ import (
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/core"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
 
 func tw(w io.Writer) *tabwriter.Writer { return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0) }
@@ -47,7 +48,7 @@ func dur(sec int64) string {
 	return fmt.Sprintf("%dm%02ds", m, int(d.Seconds())%60)
 }
 
-func printStatus(w io.Writer, s *core.ClusterStatus) {
+func printStatus(w io.Writer, s *core.ClusterStatus, sp *site.Profile) {
 	fmt.Fprintf(w, "%s (Slurm %s): %d running, %d pending, %d node(s) powered up, now %s/hour\n\n",
 		s.Cluster, s.SlurmVersion, s.JobsRunning, s.JobsPending, s.NodesUp, money(s.BurnPerHour))
 	t := tw(w)
@@ -72,7 +73,7 @@ func printStatus(w io.Writer, s *core.ClusterStatus) {
 	for k, v := range s.PendingByWhy {
 		fmt.Fprintf(w, "pending (%s): %d\n", k, v)
 	}
-	fmt.Fprintln(w, "\n* default partition. Powered-down cloud nodes cost nothing.")
+	fmt.Fprintln(w, "\n"+sp.Text("status_footer", "* default partition."))
 }
 
 func printPartitions(w io.Writer, ps []core.PartitionInfo) {
@@ -263,11 +264,11 @@ func printUsage(w io.Writer, u *core.Usage) {
 	}
 }
 
-func printAllocation(w io.Writer, a *core.MyAllocation) {
+func printAllocation(w io.Writer, a *core.MyAllocation, sp *site.Profile) {
 	if a == nil {
 		return
 	}
-	fmt.Fprintf(w, "Ursa Major allocation for period %s (resets %s)\n", a.Period, a.ResetsAt)
+	fmt.Fprintf(w, "%s for period %s (resets %s)\n", sp.Text("allocation_header", "Allocation"), a.Period, a.ResetsAt)
 	fmt.Fprintf(w, "Basis: %s, covered by %s\n\n", a.Basis, a.CoveredBy)
 	if a.Person != nil {
 		fmt.Fprintf(w, "Person: $%.2f of $%.2f used ($%.2f left, %.1f%%) [%s]\n",
@@ -394,6 +395,7 @@ func doctor(ctx context.Context, svc *core.Service, w io.Writer, g globals) int 
 	var cs []check
 	add := func(name string, ok bool, detail string) { cs = append(cs, check{name, ok, detail}) }
 	add("config", true, svc.Cfg.Path)
+	add("site", true, siteLine(svc))
 	add("backend", true, svc.Backend.Name())
 	t0 := time.Now()
 	u, err := svc.User(ctx)
@@ -444,4 +446,18 @@ func firstOf(err error, ok string) string {
 		return err.Error()
 	}
 	return ok
+}
+
+// siteLine names the site profile in use (doctor).
+func siteLine(svc *core.Service) string {
+	sp := svc.Site
+	line := sp.Name
+	if sp.Title != "" {
+		line += " (" + sp.Title + ")"
+	}
+	line += ", charge " + sp.Model()
+	if svc.Cfg.CatalogPath == "" {
+		line += ", no catalog"
+	}
+	return line
 }

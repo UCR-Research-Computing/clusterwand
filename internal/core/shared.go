@@ -12,8 +12,7 @@ import (
 
 // Shared partitions (v0.8.0).
 //
-// Ursa Major is moving to shared nodes: every partition except highmem and gpul4
-// will let several jobs share a node (Slurm OverSubscribe no longer EXCLUSIVE).
+// Clusters may let several jobs share a node (Slurm OverSubscribe not EXCLUSIVE).
 // On a shared partition a job gets only the cores and memory it asks for, and the
 // cgroup holds it there; a job that asks for nothing gets one core. So on a shared
 // partition clusterwand:
@@ -92,7 +91,7 @@ func coreRequest(req map[string]string, p CatalogPartition, shared bool) CoreReq
 	}
 	r.CoresPerNod = cores
 	// memory: --mem (per node) wins, then --mem-per-cpu x cores, else the
-	// partition default (DefMemPerCPU = node memory / node cores on Ursa Major)
+	// partition default (assumed DefMemPerCPU = node memory / node cores)
 	var mem int64
 	if v, ok := memMB(req["mem"]); ok && v > 0 {
 		mem, r.MemAsked = v, true

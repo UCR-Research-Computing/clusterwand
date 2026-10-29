@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,6 +23,7 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
@@ -59,6 +61,59 @@ type SubmitPlan struct {
 	Overrides    []string        `json:"overrides"` // #SBATCH values clusterwand replaced
 	Next         string          `json:"next"`
 	Allocation   *PlanAllocation `json:"allocation"`
+	Charge       *PlanCharge     `json:"charge,omitempty"` // sites charged in service units
+}
+
+// PlanCharge is a plan's cost on a site not charged in dollars.
+type PlanCharge struct {
+	Unit           string  `json:"unit"` // "SU"
+	PerNodeHour    float64 `json:"per_node_hour,omitempty"`
+	WorstCase      float64 `json:"worst_case"`
+	CommittedToday float64 `json:"committed_today"`
+	DayCap         float64 `json:"day_cap"`
+}
+
+// chargeCaps are the per-job and per-day caps in the site's charge unit, and the
+// unit ("USD", "SU", or "" when the site has no charge model: no cost caps).
+func (s *Service) chargeCaps() (job, day float64, unit string) {
+	switch s.Site.Model() {
+	case site.ChargeUSDPerNodeHour:
+		return s.Cfg.Caps.MaxCostPerJobUSD, s.Cfg.Caps.MaxCostPerDayUSD, "USD"
+	case site.ChargeSUPerCoreHour:
+		job = firstPositive(s.Cfg.Caps.MaxSUPerJob, s.Site.Charge.MaxSUPerJob)
+		day = firstPositive(s.Cfg.Caps.MaxSUPerDay, s.Site.Charge.MaxSUPerDay)
+		if job <= 0 || day <= 0 {
+			// never submit without a cap: an SU site must set both
+			return 0, 0, "SU"
+		}
+		return job, day, "SU"
+	}
+	return math.Inf(1), math.Inf(1), ""
+}
+
+func firstPositive(v ...float64) float64 {
+	for _, x := range v {
+		if x > 0 {
+			return x
+		}
+	}
+	return 0
+}
+
+// amount formats a figure in the site's charge unit.
+func (s *Service) amount(v float64) string {
+	if s.Site.Model() == site.ChargeSUPerCoreHour {
+		return fmt.Sprintf("%.1f SU", v)
+	}
+	return fmt.Sprintf("$%.2f", v)
+}
+
+// priceHint says where a missing price is set.
+func (s *Service) priceHint() string {
+	if s.Site.Model() == site.ChargeSUPerCoreHour {
+		return "add it under charge.rates in the site profile"
+	}
+	return "add it under usd_per_node_hour"
 }
 
 // ActionPlan is what job_cancel/hold/release return before confirmation.
@@ -377,8 +432,12 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 		return nil, fmt.Errorf("%w: time limit %d min is over the %.0f h cap (caps.max_hours)", ErrCapExceeded, mins, caps.MaxHours)
 	}
 	price, priced := s.price(cat, part)
-	if !priced {
-		return nil, fmt.Errorf("no price known for partition %s, so the cost cap cannot be checked; add it under usd_per_node_hour", part)
+	jobCap, dayCap, unit := s.chargeCaps()
+	if unit == "SU" && (jobCap <= 0 || dayCap <= 0) {
+		return nil, fmt.Errorf("%w: this site charges service units but sets no SU caps; set caps.max_su_per_job and caps.max_su_per_day", ErrCapExceeded)
+	}
+	if !priced && unit != "" {
+		return nil, fmt.Errorf("no price known for partition %s, so the cost cap cannot be checked; %s", part, s.priceHint())
 	}
 	// shared partitions bill the share of each node the job holds (v0.8.0); the
 	// share is read from the script's #SBATCH lines against the partition chosen
@@ -388,8 +447,8 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 		share = coreRequest(req, cp, true).NodeShare
 	}
 	worst := round(price*float64(nodes)*share*float64(mins)/60, 2)
-	if worst > caps.MaxCostPerJobUSD {
-		return nil, fmt.Errorf("%w: worst case $%.2f (%d node(s) x %.0f%% of a node x %d min x $%.2f/node-h) is over the $%.2f per-job cap", ErrCapExceeded, worst, nodes, 100*share, mins, price, caps.MaxCostPerJobUSD)
+	if worst > jobCap {
+		return nil, fmt.Errorf("%w: worst case %s (%d node(s) x %.0f%% of a node x %d min x %s/node-h) is over the %s per-job cap", ErrCapExceeded, s.amount(worst), nodes, 100*share, mins, s.amount(price), s.amount(jobCap))
 	}
 
 	lk, err := s.lockState()
@@ -402,8 +461,8 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 		return nil, err
 	}
 	spent, n := s.committedToday(st)
-	if spent+worst > caps.MaxCostPerDayUSD {
-		return nil, fmt.Errorf("%w: today's committed worst case is $%.2f; this job adds $%.2f, over the $%.2f day cap", ErrCapExceeded, spent, worst, caps.MaxCostPerDayUSD)
+	if spent+worst > dayCap {
+		return nil, fmt.Errorf("%w: today's committed worst case is %s; this job adds %s, over the %s day cap", ErrCapExceeded, s.amount(spent), s.amount(worst), s.amount(dayCap))
 	}
 	if caps.MaxSubmitsPerDay > 0 && n >= caps.MaxSubmitsPerDay {
 		return nil, fmt.Errorf("%w: %d submissions today (cap %d)", ErrCapExceeded, n, caps.MaxSubmitsPerDay)
@@ -439,7 +498,7 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	} else {
 		plan.Scheduler = policy.CleanLabel(ans, 300)
 	}
-	// sbatch --test-only does not know about GCP stockouts: check the partition's
+	// sbatch --test-only does not know about cloud stockouts: check the partition's
 	// nodes for boot failures before the user commits money to a job that will wait.
 	if w := s.partitionTrouble(ctx, part); w != "" {
 		plan.Warnings = append(plan.Warnings, w)
@@ -459,7 +518,7 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	*plan = SubmitPlan{Token: tok, ExpiresAt: exp.Format(time.RFC3339), PlanHash: planHash[:12],
 		Partition: slurmPart, Nodes: nodes, TimeLimit: minutesText(mins), JobName: name, RemoteDir: "~/" + dir,
 		ScriptBytes: len(in.Script), ScriptSHA256: scriptHash[:16], USDPerNodeH: price, WorstCaseUSD: worst,
-		SpentTodayUS: spent, DayCapUSD: caps.MaxCostPerDayUSD, Scheduler: plan.Scheduler,
+		SpentTodayUS: spent, DayCapUSD: dayCap, Scheduler: plan.Scheduler,
 		Warnings: plan.Warnings, Overrides: plan.Overrides,
 		Next: "Show this plan to the user. Only if they approve, call job_submit_confirm with the confirm_token. Nothing has been submitted yet."}
 	allocPlan := s.planAllocation(ctx, worst)
@@ -469,6 +528,14 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	}
 	if !s.Cfg.ShowCost {
 		plan.USDPerNodeH = 0
+	}
+	if unit != "USD" {
+		// the plan's *_usd fields carry dollars only: other units go in charge_*
+		plan.Charge = &PlanCharge{Unit: unit, PerNodeHour: plan.USDPerNodeH, WorstCase: worst, CommittedToday: spent, DayCap: dayCap}
+		if unit == "" {
+			plan.Charge = nil
+		}
+		plan.USDPerNodeH, plan.WorstCaseUSD, plan.SpentTodayUS, plan.DayCapUSD = 0, 0, 0, 0
 	}
 	return plan, nil
 }
@@ -499,7 +566,7 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 		}
 		if down && contains(n.Partitions, part) {
 			bad++
-			if strings.Contains(n.Reason, "RESOURCE_POOL_EXHAUSTED") || strings.Contains(n.Reason, "stockout") {
+			if s.Site.IsStockout(n.Reason) {
 				stockout = true
 			}
 		}
@@ -509,17 +576,17 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 	}
 	why := fmt.Sprintf("%d %s node(s) failed to start recently", bad, part)
 	if stockout {
-		why = fmt.Sprintf("GCP has no capacity for %s right now (%d node(s) failed with ZONE_RESOURCE_POOL_EXHAUSTED); the job may wait a long time", part, bad)
+		why = fmt.Sprintf(s.Site.Text("stockout", "the provider has no capacity for %s right now (%d node(s) failed to start); the job may wait a long time"), part, bad)
 	}
 	alt := ""
-	for _, p := range altPartitions {
+	for _, p := range s.Site.Partitions.FallbackIdle {
 		if p != part && upIdle[p] {
 			alt = p + " (a node is already up and idle)"
 			break
 		}
 	}
 	if alt == "" {
-		for _, p := range altColdPartitions {
+		for _, p := range s.Site.Partitions.FallbackCold {
 			if p != part && !troubled[p] {
 				alt = p
 				break
@@ -531,14 +598,6 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 	}
 	return why
 }
-
-// altPartitions: where a stocked-out job is pointed when a node is already up and idle;
-// altColdPartitions: where it is pointed otherwise. standard (e2 in any us-central1
-// zone, the cheapest) first, then spot (same nodes), then the specialists (v0.9.8).
-var (
-	altPartitions     = []string{"standard", "spot", "computehigh", "nvmescratch", "highmem"}
-	altColdPartitions = []string{"standard", "spot", "computehigh"}
-)
 
 func contains(xs []string, v string) bool {
 	for _, x := range xs {
@@ -608,9 +667,10 @@ func (s *Service) ConfirmSubmit(ctx context.Context, tok string) (*Confirmed, er
 	// dollars, and the submission count (v0.9.16: plans prepared together could
 	// all be confirmed past max_submits_per_day, since only confirms enter the ledger)
 	spent, n := s.committedToday(st)
-	if spent+p.WorstUSD > s.Cfg.Caps.MaxCostPerDayUSD {
+	_, dayCap, _ := s.chargeCaps()
+	if spent+p.WorstUSD > dayCap {
 		_ = s.saveState(st)
-		return nil, fmt.Errorf("%w: day cap reached since the plan was made ($%.2f committed)", ErrCapExceeded, spent)
+		return nil, fmt.Errorf("%w: day cap reached since the plan was made (%s committed)", ErrCapExceeded, s.amount(spent))
 	}
 	if s.Cfg.Caps.MaxSubmitsPerDay > 0 && n >= s.Cfg.Caps.MaxSubmitsPerDay {
 		_ = s.saveState(st)

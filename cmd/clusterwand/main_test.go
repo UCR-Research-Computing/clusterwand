@@ -15,7 +15,7 @@ func testConfig(t *testing.T, tiers string) string {
 	dir := t.TempDir()
 	td, _ := filepath.Abs("../../testdata")
 	p := filepath.Join(dir, "config.yaml")
-	body := "backend: fixture\nfixtures_dir: " + td + "\ncluster_user: alice_ucr_edu\ntiers: [" + tiers + "]\naudit_path: " + filepath.Join(dir, "audit.jsonl") +
+	body := "site: ursa-major\nbackend: fixture\nfixtures_dir: " + td + "\ncluster_user: alice_ucr_edu\ntiers: [" + tiers + "]\naudit_path: " + filepath.Join(dir, "audit.jsonl") +
 		"\nstate_path: " + filepath.Join(dir, "a1.json") + "\nresults_dir: " + filepath.Join(dir, "results") + "\n"
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)

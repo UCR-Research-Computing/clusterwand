@@ -43,6 +43,7 @@ func (b *countingBackend) n(c backend.Command) int {
 func svcFor(t *testing.T, who string, shared *SharedCache, delay time.Duration) (*Service, *countingBackend) {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Site = "ursa-major"
 	be := &countingBackend{runs: map[string]int{}, delay: delay, who: who}
 	s := NewService(cfg, be, nil)
 	s.Principal = who

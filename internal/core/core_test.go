@@ -22,6 +22,7 @@ import (
 func newTestService(t *testing.T, tiers ...string) (*Service, *backend.Fixture) {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Site = "ursa-major" // the fixtures were recorded on Ursa Major
 	cfg.Backend = "fixture"
 	cfg.FixturesDir = "../../testdata"
 	cfg.ClusterUser = "alice_ucr_edu"

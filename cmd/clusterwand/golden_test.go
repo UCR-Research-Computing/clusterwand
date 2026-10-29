@@ -50,11 +50,12 @@ func TestGoldenCLIText(t *testing.T) {
 			b.WriteString("error: " + err.Error() + "\n")
 		}
 	}
-	section("usage", func(w io.Writer) error { _, err := io.WriteString(w, usage); return err })
+	// (the --help text is printed before any config or site loads, so it is generic
+	// and not part of the site golden)
 	section("status", func(w io.Writer) error {
 		r, err := core.Call(ctx, s, "cli", "cluster_status", "R1", nil, false, s.ClusterStatus)
 		if err == nil {
-			printStatus(w, r.Data)
+			printStatus(w, r.Data, s.Site)
 		}
 		return err
 	})
@@ -119,7 +120,7 @@ func TestGoldenCLIText(t *testing.T) {
 	section("allocation", func(w io.Writer) error {
 		a, err := s.MyAllocation(ctx)
 		if err == nil {
-			printAllocation(w, a)
+			printAllocation(w, a, s.Site)
 		}
 		return err
 	})

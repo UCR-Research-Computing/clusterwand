@@ -1,39 +1,3 @@
-==== usage
-clusterwand - read-only bridge between AI assistants and the Ursa Major Slurm cluster
-
-Usage:
-  clusterwand mcp                              run the MCP server on stdio
-  clusterwand status                           cluster status (nodes, queue, $/hour)
-  clusterwand partitions                       partitions from the cluster catalog
-  clusterwand jobs [--state S] [--since T] [--all] [--user U]
-  clusterwand job show <id> [--script] [--any]
-  clusterwand job explain <id> [--lines N] [--any]
-  clusterwand job log <id> [--stderr] [--lines N] [--start N] [--grep RE] [--any]
-  clusterwand modules [query]                  search software modules
-  clusterwand module [--mpi M] <name>          module show (MPI-built ones under their MPI)
-  clusterwand recipes [query]                  known-good recipes and site rules
-  clusterwand check <script.sh|->              static check of a batch script
-  clusterwand allocation                       your Ursa Major allocation and use
-  clusterwand usage [--since T] [--until T] [--by partition|state|user] [--all]
-  clusterwand waste [--since T] [--cpu PCT] [--all] [--user U]   avoidable spend
-  clusterwand health                           down/drained nodes, stockouts, stuck jobs (R2)
-  clusterwand ticket <id> [--text FILE|-]      draft a ticket reply (R2; never sent)
-  clusterwand results <id> [--prefix DIR] [--pattern GLOB] [--offset N] [--limit N]
-                  [--read FILE [--read-offset N] [--bytes N] [--grep RE]] [--download] [--files a,b]
-  clusterwand storage                          space used in your home and scratch folders
-  clusterwand ls [PATH] [--pattern GLOB] [--offset N]   a folder under your home or scratch
-  clusterwand cat PATH [--offset N] [--bytes N] [--grep RE]   a text file under home or scratch
-  clusterwand env [--module M]... [CMD...]     what modules load and which tools you get
-  clusterwand interactive [--partition P] [--nodes N] [--cpus N] [--gpus N] [--time T] [--mem M]
-  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]   (A1)
-  clusterwand cancel|hold|release <id> [--yes]                      (A1)
-  clusterwand confirm <token>                  confirm a prepared action (A1)
-  clusterwand config init|show|path
-  clusterwand doctor                           check config, SSH and the catalog
-  clusterwand version
-
-Global flags (anywhere): --json  --config PATH
-Times: now-7days, now-12hours, YYYY-MM-DD. --all/--any need tier R2 in the config.
 ==== status
 ursa-major (Slurm 25.11.4): 1 running, 0 pending, 1 node(s) powered up, now $1.87/hour
 

@@ -188,7 +188,7 @@ func (s *Service) MyAllocation(ctx context.Context) (*MyAllocation, error) {
 		PeriodStart: start.Format(time.RFC3339),
 		ResetsAt:    resets.Format(time.RFC3339),
 		Basis:       "list-price estimate",
-		CoveredBy:   "Research Computing / UCR ITS",
+		CoveredBy:   s.Site.Allocation.CoveredBy,
 		Enforcement: "warn",
 		Notes:       []string{},
 	}
@@ -281,9 +281,9 @@ func (s *Service) planAllocation(ctx context.Context, worstUSD float64) *PlanAll
 
 	var warning string
 	if pa.LabPctAfter != nil && *pa.LabPctAfter >= 80 {
-		warning = fmt.Sprintf("This job could take your lab to %g%% of its Ursa allocation. Allocations are warn-only for now; it will still run.", *pa.LabPctAfter)
+		warning = fmt.Sprintf("This job could take your lab to %g%% of its %s. Allocations are warn-only for now; it will still run.", *pa.LabPctAfter, s.Site.Text("allocation_name", "allocation"))
 	} else if pa.PersonPctAfter != nil && *pa.PersonPctAfter >= 80 {
-		warning = fmt.Sprintf("This job could take your personal allocation to %g%% of its Ursa allocation. Allocations are warn-only for now; it will still run.", *pa.PersonPctAfter)
+		warning = fmt.Sprintf("This job could take your personal allocation to %g%% of its %s. Allocations are warn-only for now; it will still run.", *pa.PersonPctAfter, s.Site.Text("allocation_name", "allocation"))
 	}
 	pa.Warning = warning
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
 
 // pageChars caps the text of one page (a read chunk, a log window, a search).
@@ -163,7 +164,11 @@ func (s *Service) userRoots(ctx context.Context) (user string, roots []string, e
 	if err != nil {
 		return "", nil, err
 	}
-	return user, []string{"/home/" + user, "/scratch/" + user}, nil
+	roots = []string{site.Dir(s.Site.Paths.Home, user)}
+	if sc := site.Dir(s.Site.Paths.Scratch, user); sc != "" {
+		roots = append(roots, sc)
+	}
+	return user, roots, nil
 }
 
 var sensitiveName = regexp.MustCompile(`(?i)(^id_|\.pem$|\.key$|\.p12$|\.pfx$|\.keystore$|\.jks$|\.kdbx$|\.env$|^\.?env$|^\.netrc$|^\.pgpass$|credential|secret|token|password|passwd|private)`)

@@ -7,8 +7,9 @@ import (
 	"strings"
 )
 
-// Catalog is the cluster's published description (ursa-catalog/1 schema),
-// read from catalog_path on the login node.
+// Catalog is the cluster's published description, read from catalog_path on the
+// login node. Schema "clusterwand-catalog/1" (or the identical "ursa-catalog/1"
+// that ursa-catalog publishes).
 type Catalog struct {
 	Schema     string             `json:"schema"`
 	Cluster    string             `json:"cluster"`
@@ -36,6 +37,9 @@ type Catalog struct {
 	Summary      struct {
 		GPU map[string]any `json:"gpu"`
 	} `json:"summary"`
+	// GPUModules are module names the site profile marks as GPU builds (not
+	// from the catalog file).
+	GPUModules []string `json:"-"`
 }
 
 // CatalogPartition is one partition as described by the catalog.
@@ -208,8 +212,10 @@ func (c *Catalog) SearchModules(q string) []ModuleHit {
 		if card, ok := c.UsageCards[h.Name]; ok {
 			h.Card = card
 		}
-		if h.Name == "python-ml" {
-			h.GPU = true
+		for _, g := range c.GPUModules {
+			if h.Name == g {
+				h.GPU = true
+			}
 		}
 		out = append(out, *h)
 	}
@@ -380,7 +386,7 @@ func parseCatalog(b []byte) (*Catalog, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, fmt.Errorf("parsing cluster catalog: %w", err)
 	}
-	if !strings.HasPrefix(c.Schema, "ursa-catalog/") {
+	if !strings.HasPrefix(c.Schema, "ursa-catalog/") && !strings.HasPrefix(c.Schema, "clusterwand-catalog/") {
 		return nil, fmt.Errorf("cluster catalog has unexpected schema %q", c.Schema)
 	}
 	return &c, nil

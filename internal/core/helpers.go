@@ -16,6 +16,7 @@ import (
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
 
 // ---- storage_usage ---------------------------------------------------------------
@@ -120,10 +121,10 @@ func (s *Service) StorageUsage(ctx context.Context) (*StorageUsage, error) {
 		r.Notes = append(r.Notes, fmt.Sprintf("%d folder(s) were too big to size within the time limit (shown as unknown); totals are a lower bound.", partial))
 		markTruncated(ctx)
 	}
-	r.Notes = append(r.Notes, "No per-user quota is set on this cluster; the filesystems are shared. Hidden folders such as .cache and .conda are included because they often fill a home folder.")
+	r.Notes = append(r.Notes, s.Site.Text("storage_quota", "Filesystems are shared; quotas, if any, are not shown here. Hidden folders such as .cache and .conda are included because they often fill a home folder."))
 	// Reference data people would otherwise download into home or scratch (best effort).
 	if cat, err := s.Catalog(ctx); err == nil && len(cat.Datasets.Items) > 0 {
-		r.Notes = append(r.Notes, fmt.Sprintf("%d public reference databases (BLAST, DIAMOND, GTDB-Tk, Kraken2, Pfam...) are already on the cluster in %s, read-only: modules_search \"db-\" lists them. Don't keep private copies.", len(cat.Datasets.Items), cat.Datasets.Root))
+		r.Notes = append(r.Notes, fmt.Sprintf(s.Site.Text("storage_datasets", "%d public reference databases are already on the cluster in %s, read-only: modules_search \"db-\" lists them. Don't keep private copies."), len(cat.Datasets.Items), cat.Datasets.Root))
 	}
 	markUntrusted(ctx) // folder names are written by people and programs
 	return r, nil
@@ -165,9 +166,12 @@ type EnvCheck struct {
 	Notes     []string      `json:"notes"`
 }
 
-// EnvCheck loads modules in a one-core job on the check partition (never on
-// the login node) and reports what you get.
+// EnvCheck loads modules in a one-core job on the site's probe partition (never
+// on the login node) and reports what you get.
 func (s *Service) EnvCheck(ctx context.Context, modules, commands []string) (*EnvCheck, error) {
+	if s.Cfg.EnvPartition == "" {
+		return nil, errors.New("env_check needs a partition for its one-core job (site profile partitions.probe or env_check_partition); it never runs on the login node")
+	}
 	if len(modules) == 0 && len(commands) == 0 {
 		commands = []string{"python3", "gcc", "mpirun"}
 	}
@@ -212,15 +216,16 @@ func (s *Service) EnvCheck(ctx context.Context, modules, commands []string) (*En
 		if ci.Path == "" {
 			switch ci.Command {
 			case "python":
-				r.Notes = append(r.Notes, "There is no bare `python` on Ursa Major; use python3 (or a conda/pixi environment).")
+				r.Notes = append(r.Notes, s.Site.Text("env_no_python", "There is no bare `python` here; use python3 (or a conda/pixi environment)."))
 			case "nvcc":
-				r.Notes = append(r.Notes, "nvcc comes from a cuda module and is only useful on the gpul4 partition.")
+				r.Notes = append(r.Notes, s.Site.Text("env_nvcc", "nvcc comes from a cuda module and is only useful on GPU nodes."))
 			case "mpirun", "mpicc":
 				r.Notes = append(r.Notes, "MPI tools appear after `module load openmpi` (or mpich / intel-oneapi-mpi).")
 			}
 		}
 	}
-	r.Notes = append(r.Notes, "Checked in a one-core job on a "+s.Cfg.EnvPartition+" compute node; every partition shares /apps, so modules resolve the same in batch jobs (GPU tools such as nvcc only run on gpul4).")
+	r.Notes = append(r.Notes, s.Site.Text("env_checked", "Checked in a one-core job on a {probe} compute node; other partitions usually share the same software tree, but GPU tools only run on GPU nodes.",
+		"{probe}", s.Cfg.EnvPartition))
 	return r, nil
 }
 
@@ -238,15 +243,19 @@ type InteractiveInput struct {
 
 // InteractiveHelp is interactive_help's answer. It runs nothing.
 type InteractiveHelp struct {
-	Partition    string   `json:"partition"`
-	TimeLimit    string   `json:"time_limit"`
-	Connect      string   `json:"connect"`                  // how to reach the login node
-	Command      string   `json:"command"`                  // one-step: shell on a compute node
-	Alternative  string   `json:"alternative"`              // salloc, then srun
-	USDPerHour   float64  `json:"usd_per_hour,omitempty"`   // whole nodes, or the share held on shared partitions
-	WorstCaseUSD float64  `json:"worst_case_usd,omitempty"` // if the session runs to the limit
-	Warnings     []string `json:"warnings"`
-	Notes        []string `json:"notes"`
+	Partition    string  `json:"partition"`
+	TimeLimit    string  `json:"time_limit"`
+	Connect      string  `json:"connect"`                  // how to reach the login node
+	Command      string  `json:"command"`                  // one-step: shell on a compute node
+	Alternative  string  `json:"alternative"`              // salloc, then srun
+	USDPerHour   float64 `json:"usd_per_hour,omitempty"`   // whole nodes, or the share held on shared partitions
+	WorstCaseUSD float64 `json:"worst_case_usd,omitempty"` // if the session runs to the limit
+	// sites charged in service units: the same figures in charge_unit
+	ChargePerHour   float64  `json:"charge_per_hour,omitempty"`
+	WorstCaseCharge float64  `json:"worst_case_charge,omitempty"`
+	ChargeUnit      string   `json:"charge_unit,omitempty"`
+	Warnings        []string `json:"warnings"`
+	Notes           []string `json:"notes"`
 }
 
 // InteractiveHelp writes the commands for an interactive session.
@@ -277,7 +286,7 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 	}
 	if in.GPUs < 0 || in.GPUs > cp.GPUsPerNode {
 		if cp.GPUsPerNode == 0 {
-			return nil, fmt.Errorf("partition %s has no GPUs; use gpul4", part)
+			return nil, fmt.Errorf("partition %s has no GPUs%s", part, s.useGPU())
 		}
 		return nil, fmt.Errorf("gpus must be 0-%d on %s", cp.GPUsPerNode, part)
 	}
@@ -298,7 +307,7 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 	a := strings.Join(args, " ")
 	r.Command = "srun " + a + " --pty bash -l"
 	r.Alternative = "salloc " + a + "   # then: srun --pty bash -l   (exit twice to release the node)"
-	r.Connect = "ssh " + firstNonEmpty(s.Cfg.SSH.Host, "<your cluster login host>")
+	r.Connect = firstNonEmpty(s.Site.Connect, "ssh "+firstNonEmpty(s.Cfg.SSH.Host, "<your cluster login host>"))
 	// shared partitions bill the share of the node the session holds (v0.8.0)
 	shared := s.partitionShared(ctx, part)
 	share := 1.0
@@ -317,23 +326,32 @@ func (s *Service) InteractiveHelp(ctx context.Context, in InteractiveInput) (*In
 		}
 	}
 	if price, priced := s.price(cat, part); priced {
-		r.USDPerHour = round(price*float64(nodes)*share, 2)
-		r.WorstCaseUSD = round(price*float64(nodes)*share*float64(mins)/60, 2)
+		perHour, worst := round(price*float64(nodes)*share, 2), round(price*float64(nodes)*share*float64(mins)/60, 2)
+		if s.chargedInUSD() {
+			r.USDPerHour, r.WorstCaseUSD = perHour, worst
+		} else if s.canSeeCharge() {
+			r.ChargePerHour, r.WorstCaseCharge, r.ChargeUnit = perHour, worst, s.Site.Unit()
+		}
 	}
 	if cp.GPUsPerNode > 0 && in.GPUs == 0 {
 		r.Warnings = append(r.Warnings, fmt.Sprintf("%s nodes have a GPU, but without --gres=gpu:1 your session cannot see it.", part))
 	}
 	if cp.Spot {
-		r.Warnings = append(r.Warnings, "Spot nodes can be taken back by Google at any time; do not use them for work you cannot lose.")
+		r.Warnings = append(r.Warnings, s.Site.Text("spot_interactive", "Preemptible nodes can be taken back at any time; do not use them for work you cannot lose."))
 	}
 	if float64(mins) > s.Cfg.Caps.MaxHours*60 {
 		r.Warnings = append(r.Warnings, fmt.Sprintf("That is longer than the %.0f h clusterwand cap for batch jobs; an idle interactive session still bills what it holds.", s.Cfg.Caps.MaxHours))
 	}
-	r.Notes = append(r.Notes,
-		"clusterwand does not open shells. Run these yourself: first connect to the login node, then start the session.",
-		"Nodes power up on demand, so the first session can take a few minutes to start.",
-		"The session is billed until it ends: exit as soon as you are done.",
-		"Do not run heavy work on the login node itself; that is what the interactive session is for.")
+	r.Notes = append(r.Notes, "clusterwand does not open shells. Run these yourself: first connect to the login node, then start the session.")
+	if s.Site.CloudNodes {
+		r.Notes = append(r.Notes, "Nodes power up on demand, so the first session can take a few minutes to start.")
+	}
+	if s.Site.Model() != site.ChargeNone {
+		r.Notes = append(r.Notes, "The session is billed until it ends: exit as soon as you are done.")
+	} else {
+		r.Notes = append(r.Notes, "The session holds its nodes until it ends: exit as soon as you are done.")
+	}
+	r.Notes = append(r.Notes, "Do not run heavy work on the login node itself; that is what the interactive session is for.")
 	if !s.Cfg.ShowCost {
 		r.USDPerHour, r.WorstCaseUSD = 0, 0
 	}

@@ -382,9 +382,9 @@ func (s *Service) JobShow(ctx context.Context, in JobShowInput) (*JobDetail, err
 				d.Script = policy.Wrap(j.Script, s.Cfg.Limits.ScriptBytes)
 				markUntrusted(ctx)
 			} else {
-				// SPEC 23: Ursa Major's AccountingStoreFlags has no job_script,
-				// so an empty script is the cluster's setting, not a lookup miss
-				d.ScriptNote = "Slurm did not store this job's batch script (the cluster's AccountingStoreFlags does not include job_script). Read the script from the job's working directory instead."
+				// SPEC 23: when AccountingStoreFlags has no job_script, an empty
+				// script is the cluster's setting, not a lookup miss
+				d.ScriptNote = s.Site.Text("script_not_stored", "Slurm did not store this job's batch script (the cluster's AccountingStoreFlags may not include job_script). Read the script from the job's working directory instead.")
 			}
 		}
 	}
@@ -403,7 +403,7 @@ func (s *Service) JobShow(ctx context.Context, in JobShowInput) (*JobDetail, err
 			d.RestartCount = n
 		}
 		if d.State == "PENDING" {
-			m, adv := rules.PendingReason(q.StateReason)
+			m, adv := rules.PendingReason(s.Site, q.StateReason)
 			d.PendingReason = &PendingExplain{Reason: q.StateReason, Meaning: m, Advice: adv}
 		}
 	}
@@ -469,7 +469,7 @@ func (s *Service) JobExplain(ctx context.Context, jobID string, anyUser bool, li
 	}
 	f := rules.Facts{State: d.State, Reason: d.Reason, ExitCode: d.ExitCode, Partition: d.Partition,
 		ElapsedSec: d.ElapsedS, LimitMin: d.TimeLimitMin, CPUsAlloc: d.CPUs, RestartCnt: d.RestartCount,
-		KilledBy: d.KilledBy}
+		KilledBy: d.KilledBy, Site: s.Site}
 	if e := d.Efficiency; e != nil {
 		f.CPUSeconds, f.MemReqMB, f.MaxRSSMB = e.CPUSeconds, e.MemAllocMB, e.MemPeakMB
 	}
@@ -477,8 +477,8 @@ func (s *Service) JobExplain(ctx context.Context, jobID string, anyUser bool, li
 	if cat, err := s.Catalog(ctx); err == nil {
 		if p, ok := cat.Partition(d.Partition); ok {
 			f.SpotPartition = p.Spot
-			// GPUs are not in AccountingStorageTRES on Ursa Major; partitions are
-			// whole-node, so a gpul4 job holds the node's GPU.
+			// When GPUs are not in AccountingStorageTRES (as on some sites) and the
+			// partition is whole-node, a job there holds the node's GPUs.
 			if f.GPUsAlloc == 0 && p.GPUsPerNode > 0 {
 				f.GPUsAlloc = int64(p.GPUsPerNode) * max(d.NodeCount, 1)
 			}

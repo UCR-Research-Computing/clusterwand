@@ -1,0 +1,133 @@
+# Ursa Major site profile (UCR Research Computing, Slurm on Google Cloud).
+#
+# Everything clusterwand knows about Ursa Major that is not plain Slurm lives here:
+# paths, partition roles, CPU notes, the catalog location, the charge model and the
+# site-specific wording. The code holds generic behaviour; with this profile loaded
+# every tool answers byte-identically to ursa-bifrost v0.10.1 on the recorded
+# fixtures (testdata/golden/ursa-major, TestGoldenUrsaMajor).
+#
+# Live facts checked 2026-10-28 with `scontrol show partition` as a normal user:
+# MaxTime 30-00:00:00 on standard, computehigh, highmem, gpul4, nvmescratch (and
+# the lab partitions amd112, amd56, gpu1v1); spot 7-00:00:00; arm, tpu, tpuspot
+# 1 day; check 15 min. SuspendTime 1800 s (general) / 3600 s (labs, check), 300 s
+# (spot, arm, tpu*). Those limits come from the cluster catalog and Slurm at run
+# time, not from this file.
+name: ursa-major
+title: Ursa Major
+description: UCR Research Computing, Google Cloud
+approved: true
+help: Research Computing
+
+# The catalog ursa-catalog publishes on the cluster: partitions, $/node-hour,
+# modules, recipes, containers, shared reference data.
+catalog: /apps/docs/catalog.json
+
+paths:
+  home: /home/{user}
+  scratch: /scratch/{user}
+  log_roots: ["/home/{user}/", "/scratch/{user}/"]
+
+# slurm-gcp: nodes power up on demand and bill while up.
+cloud_nodes: true
+stockout_reasons: [RESOURCE_POOL_EXHAUSTED, stockout]
+
+partitions:
+  probe: check            # env_check's one-core job (always-on, 15 min limit)
+  gpu: gpul4
+  highmem: highmem
+  general: standard       # e2, the cheapest cores
+  fast: computehigh       # Intel Sapphire Rapids, Tier_1 networking
+  # where a stocked-out job is pointed: a node already up and idle first, then
+  # standard (e2 in any us-central1 zone, the cheapest), spot (same nodes), the
+  # specialists
+  fallback_idle: [standard, spot, computehigh, nvmescratch, highmem]
+  fallback_cold: [standard, spot, computehigh]
+  # e2 hosts (x86-64-v3, no AVX-512) since 2026-10-03
+  avx2_only: [standard, spot, check]
+  cpu: {standard: AVX2 only (e2), spot: AVX2 only (e2), check: AVX2 only (e2)}
+  cpu_default: AVX-512
+  time_hint:
+    check: ", or submit the real run to standard (check is for tests under 15 minutes)"
+  multinode_mpi:
+    standard: "multi-node MPI on standard (e2 nodes, standard networking, any zone): fine for loosely coupled work; tightly coupled codes (GROMACS, LAMMPS, CFD) scale better on computehigh (Tier_1 networking, fast cores)"
+
+modules:
+  python: [python-sci, python-ml]
+  gpu: [python-ml]
+
+# Dollars per node-hour from the catalog (cloud list prices).
+charge:
+  model: usd_per_node_hour
+
+allocation:
+  covered_by: Research Computing / UCR ITS
+
+# Site wording (keys are documented where the code uses them).
+text:
+  server_title: Ursa Major HPC (read-only)
+  instructions_site: " (configured site: Ursa Major, UCR Research Computing, Google Cloud)"
+  instructions_datasets: |-
+    - Public reference databases (BLAST nr/core_nt, DIAMOND nr, UniRef90, GTDB-Tk, Kraken2, Kaiju, Bakta, eggNOG, Pfam, BUSCO...) are already on the cluster in /data/shared, read-only. Find them with modules_search (e.g. "db-", "kraken", "blast") and load the db-* module in the script; never have a job download its own copy.
+  instructions_cost: "- Costs are estimates from list prices. Whole-node partitions bill whole nodes; shared partitions bill the share of the node a job holds (cores or memory, whichever is larger), and there a script must ask for its cores (--cpus-per-task, --ntasks-per-node, or --exclusive). cluster_status notes say which partitions share. Powered-down cloud nodes cost nothing."
+  tool_partitions: "Partitions from the cluster catalog: nodes, cores and memory per node, GPUs, time limit, CPU instruction set (standard/spot/check are AVX2-only e2 nodes), $/node-hour, spot, what each is for, and the default."
+  tool_modules_search: "Search the cluster's software modules (Lmod) and shared reference databases (db-* modules for /data/shared: BLAST, DIAMOND, GTDB-Tk, Kraken2, Pfam...). Shows versions, whether a module needs an MPI module loaded first, GPU (-cuda) builds, and usage notes."
+  tool_waste_report: "Avoidable spend in the caller's jobs: jobs that left most cores idle, timeouts that did nothing, repeated fast failures, highmem jobs that fit standard, and powered-up nodes with no job. Sorted by wasted node-hours, with suggestions."
+  tool_env_check: "Loads the given modules in a one-core job (a few seconds) on the always-on check partition, never on the login node, and reports whether each loads (with Lmod's message if not), the resulting module list, and where each program resolves with its version (python3, gcc, mpirun, nvcc, cmake, R, ...), with the job and node it ran on. Changes no files."
+  schema_interactive_gpus: GPUs (gpul4 only)
+  modules_search_hint: "Not a module or prebuilt container. Python packages come from python-sci/python-ml or a uv/Pixi env; anything on Docker Hub runs with apptainer (docker://image:tag). See install_tools in recipes."
+  catalog_title: Ursa Major catalog
+  status_note_nodes: "Cloud nodes (slurm-gcp): powered-down nodes have no VM and cost nothing; powered-up nodes bill per hour whether or not a job runs."
+  status_footer: "* default partition. Powered-down cloud nodes cost nothing."
+  allocation_header: Ursa Major allocation
+  allocation_name: Ursa allocation
+  script_spot: "spot nodes can be reclaimed with ~30 s notice; add #SBATCH --requeue and make the job restartable"
+  script_python_env: "calls python without loading python-sci/python-ml or an environment (system Python 3.6 on Rocky 8)"
+  script_avx512: "%s compiles for AVX-512 or for the build host (%s), but %s nodes (e2) have AVX2 only: the program can die with 'Illegal instruction'. Use -march=x86-64-v3 (what the site software uses), or run on computehigh (Intel, AVX-512)"
+  env_no_python: "There is no bare `python` on Ursa Major; use python3 (or a conda/pixi environment)."
+  env_nvcc: "nvcc comes from a cuda module and is only useful on the gpul4 partition."
+  env_checked: "Checked in a one-core job on a {probe} compute node; every partition shares /apps, so modules resolve the same in batch jobs (GPU tools such as nvcc only run on gpul4)."
+  storage_quota: "No per-user quota is set on this cluster; the filesystems are shared. Hidden folders such as .cache and .conda are included because they often fill a home folder."
+  storage_datasets: "%d public reference databases (BLAST, DIAMOND, GTDB-Tk, Kraken2, Pfam...) are already on the cluster in %s, read-only: modules_search \"db-\" lists them. Don't keep private copies."
+  spot_interactive: "Spot nodes can be taken back by Google at any time; do not use them for work you cannot lose."
+  stockout: "GCP has no capacity for %s right now (%d node(s) failed with ZONE_RESOURCE_POOL_EXHAUSTED); the job may wait a long time"
+  script_not_stored: "Slurm did not store this job's batch script (the cluster's AccountingStoreFlags does not include job_script). Read the script from the job's working directory instead."
+  waste_fast_single_node: " Single-node work like this is cheaper on standard (%s/node-hour vs %s)."
+  waste_highmem_fits: "Fits a cheaper partition: standard has %.0f GB per node. highmem costs %s/node-hour."
+  waste_idle_node: "Billing while idle. Check SuspendTime for this partition (slurm-gcp powers nodes down after it), or whether something keeps it warm on purpose."
+  health_node_down: "On slurm-gcp a cloud node that failed to boot or was lost goes DOWN; check the resume log on the controller and `scontrol update nodename=... state=resume` once fixed (admin)."
+  health_slow_boot: "Likely a GCP stockout or a resume failure; check the zone's capacity and the slurm-gcp resume log."
+  health_launch_failed: "Node launch failed (often a GCP stockout or a bad image). Check the slurm-gcp resume log."
+  health_boot_failures: "Cloud nodes failed under jobs or did not boot; check GCP quota/stockouts for the zone."
+  health_note: "Read-only checks over scontrol, squeue and the last day of sacct. Stockouts show up as slow boots, NODE_FAIL/BOOT_FAIL or launch-failed holds; the slurm-gcp resume log on the controller has the GCP error text."
+  ticket_site: " on Ursa Major"
+  prompt_site: " on Ursa Major"
+  prompt_for_site: " for Ursa Major"
+  prompt_my_site: "my Ursa Major usage"
+  prompt_job: Ursa Major job
+  prompt_site_fits: "Ursa Major's partitions and modules"
+  tool_script_check_site: " against Ursa Major"
+  tool_my_allocation: "Your Ursa Major compute allocation and current period usage, both for yourself and your lab. Allocations are list-price estimates in dollars; enforcement is warn-only."
+  # diagnosis rules (internal/rules)
+  rule_container: "Local .sif files are run directly (`apptainer exec /apps/containers/x.sif ...`), not pulled; for registry images use docker://name:tag. List /apps/containers for prebuilt images."
+  rule_illegal_instruction: "The program was built for a newer CPU (usually AVX-512, or -march=native on another machine). standard, spot and check run e2 nodes with AVX2 only. Rebuild with -march=x86-64-v3 (what the site software uses), use the site module or a container, or run on computehigh (Intel Sapphire Rapids, AVX-512)."
+  rule_tool_crash: "Usually an input it did not expect (name or format), or code built for AVX-512 on the AVX2-only standard/spot nodes (e2). Check inputs; try computehigh (Intel, AVX-512) to rule out the CPU."
+  rule_glibc: "Nodes run Rocky 8 (glibc 2.28). Use the module, a container, or an older build (conda-forge keeps old versions)."
+  rule_python_import: "Load python-sci (CPU) or python-ml (PyTorch/GPU), or create a uv/Pixi environment in the job. Check that the environment is activated in the same shell that runs python."
+  rule_cuda: "GPU memory is 24 GB per L4: reduce batch size or model size. If no device is found, request --gres=gpu:1 on gpul4 and use `apptainer exec --nv` for containers."
+  rule_disk_full: "Write large outputs to $SCRATCH (/scratch/$USER) and temp files to $TMPDIR; clean up old runs. Public reference databases are already in /data/shared (module load db-<name>), so do not download private copies."
+  rule_permission: "Check file permissions and that paths are under your home or scratch; scripts need chmod +x if executed directly. /data/shared (reference databases) and /apps are read-only: write outputs to $SCRATCH and point tools at the database with its db-* module."
+  rule_timeout: "Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock)."
+  rule_node_fail: "Usually not the user's fault (cloud node lost). Resubmit; add --requeue for long jobs."
+  rule_preempted: "Spot nodes can be reclaimed with ~30 s notice. Add --requeue and checkpointing, or use standard for work that cannot restart."
+  rule_exit127: "Check the first \"command not found\" line in the log (job_log_tail). Load the module that provides the program, or use its full path. There is no bare `python` on the nodes: use python3, or load python-sci / python-ml."
+  rule_mem: "Request more memory (--mem) or use the highmem partition (~497 GB per node)."
+  rule_pending_resources: "Cold partitions take ~90 s-5 min to boot a node; GCP stockouts can delay longer. Try another partition if it waits more than 15 minutes."
+  rule_sig_139: "Usually an input it did not expect, a bug, or code built for AVX-512 running on the AVX2-only standard/spot nodes (try computehigh). Run it under gdb or with core dumps to find where."
+  rule_sig_segv: "Usually an input it did not expect, a bug, or AVX-512 code on the AVX2-only standard/spot nodes (try computehigh)."
+  rule_sig_137: "Most often the out-of-memory killer: check peak memory and request more (--mem) or use highmem."
+  rule_sig_132: "Usually code built for AVX-512 or -march=native running on the AVX2-only standard/spot/check nodes (e2): rebuild with -march=x86-64-v3, or run on computehigh."
+  rule_sig_ill: "Code built for AVX-512 or another CPU, on the AVX2-only e2 nodes: rebuild with -march=x86-64-v3 or use computehigh."
+  rule_sig_143: "Sent by scancel, a time limit or node shutdown (spot reclaim)."
+  rule_cnf_python: "%q does not exist on the nodes (only python3, and pip inside an environment). Load python-sci or python-ml first, call python3, or for a Makefile pass PYTHON=python3 (make PYTHON=python3)."
+  rule_cnf_module: "The `module` command is missing in this shell: start the script with #!/bin/bash -l, or source /apps/docs/templates/job-header.sh."
+  rule_cnf_nvcc: "%q is only on the GPU nodes (partition gpul4, --gres=gpu:1); nvcc also needs `module load cuda`."

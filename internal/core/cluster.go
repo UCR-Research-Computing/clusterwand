@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
@@ -146,10 +147,13 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 	if len(cs.PendingByWhy) == 0 {
 		cs.PendingByWhy = nil
 	}
-	cs.Notes = []string{
-		"Cloud nodes (slurm-gcp): powered-down nodes have no VM and cost nothing; powered-up nodes bill per hour whether or not a job runs.",
-		s.sharedSummary(ctx),
+	cs.Notes = []string{}
+	if s.Site.CloudNodes {
+		cs.Notes = append(cs.Notes, s.Site.Text("status_note_nodes", "Cloud nodes: powered-down nodes have no VM and cost nothing; powered-up nodes bill per hour whether or not a job runs."))
+	} else {
+		cs.IdleBilling = nil // on fixed nodes an idle node bills nothing extra
 	}
+	cs.Notes = append(cs.Notes, s.sharedSummary(ctx))
 	if len(cs.IdleBilling) > 0 {
 		cs.Notes = append(cs.Notes, fmt.Sprintf("%d node(s) are powered up with no job (billing while idle). A warm worker kept on purpose looks like this too.", len(cs.IdleBilling)))
 	}
@@ -162,8 +166,8 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 type PartitionInfo struct {
 	CatalogPartition
 	USD *float64 `json:"usd_per_node_hour,omitempty"`
-	// CPU is the instruction-set note people need before compiling (v0.9.10):
-	// "AVX2 (e2)" on standard/spot/check, "AVX-512" elsewhere on CPU partitions.
+	// CPU is the instruction-set note people need before compiling (v0.9.10),
+	// from the site profile (partitions.cpu, cpu_default).
 	CPU string `json:"cpu,omitempty"`
 }
 
@@ -175,7 +179,7 @@ func (s *Service) Partitions(ctx context.Context) ([]PartitionInfo, error) {
 	}
 	var out []PartitionInfo
 	for _, p := range cat.Partitions {
-		pi := PartitionInfo{CatalogPartition: p, CPU: cpuNote(p.Name)}
+		pi := PartitionInfo{CatalogPartition: p, CPU: s.Site.CPUNote(p.Name)}
 		pi.CatalogPartition.USDPerNodeHr = nil
 		if v, ok := s.price(cat, p.Name); ok && s.Cfg.ShowCost {
 			v := v
@@ -198,16 +202,18 @@ type UsageRow struct {
 	GPUHours   float64 `json:"gpu_hours,omitempty"`
 	CPUPercent float64 `json:"cpu_efficiency_percent"`
 	CostUSD    float64 `json:"est_cost_usd,omitempty"`
+	Charge     float64 `json:"est_charge,omitempty"` // in the site's charge unit, when not dollars
 }
 
 // Usage is the my_usage / usage_report answer.
 type Usage struct {
-	Since   string     `json:"since"`
-	Until   string     `json:"until,omitempty"`
-	GroupBy string     `json:"group_by"`
-	Rows    []UsageRow `json:"rows"`
-	Total   UsageRow   `json:"total"`
-	Notes   []string   `json:"notes"`
+	Since      string     `json:"since"`
+	Until      string     `json:"until,omitempty"`
+	GroupBy    string     `json:"group_by"`
+	ChargeUnit string     `json:"charge_unit,omitempty"` // "SU" on sites charged in service units
+	Rows       []UsageRow `json:"rows"`
+	Total      UsageRow   `json:"total"`
+	Notes      []string   `json:"notes"`
 }
 
 // UsageInput selects a usage report.
@@ -326,7 +332,27 @@ func (s *Service) Usage(ctx context.Context, in UsageInput) (*Usage, error) {
 	if u.Rows == nil {
 		u.Rows = []UsageRow{}
 	}
-	u.Notes = []string{"Estimated cost = partition list price x nodes x elapsed hours x the share of each node the job held (1 on whole-node partitions; cores or memory share, whichever is larger, on shared ones); it excludes boot/idle time and credits. Treat as an estimate."}
+	u.Notes = []string{}
+	switch {
+	case s.chargedInUSD():
+		u.Notes = append(u.Notes, "Estimated cost = partition list price x nodes x elapsed hours x the share of each node the job held (1 on whole-node partitions; cores or memory share, whichever is larger, on shared ones); it excludes boot/idle time and credits. Treat as an estimate.")
+	case s.Site.Model() == site.ChargeSUPerCoreHour:
+		u.ChargeUnit = "SU"
+		u.Total.Charge, u.Total.CostUSD = round(u.Total.CostUSD, 1), 0
+		for i := range u.Rows {
+			u.Rows[i].Charge, u.Rows[i].CostUSD = round(u.Rows[i].CostUSD, 1), 0
+		}
+		u.Notes = append(u.Notes, "Estimated charge (est_charge, in service units) = the site's SU per core-hour x cores per node x nodes x elapsed hours x the share of each node the job held. Treat as an estimate.")
+	default:
+		missingPrice = nil
+		u.Notes = append(u.Notes, "This cluster has no charge model, so no cost figures are given.")
+	}
+	if !s.canSeeCharge() {
+		u.Total.Charge = 0
+		for i := range u.Rows {
+			u.Rows[i].Charge = 0
+		}
+	}
 	if len(missingPrice) > 0 {
 		var m []string
 		for k := range missingPrice {
@@ -335,7 +361,7 @@ func (s *Service) Usage(ctx context.Context, in UsageInput) (*Usage, error) {
 		sort.Strings(m)
 		u.Notes = append(u.Notes, "No price for partition(s): "+strings.Join(m, ", "))
 	}
-	if !s.Cfg.ShowCost {
+	if !s.Cfg.ShowCost && s.Site.Model() != site.ChargeNone {
 		u.Notes = append(u.Notes, "Dollar figures hidden (show_cost: false).")
 	}
 	return u, nil
@@ -381,14 +407,16 @@ type ScriptCheck struct {
 	Issues     []ScriptIssue     `json:"issues"`
 	Cores      *CoreRequest      `json:"cores,omitempty"` // what the job holds per node (v0.8.0)
 	EstCostUSD *float64          `json:"est_max_cost_usd,omitempty"`
+	EstCharge  *float64          `json:"est_max_charge,omitempty"` // in charge_unit, on sites not charged in dollars
+	ChargeUnit string            `json:"charge_unit,omitempty"`
 	Note       string            `json:"note"`
 }
 
 var (
 	// idioms that count the whole node's cores rather than the job's
 	reAllCores = regexp.MustCompile(`os\.cpu_count\(\)|multiprocessing\.cpu_count\(\)|nproc\s+--all|/proc/cpuinfo`)
-	// compiler flags that emit AVX-512 (or tune for a host that has it); the e2 nodes
-	// behind standard/spot/check run AVX2 only, so such a binary dies with SIGILL
+	// compiler flags that emit AVX-512 (or tune for a host that has it); on nodes
+	// that stop at AVX2 (site profile partitions.avx2_only) such a binary dies with SIGILL
 	reMPIRun   = regexp.MustCompile(`\b(srun|mpirun|mpiexec)\b`)
 	reAVX512   = regexp.MustCompile(`-mavx512\w*|-march=(?:native|skylake-avx512|icelake\w*|sapphirerapids|cascadelake|cooperlake|tigerlake|znver4|znver5|x86-64-v4)\b|-xCORE-AVX512|-xHost\b`)
 	reSbatch   = regexp.MustCompile(`^#SBATCH\s+(.*)$`)
@@ -488,7 +516,7 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 		// --time is held by Slurm forever with reason PartitionTimeLimit (v0.9.9)
 		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {
 			add("error", 0, "--time %s is over %s's limit of %s; Slurm would hold the job (PartitionTimeLimit). Lower --time%s",
-				sc.Request["time"], part, minutesText(maxMin), partitionTimeHint(part))
+				sc.Request["time"], part, minutesText(maxMin), s.Site.Partitions.TimeHint[part])
 		}
 		nodes := atoiDefault(sc.Request["nodes"], 1)
 		if nodes > p.MaxNodes {
@@ -502,7 +530,7 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 		}
 		g := gpusRequested(sc.Request)
 		if g > 0 && p.GPUsPerNode == 0 {
-			add("error", 0, "GPUs requested on %s, which has no GPUs; use gpul4", part)
+			add("error", 0, "GPUs requested on %s, which has no GPUs%s", part, s.useGPU())
 		}
 		if g > p.GPUsPerNode && p.GPUsPerNode > 0 {
 			add("error", 0, "%d GPUs per node requested; %s has %d", g, part, p.GPUsPerNode)
@@ -511,7 +539,7 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 			add("warning", 0, "running on %s without --gres=gpu:1; the GPU will not be visible to the job", part)
 		}
 		if p.Spot && !strings.Contains(script, "--requeue") {
-			add("warning", 0, "spot nodes can be reclaimed with ~30 s notice; add #SBATCH --requeue and make the job restartable")
+			add("warning", 0, "%s", s.Site.Text("script_spot", "nodes on %s can be reclaimed at short notice (preemptible); add #SBATCH --requeue and make the job restartable", "%s", part))
 		}
 		shared := s.partitionShared(ctx, part)
 		cr := coreRequest(sc.Request, p, shared)
@@ -521,12 +549,12 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 			// there; refuse rather than let it run 20x slower than its author meant
 			add("error", 0, "%s shares nodes between jobs: this script %s. Ask for the cores it needs (#SBATCH --cpus-per-task=N, or --ntasks-per-node=N for MPI ranks), or #SBATCH --exclusive for the whole node", part, cr.DefaultNote)
 		}
-		if part == "standard" && nodes > 1 && reMPIRun.MatchString(codeOnly(script)) {
-			add("info", 0, "multi-node MPI on standard (e2 nodes, standard networking, any zone): fine for loosely coupled work; tightly coupled codes (GROMACS, LAMMPS, CFD) scale better on computehigh (Tier_1 networking, fast cores)")
+		if note, ok := s.Site.Partitions.MultiNodeMPI[part]; ok && nodes > 1 && reMPIRun.MatchString(codeOnly(script)) {
+			add("info", 0, "%s", note)
 		}
-		if avx2OnlyPartitions[part] {
+		if s.Site.AVX2Only(part) {
 			if m := reAVX512.FindString(codeOnly(script)); m != "" {
-				add("warning", 0, "%s compiles for AVX-512 or for the build host (%s), but %s nodes (e2) have AVX2 only: the program can die with 'Illegal instruction'. Use -march=x86-64-v3 (what the site software uses), or run on computehigh (Intel, AVX-512)", m, m, part)
+				add("warning", 0, s.Site.Text("script_avx512", "%s compiles for AVX-512 or for the build host (%s), but %s nodes have AVX2 only: the program can die with 'Illegal instruction'. Use -march=x86-64-v3, or run on a partition whose nodes have AVX-512"), m, m, part)
 			}
 		}
 		if shared && !cr.Exclusive {
@@ -536,11 +564,17 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 		}
 		if price, ok := s.price(cat, part); ok && hasTime && s.Cfg.ShowCost {
 			c := round(price*float64(nodes)*cr.NodeShare*float64(mins)/60, 2)
-			sc.EstCostUSD = &c
+			if s.chargedInUSD() {
+				sc.EstCostUSD = &c
+			} else if s.canSeeCharge() {
+				sc.EstCharge, sc.ChargeUnit = &c, s.Site.Unit()
+			}
 		}
-		if shared {
+		switch {
+		case s.Site.Model() == site.ChargeNone:
+		case shared:
 			sc.Note += fmt.Sprintf(" %s shares nodes: cost is the share of the node held (%.0f%%, by %s).", part, 100*cr.NodeShare, firstNonEmpty(cr.Basis, "whole node"))
-		} else {
+		default:
 			sc.Note += fmt.Sprintf(" %s gives whole nodes, so cost is per node regardless of cores used.", part)
 		}
 	}
@@ -552,10 +586,10 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 	if regexp.MustCompile(`(?m)^\s*(pip|pip3)\s+install\b`).MatchString(code) && !strings.Contains(code, "venv") && !strings.Contains(code, "uv ") && !strings.Contains(code, "pixi") && !strings.Contains(code, "--user") {
 		add("warning", 0, "bare `pip install` without a virtual environment; use `uv venv $TMPDIR/v` or a Pixi/conda env")
 	}
-	if strings.Contains(code, "python") && !regexp.MustCompile(`python-(sci|ml)|venv|conda|pixi|uv |apptainer|miniforge`).MatchString(code) {
-		add("warning", 0, "calls python without loading python-sci/python-ml or an environment (system Python 3.6 on Rocky 8)")
+	if strings.Contains(code, "python") && !s.rePythonEnv().MatchString(code) {
+		add("warning", 0, "%s", s.Site.Text("script_python_env", "calls python without loading a Python module or an environment (venv, conda, pixi, uv)"))
 	}
-	if strings.Contains(code, "apptainer") && strings.Contains(code, "--nv") && part != "gpul4" {
+	if strings.Contains(code, "apptainer") && strings.Contains(code, "--nv") && p.GPUsPerNode == 0 {
 		add("warning", 0, "apptainer --nv on a partition without GPUs")
 	}
 	dbChecks(cat, script, sc.Request["array"], add)
@@ -674,26 +708,26 @@ func memMB(s string) (int64, bool) {
 	return v, true
 }
 
-// slurmMinutes parses Slurm time formats: M, M:S, H:M:S, D-H, D-H:M, D-H:M:S.
-// cpuNote is what a partition's nodes can run: the e2 partitions stop at AVX2.
-func cpuNote(part string) string {
-	if avx2OnlyPartitions[part] {
-		return "AVX2 only (e2)"
+// rePythonEnv matches a script that sets up a Python environment: one of the
+// site's Python modules, or a venv/conda/pixi/uv/container.
+func (s *Service) rePythonEnv() *regexp.Regexp {
+	alts := []string{}
+	for _, m := range s.Site.Modules.Python {
+		alts = append(alts, regexp.QuoteMeta(m))
 	}
-	return "AVX-512"
+	alts = append(alts, "venv", "conda", "pixi", "uv ", "apptainer", "miniforge")
+	return regexp.MustCompile(strings.Join(alts, "|"))
 }
 
-// avx2OnlyPartitions run on e2 hosts (x86-64-v3, no AVX-512) since 2026-10-03.
-var avx2OnlyPartitions = map[string]bool{"standard": true, "spot": true, "check": true}
-
-// partitionTimeHint suggests where a too-long job belongs.
-func partitionTimeHint(part string) string {
-	if part == "check" {
-		return ", or submit the real run to standard (check is for tests under 15 minutes)"
+// useGPU is "; use <gpu partition>" when the site names one.
+func (s *Service) useGPU() string {
+	if g := s.Site.Partitions.GPU; g != "" {
+		return "; use " + g
 	}
 	return ""
 }
 
+// slurmMinutes parses Slurm time formats: M, M:S, H:M:S, D-H, D-H:M, D-H:M:S.
 func slurmMinutes(s string) (int, bool) {
 	if s == "" {
 		return 0, false

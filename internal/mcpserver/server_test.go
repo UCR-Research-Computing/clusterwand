@@ -16,6 +16,7 @@ import (
 func connect(t *testing.T, tiers ...string) *mcp.ClientSession {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Site = "ursa-major"
 	cfg.StatePath = filepath.Join(t.TempDir(), "a1.json")
 	cfg.ResultsDir = filepath.Join(t.TempDir(), "results")
 	cfg.Backend = "fixture"
