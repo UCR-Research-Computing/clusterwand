@@ -36,12 +36,13 @@
       "cached": true,
       "commands": [
         "cat -- /opt/site/catalog.json",
+        "scontrol -o show partition",
         "sinfo -h -o '%R|%h'",
         "cat -- /opt/site/catalog.json",
         "sinfo -h -o '%R|%h'",
         "sinfo -h -o '%R|%h'",
         "sbatch --test-only --partition=fast --nodes=1 --time=60 --comment=clusterwand:2874480c02ff --job-name=hello",
-        "scontrol show nodes --json"
+        "bash -c 'scontrol --version; SLURM_TIME_FORMAT=%s exec scontrol -o show nodes' clusterwand"
       ]
     }
   }

@@ -88,49 +88,38 @@ func (s *Service) JobsList(ctx context.Context, in JobsListInput) ([]JobSummary,
 	if limit > s.Cfg.Limits.ListRows {
 		limit = s.Cfg.Limits.ListRows
 	}
-	var qc, ac backend.Command
+	var qsel queueSel
+	var ac backend.Command
+	var ids []string
 	byID := len(want) > 0 && !in.All
 	if byID {
 		// a program watching its own jobs (the Lab's watcher): ask Slurm for just
 		// these jobs, uncached, so a job that ended shows as ended on the next call
 		// instead of after the queue/accounting cache (up to 80 s) runs out. The rows
 		// are filtered to the caller's own user below.
-		ids := make([]string, 0, len(want))
+		ids = make([]string, 0, len(want))
 		for id := range want {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		qc, err = backend.SqueueJobs(ids)
-		if err == nil {
-			ac, err = backend.SacctJobs(ids)
-		}
+		qsel = queueSel{jobs: ids}
 	} else if in.All {
-		qc = backend.SqueueAll()
+		qsel = queueSel{all: true}
 		ac, err = backend.SacctSummaryAll(in.Since, "")
 	} else {
-		qc, err = backend.SqueueUser(who)
-		if err == nil {
-			ac, err = backend.SacctSummaryUser(who, in.Since, "")
-		}
+		qsel = queueSel{user: who}
+		ac, err = backend.SacctSummaryUser(who, in.Since, "")
 	}
 	if err != nil {
 		return nil, err
 	}
 	var q slurm.QueueResponse
-	b, err := s.run(ctx, qc)
-	if err != nil {
-		return nil, err
-	}
-	if err := slurm.Decode(b, &q); err != nil {
+	if q.Jobs, err = s.queue(ctx, qsel); err != nil {
 		return nil, err
 	}
 	var a slurm.AcctResponse
 	if byID {
-		b, err = s.run(ctx, ac)
-		if err != nil {
-			return nil, err
-		}
-		if err := slurm.Decode(b, &a); err != nil {
+		if a.Jobs, err = s.acctJobs(ctx, ids, false); err != nil {
 			return nil, err
 		}
 	} else if a.Jobs, err = s.acctRows(ctx, ac); err != nil {
@@ -313,21 +302,12 @@ func (s *Service) JobShow(ctx context.Context, in JobShowInput) (*JobDetail, err
 		return nil, err
 	}
 	var d JobDetail
-	qc, _ := backend.SqueueJob(in.JobID)
-	if b, err := s.run(ctx, qc); err == nil {
-		var q slurm.QueueResponse
-		if slurm.Decode(b, &q) == nil && len(q.Jobs) > 0 {
-			j := q.Jobs[0]
-			d.queue = &j
-		}
-	}
-	ac, _ := backend.SacctJob(in.JobID)
-	b, err := s.run(ctx, ac)
-	if err != nil {
-		return nil, err
+	if qs, err := s.queue(ctx, queueSel{job: in.JobID}); err == nil && len(qs) > 0 {
+		j := qs[0]
+		d.queue = &j
 	}
 	var a slurm.AcctResponse
-	if err := slurm.Decode(b, &a); err != nil {
+	if a.Jobs, err = s.acctJobs(ctx, []string{in.JobID}, true); err != nil {
 		return nil, err
 	}
 	for i := range a.Jobs {
@@ -378,6 +358,11 @@ func (s *Service) JobShow(ctx context.Context, in JobShowInput) (*JobDetail, err
 		}
 		d.Efficiency = efficiency(j)
 		if in.IncludeScript {
+			// the owner check above has passed: the text path reads the stored
+			// script separately (--json carries it in the record)
+			if j.Script == "" && !s.useJSON() {
+				j.Script = s.batchScript(ctx, fmt.Sprint(j.JobID))
+			}
 			if j.Script != "" {
 				d.Script = policy.Wrap(j.Script, s.Cfg.Limits.ScriptBytes)
 				markUntrusted(ctx)

@@ -70,7 +70,7 @@
     "source": {
       "backend": "fixture:bigcluster",
       "commands": [
-        "bash -c 'SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"' clusterwand -u bob42 -S 2026-09-01",
+        "bash -c 'if sacct --helpformat | grep -qw Restarts; then SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"; fi; set -o pipefail; SLURM_TIME_FORMAT=%s sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,JobName \"$@\" | sed '\\''s/|/||/15'\\''' clusterwand -u bob42 -S 2026-09-01",
         "cat -- /opt/site/catalog.json"
       ]
     }

@@ -58,8 +58,10 @@ v0.10.1, UCR Research Computing's MCP server for its Ursa Major cluster, on its 
 working with any Slurm cluster. v0.1.0 is the renamed fork, cut down to SSH only: it runs
 on your machine and reaches the cluster through your own OpenSSH login. The fork's hosted
 mode (HTTP server, Google sign-in, IAP backend, Cloud Storage staging) is gone; the local
-tools behave as before. Site profiles and text-format Slurm parsing come next (see
-[Roadmap](#roadmap)).
+tools behave as before. Since v0.2.0 everything site-specific lives in a site profile, and
+since v0.3.0 Slurm is read as plain text (works on Slurm 21.08 to 25.11; `--json` is an
+opt-in per site) and partitions locked to some accounts or groups are only offered to
+people who may use them. Next: `clusterwand discover` (see [Roadmap](#roadmap)).
 
 ## 60-second demo
 
@@ -270,7 +272,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 |---|---|---|
 | F0 | Fork and polish: renamed module, binary and paths; docs; CI | v0.1.0 |
 | F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | done, v0.2.0 |
-| F2 | Slurm adapter: text-format parsers for older Slurm, JSON behind a flag; lab-locked partitions | planned, v0.3.0 |
+| F2 | Slurm adapter: plain-text reads as the primary path (Slurm 21.08 to 25.11), JSON behind a site flag; lab-locked partitions (AllowAccounts/AllowGroups) | done, v0.3.0 |
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey | planned, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |
 | Later | Multi-cluster configs | not started |

@@ -18,8 +18,8 @@
     "source": {
       "backend": "fixture:bigcluster",
       "commands": [
-        "squeue --json -j 236",
-        "sacct --json -j 236",
+        "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand -j 236",
+        "bash -c 'f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName; sacct --helpformat | grep -qw StdOut || f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName; SLURM_TIME_FORMAT=%s exec sacct -P --noconvert --delimiter=$'\\''\\037'\\'' -o \"$f\" \"$@\"' clusterwand -j 236",
         "cat -- /opt/site/catalog.json",
         "bash -c 'set -e; [ -f \"$1\" ] || { echo \"$1: not a regular file\" \u003e\u00262; exit 4; }; n=$(grep -c '\\'''\\'' \u003c \"$1\" || true); if [ \"$2\" -le 0 ]; then s=$(( n - $3 + 1 )); else s=$2; fi; if [ \"$s\" -lt 1 ]; then s=1; fi; e=$(( s + $3 - 1 )); printf '\\''%s %s\\n'\\'' \"$n\" \"$s\"; sed -n \"${s},${e}p;${e}q\" -- \"$1\"' clusterwand /users/bob42/projects/run_76/job.log 0 20"
       ]

@@ -543,14 +543,11 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 // partitionTrouble reports recent boot failures (stockouts) on a partition and
 // suggests a partition with a node already up or no failures, or "" when fine.
 func (s *Service) partitionTrouble(ctx context.Context, part string) string {
-	b, err := s.run(ctx, backend.Nodes())
+	ns, _, err := s.nodes(ctx)
 	if err != nil {
 		return ""
 	}
-	var nr slurm.NodesResponse
-	if slurm.Decode(b, &nr) != nil {
-		return ""
-	}
+	nr := slurm.NodesResponse{Nodes: ns}
 	bad, stockout := 0, false
 	upIdle := map[string]bool{}
 	troubled := map[string]bool{}
@@ -579,15 +576,16 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 		why = fmt.Sprintf(s.Site.Text("stockout", "the provider has no capacity for %s right now (%d node(s) failed to start); the job may wait a long time"), part, bad)
 	}
 	alt := ""
+	acc := s.partitionAccess(ctx)
 	for _, p := range s.Site.Partitions.FallbackIdle {
-		if p != part && upIdle[p] {
+		if p != part && upIdle[p] && acc.allowed(p) {
 			alt = p + " (a node is already up and idle)"
 			break
 		}
 	}
 	if alt == "" {
 		for _, p := range s.Site.Partitions.FallbackCold {
-			if p != part && !troubled[p] {
+			if p != part && !troubled[p] && acc.allowed(p) {
 				alt = p
 				break
 			}
@@ -862,7 +860,8 @@ func (s *Service) invalidateQueue() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for k := range s.cache {
-		if strings.HasPrefix(k, "squeue") || strings.HasPrefix(k, "sacct") || strings.HasPrefix(k, "scontrol show nodes") {
+		if strings.HasPrefix(k, "squeue") || strings.HasPrefix(k, "sacct") || strings.HasPrefix(k, "scontrol show nodes") ||
+			strings.Contains(k, "exec squeue ") || strings.Contains(k, "exec sacct ") || strings.Contains(k, "scontrol -o show nodes") {
 			delete(s.cache, k)
 		}
 	}

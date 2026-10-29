@@ -242,7 +242,18 @@ func SacctStates(user, since, states string) (Command, error) {
 // --json spends nearly all its time serializing (a week of one person's jobs:
 // 19.6 s as JSON, 0.2 s as text). Epoch times keep the parse exact. The
 // validated selection (-u user or -a, -S, -E) arrives as positional parameters.
+//
+// F2: Slurm 21.08 has no Restarts field and refuses the whole list. There the
+// template asks for the list without it and puts an empty Restarts column back
+// (sed replaces the 15th "|", the one before JobName, with "||"), so the parser
+// sees the same 17 columns and reads 0 restarts.
 const sacctSummaryTemplate = `SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o ` + slurmFields + ` "$@"`
+
+// sacctSummaryCompat runs sacctSummaryTemplate where sacct knows Restarts.
+const sacctSummaryCompat = `if sacct --helpformat | grep -qw Restarts; then ` + sacctSummaryTemplate + `; fi; set -o pipefail; SLURM_TIME_FORMAT=%s sacct -n -P --noconvert -o ` + slurmLegacyFields + ` "$@" | sed 's/|/||/15'`
+
+// slurmLegacyFields is slurmFields without Restarts.
+const slurmLegacyFields = "JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,JobName"
 
 // slurmFields mirrors slurm.SacctFields (the backend does not import slurm;
 // TestSacctSummaryFields keeps the two equal).
@@ -281,12 +292,12 @@ func sacctSummary(who []string, since, until string) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	argv := append([]string{"bash", "-c", sacctSummaryTemplate, "clusterwand"}, r.argv[2:]...)
+	argv := append([]string{"bash", "-c", sacctSummaryCompat, "clusterwand"}, r.argv[2:]...)
 	return Command{argv: argv, kind: KindAcct}, nil
 }
 
 // SacctSummaryTemplateForTest lets fixtures answer the summary template.
-func SacctSummaryTemplateForTest() string { return sacctSummaryTemplate }
+func SacctSummaryTemplateForTest() string { return sacctSummaryCompat }
 
 // SacctFieldsForTest is the field list the template prints.
 func SacctFieldsForTest() string { return slurmFields }
@@ -307,6 +318,142 @@ func PartitionSharing() Command {
 // Nodes is `scontrol show nodes --json`.
 func Nodes() Command {
 	return Command{argv: []string{"scontrol", "show", "nodes", "--json"}, kind: KindNodes, public: true}
+}
+
+// ---- F2: plain-text Slurm reads (the primary path) ----------------------------
+//
+// Text formats read the same on Slurm 20.11 to 25.11; --json needs Slurm 25.11's
+// data_parser and is only used on sites whose profile sets slurm.json. Fields are
+// split by \x1f (ASCII unit separator, never in a name or path) and times print as
+// epoch seconds. Selections (-u user, -j ids) are validated and arrive as
+// positional parameters of a fixed template.
+
+// squeueTextFields mirrors slurm.SqueueFields (TestTextFieldsMatch keeps them equal).
+const squeueTextFields = "JobID,ArrayJobID,ArrayTaskID,UserName,Account,Partition,State,NumNodes,NumCPUs,tres-alloc,TimeLimit,SubmitTime,StartTime,EndTime,RestartCnt,Reason,NodeList,WorkDir,StdOut,StdErr,Name"
+
+// squeueTextTemplate prints one job per line, every field but the last (Name)
+// followed by \x1f; ":" with no width means "do not pad or truncate".
+var squeueTextTemplate = `d=$'\037'; SLURM_TIME_FORMAT=%s exec squeue -h -O "` + squeueFormat() + `" "$@"`
+
+func squeueFormat() string {
+	fs := strings.Split(squeueTextFields, ",")
+	for i := range fs {
+		if i < len(fs)-1 {
+			fs[i] += ":$d"
+		} else {
+			fs[i] += ":"
+		}
+	}
+	return strings.Join(fs, ",")
+}
+
+// sacctTextFields mirrors slurm.SacctJobFields; sacctLegacyFields drops the
+// fields older Slurm lacks (21.08 has no Restarts, StdOut or StdErr).
+const (
+	sacctTextFields   = "JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName"
+	sacctLegacyFields = "JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName"
+)
+
+// sacctTextTemplate prints the per-job accounting record with a header line (the
+// parser maps columns by name), picking the field list this sacct knows.
+const sacctTextTemplate = `f=` + sacctTextFields + `; sacct --helpformat | grep -qw StdOut || f=` + sacctLegacyFields + `; SLURM_TIME_FORMAT=%s exec sacct -P --noconvert --delimiter=$'\037' -o "$f" "$@"`
+
+// nodesTextTemplate prints the Slurm release, then one node per line.
+const nodesTextTemplate = `scontrol --version; SLURM_TIME_FORMAT=%s exec scontrol -o show nodes`
+
+// SqueueAllText lists every job in the queue (text).
+func SqueueAllText() Command {
+	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand"}, kind: KindQueue, public: true}
+}
+
+// SqueueUserText lists one user's queued and running jobs (text).
+func SqueueUserText(user string) (Command, error) {
+	if err := ValidUser(user); err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand", "-u", user}, kind: KindQueue}, nil
+}
+
+// SqueueJobText shows one queued or running job (text); a job that left the queue
+// makes squeue exit 1, which reads as no rows.
+func SqueueJobText(id string) (Command, error) {
+	if err := ValidJobID(id); err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand", "-j", id}, kind: KindQueue, okExit: []int{1}}, nil
+}
+
+// SqueueJobsText is the live queue rows of the given jobs, never cached (text).
+func SqueueJobsText(ids []string) (Command, error) {
+	list, err := jobList(ids)
+	if err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"bash", "-c", squeueTextTemplate, "clusterwand", "-j", list}, kind: KindNoCache, okExit: []int{1}}, nil
+}
+
+// SacctJobText is the accounting record of one job, steps included (text).
+func SacctJobText(id string) (Command, error) {
+	if err := ValidJobID(id); err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"bash", "-c", sacctTextTemplate, "clusterwand", "-j", id}, kind: KindAcct}, nil
+}
+
+// SacctJobsText is the accounting records of the given jobs, never cached (text).
+func SacctJobsText(ids []string) (Command, error) {
+	list, err := jobList(ids)
+	if err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"bash", "-c", sacctTextTemplate, "clusterwand", "-j", list}, kind: KindNoCache}, nil
+}
+
+// SacctScript is a job's stored batch script (`sacct -n -B -j <id>`, Slurm
+// 21.08+); "NONE" when the cluster does not store scripts.
+func SacctScript(id string) (Command, error) {
+	if err := ValidJobID(id); err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"sacct", "-n", "-B", "-j", id}, kind: KindAcct}, nil
+}
+
+// NodesText is `scontrol -o show nodes` after the Slurm release line.
+func NodesText() Command {
+	return Command{argv: []string{"bash", "-c", nodesTextTemplate, "clusterwand"}, kind: KindNodes, public: true}
+}
+
+// PartitionsText is `scontrol -o show partition`: limits and who may use each
+// partition (AllowAccounts, DenyAccounts, AllowGroups).
+func PartitionsText() Command {
+	return Command{argv: []string{"scontrol", "-o", "show", "partition"}, kind: KindNodes, public: true}
+}
+
+// Assoc is the caller's Slurm associations: default account, then one row per
+// account (and partition, when the association names one).
+func Assoc(user string) (Command, error) {
+	if err := ValidUser(user); err != nil {
+		return Command{}, err
+	}
+	return Command{argv: []string{"sacctmgr", "-n", "-P", "show", "user", user, "withassoc", "format=DefaultAccount,Account,Partition"}, kind: KindCatalog}, nil
+}
+
+// Groups is `id -Gn`: the caller's Unix groups (partitions with AllowGroups).
+func Groups() Command { return Command{argv: []string{"id", "-Gn"}, kind: KindCatalog} }
+
+// SlurmVersion is `sinfo --version`.
+func SlurmVersion() Command {
+	return Command{argv: []string{"sinfo", "--version"}, kind: KindCatalog, public: true}
+}
+
+// TextTemplatesForTest lets fixtures answer the text templates.
+func TextTemplatesForTest() (squeue, sacct, nodes string) {
+	return squeueTextTemplate, sacctTextTemplate, nodesTextTemplate
+}
+
+// TextFieldsForTest are the field lists the templates print.
+func TextFieldsForTest() (squeue, sacct, legacy string) {
+	return squeueTextFields, sacctTextFields, sacctLegacyFields
 }
 
 // Catalog reads the cluster's published catalog (fixed path from config).

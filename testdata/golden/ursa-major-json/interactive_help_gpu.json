@@ -1,0 +1,29 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "alternative": "salloc -p gpul4 -N 1 -t 1:00:00 --gres=gpu:1   # then: srun --pty bash -l   (exit twice to release the node)",
+      "command": "srun -p gpul4 -N 1 -t 1:00:00 --gres=gpu:1 --pty bash -l",
+      "connect": "ssh \u003cyour cluster login host\u003e",
+      "notes": [
+        "clusterwand does not open shells. Run these yourself: first connect to the login node, then start the session.",
+        "Nodes power up on demand, so the first session can take a few minutes to start.",
+        "The session is billed until it ends: exit as soon as you are done.",
+        "Do not run heavy work on the login node itself; that is what the interactive session is for."
+      ],
+      "partition": "gpul4",
+      "time_limit": "1 h",
+      "usd_per_hour": 1.15,
+      "warnings": [],
+      "worst_case_usd": 1.15
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "scontrol -o show partition",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

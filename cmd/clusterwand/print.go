@@ -407,8 +407,13 @@ func doctor(ctx context.Context, svc *core.Service, w io.Writer, g globals) int 
 			detail = fmt.Sprintf("%s, generated %s, %d partitions, %d core modules", cat.Schema, cat.Generated, len(cat.Partitions), len(cat.Modules.Core))
 		}
 		add("cluster catalog", err == nil, detail)
-		b, err := svc.Backend.Run(ctx, backend.Sinfo())
-		add("slurm --json", err == nil && len(b) > 0, firstOf(err, fmt.Sprintf("sinfo --json returned %d bytes", len(b))))
+		if svc.Site.Slurm.JSON {
+			b, err := svc.Backend.Run(ctx, backend.Sinfo())
+			add("slurm --json", err == nil && len(b) > 0, firstOf(err, fmt.Sprintf("sinfo --json returned %d bytes", len(b))))
+		} else {
+			b, err := svc.Backend.Run(ctx, backend.SlurmVersion())
+			add("slurm", err == nil && strings.HasPrefix(string(b), "slurm "), firstOf(err, strings.TrimSpace(string(b))+", read as plain text (squeue -O, sacct -P, scontrol -o)"))
+		}
 	}
 	add("audit log", svc.Audit != nil, svc.Audit.Path())
 	add("tiers", true, strings.Join(svc.Cfg.Tiers, ","))

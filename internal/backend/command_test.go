@@ -69,7 +69,7 @@ func TestAllowListIsClosed(t *testing.T) {
 	// Every constructor's program must be one of these. If you add a command,
 	// add it here deliberately.
 	allowed := map[string]bool{"id": true, "squeue": true, "sacct": true, "sinfo": true, "scontrol": true, "cat": true, "tail": true, "bash": true,
-		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "srun": true}
+		"sbatch": true, "scancel": true, "find": true, "head": true, "tar": true, "realpath": true, "df": true, "srun": true, "sacctmgr": true}
 	u, _ := SqueueUser("alice")
 	j, _ := SqueueJob("1")
 	st, _ := SqueueStart("1")
@@ -91,6 +91,15 @@ func TestAllowListIsClosed(t *testing.T) {
 	sqj, _ := SqueueJobs([]string{"1", "2"})
 	saj, _ := SacctJobs([]string{"1", "2"})
 	sam, _ := SacctSummaryUsers([]string{"alice", "bob"}, "now-1days", "")
+	// F2 text reads
+	tu, _ := SqueueUserText("alice")
+	tj, _ := SqueueJobText("1")
+	tjs, _ := SqueueJobsText([]string{"1", "2"})
+	ta, _ := SacctJobText("1")
+	tas, _ := SacctJobsText([]string{"1", "2"})
+	sb2, _ := SacctScript("1")
+	as, _ := Assoc("alice")
+	texts := []Command{SqueueAllText(), tu, tj, tjs, ta, tas, sb2, NodesText(), PartitionsText(), as, Groups(), SlurmVersion()}
 	writes := map[string]bool{}
 	for _, c := range []Command{sb, sc, ho, re} {
 		writes[c.String()] = true
@@ -98,20 +107,30 @@ func TestAllowListIsClosed(t *testing.T) {
 			t.Errorf("%v must be marked write", c.argv)
 		}
 	}
-	for _, c := range []Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), PartitionSharing(), Nodes(), cat, tl, ms, to, lf, hd, td, sqj, saj, sam} {
+	for _, c := range append([]Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), PartitionSharing(), Nodes(), cat, tl, ms, to, lf, hd, td, sqj, saj, sam}, texts...) {
 		if c.Write() {
 			t.Errorf("read command marked write: %v", c.argv)
 		}
 	}
-	for _, c := range []Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), Nodes(), cat, tl, ms, to, sb, sc, ho, re, lf, hd, td, sqj, saj, sam} {
+	for _, c := range append([]Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), Nodes(), cat, tl, ms, to, sb, sc, ho, re, lf, hd, td, sqj, saj, sam}, texts...) {
 		if !allowed[c.argv[0]] {
 			t.Errorf("unexpected program %q", c.argv[0])
+		}
+		if c.argv[0] == "scontrol" && strings.Join(c.argv, " ") == "scontrol -o show partition" {
+			continue // F2: one-line partition records, read only
 		}
 		if c.argv[0] == "scontrol" && (len(c.argv) < 2 || (c.argv[1] != "show" && c.argv[1] != "hold" && c.argv[1] != "release")) {
 			t.Errorf("scontrol may only show, hold or release: %v", c.argv)
 		}
-		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryTemplate {
+		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryCompat &&
+			c.argv[2] != squeueTextTemplate && c.argv[2] != sacctTextTemplate && c.argv[2] != nodesTextTemplate {
 			t.Errorf("bash only runs module show or the fixed submit template: %v", c.argv)
+		}
+		if c.argv[0] == "sacctmgr" && strings.Join(c.argv[1:5], " ") != "-n -P show user" {
+			t.Errorf("sacctmgr may only show a user's associations: %v", c.argv)
+		}
+		if c.argv[0] == "id" && len(c.argv) > 1 && c.argv[1] != "-un" && c.argv[1] != "-Gn" {
+			t.Errorf("id: %v", c.argv)
 		}
 		if c.argv[0] == "sbatch" && c.argv[1] != "--test-only" {
 			t.Errorf("bare sbatch must be --test-only: %v", c.argv)
@@ -185,7 +204,7 @@ func TestNewTemplatesAreFixed(t *testing.T) {
 			return EnvCheck("check", []string{"gcc"}, []string{"python3"}, map[string]bool{"python3": true})
 		}},
 	}
-	fixed := map[string]bool{treeTemplate: true, readRangeTemplate: true, grepTemplate: true, logWindowTemplate: true, listDirTemplate: true, duTemplate: true, envTemplate: true, sacctSummaryTemplate: true}
+	fixed := map[string]bool{treeTemplate: true, readRangeTemplate: true, grepTemplate: true, logWindowTemplate: true, listDirTemplate: true, duTemplate: true, envTemplate: true, sacctSummaryCompat: true}
 	for _, c := range cs {
 		cmd, err := c.mk()
 		if err != nil {
@@ -301,6 +320,12 @@ func TestSacctSummaryCommand(t *testing.T) {
 	if !strings.Contains(sacctSummaryTemplate, "-o "+SacctFieldsForTest()+" ") || !strings.HasPrefix(sacctSummaryTemplate, "SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert ") {
 		t.Errorf("template: %s", sacctSummaryTemplate)
 	}
+	// F2: Slurm without Restarts gets the legacy list with an empty column put back
+	if !strings.Contains(sacctSummaryCompat, "grep -qw Restarts; then "+sacctSummaryTemplate+"; fi") ||
+		!strings.Contains(sacctSummaryCompat, "-o "+slurmLegacyFields+` "$@" | sed 's/|/||/15'`) || !strings.Contains(sacctSummaryCompat, "pipefail") ||
+		slurmLegacyFields != strings.Replace(slurmFields, "Restarts,", "", 1) || strings.Count(slurmLegacyFields, ",") != 15 {
+		t.Errorf("compat template: %s", sacctSummaryCompat)
+	}
 }
 
 // The new du template still sizes every entry when names carry shell syntax,
@@ -340,5 +365,62 @@ func TestSacctSummaryUsers(t *testing.T) {
 	// Invalid username
 	if _, err := SacctSummaryUsers([]string{"alice", "bob;id"}, "now-7days", ""); err == nil {
 		t.Error("invalid username accepted")
+	}
+}
+
+// F2: the text reads take only validated selections, as positional parameters
+// of fixed templates; none writes; per-person reads are never public.
+func TestTextReadConstructors(t *testing.T) {
+	for _, bad := range []func() (Command, error){
+		func() (Command, error) { return SqueueUserText("") },
+		func() (Command, error) { return SqueueUserText("alice;id") },
+		func() (Command, error) { return SqueueJobText("1 -u bob") },
+		func() (Command, error) { return SqueueJobsText(nil) },
+		func() (Command, error) { return SqueueJobsText([]string{"1", "$(id)"}) },
+		func() (Command, error) { return SacctJobText("-a") },
+		func() (Command, error) { return SacctJobsText([]string{"1,2"}) },
+		func() (Command, error) { return SacctScript("1;id") },
+		func() (Command, error) { return Assoc("bob withassoc") },
+		func() (Command, error) { return Assoc("") },
+	} {
+		if _, err := bad(); err == nil {
+			t.Error("bad selection accepted")
+		}
+	}
+	u, _ := SqueueUserText("alice")
+	if got := strings.Join(u.argv[3:], " "); got != "clusterwand -u alice" || u.Public() || u.Write() {
+		t.Errorf("squeue user: %q public %v", got, u.Public())
+	}
+	j, _ := SacctJobText("260_3")
+	if got := strings.Join(j.argv[3:], " "); got != "clusterwand -j 260_3" || j.Kind() != KindAcct || j.Public() {
+		t.Errorf("sacct job: %q", got)
+	}
+	js, _ := SqueueJobsText([]string{"1", "2"})
+	if js.Kind() != KindNoCache || !okExit(js, 1) {
+		t.Errorf("job_ids queue read must be uncached and tolerate exit 1")
+	}
+	a, _ := Assoc("alice")
+	if a.Public() || strings.Join(a.argv, " ") != "sacctmgr -n -P show user alice withassoc format=DefaultAccount,Account,Partition" {
+		t.Errorf("assoc: %v public %v", a.argv, a.Public())
+	}
+	if Groups().Public() {
+		t.Error("id -Gn is per person")
+	}
+	for _, c := range []Command{SqueueAllText(), NodesText(), PartitionsText()} {
+		if !c.Public() || c.Write() {
+			t.Errorf("%v: public cluster facts", c.argv)
+		}
+	}
+	// every template reads epoch times and splits on \x1f, never "|"
+	for _, tpl := range []string{squeueTextTemplate, sacctTextTemplate} {
+		if !strings.Contains(tpl, "SLURM_TIME_FORMAT=%s") || !strings.Contains(tpl, `$'\037'`) || !strings.Contains(tpl, `"$@"`) {
+			t.Errorf("template: %s", tpl)
+		}
+	}
+	if !strings.Contains(sacctTextTemplate, "grep -qw StdOut || f="+sacctLegacyFields) {
+		t.Error("sacct template must fall back to the pre-23.02 field list")
+	}
+	if strings.Count(squeueTextTemplate, ":$d") != strings.Count(squeueTextFields, ",") {
+		t.Error("every squeue field but the last needs the separator")
 	}
 }

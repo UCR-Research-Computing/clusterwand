@@ -70,6 +70,14 @@ type Allocation struct {
 	CoveredBy string `yaml:"covered_by"`
 }
 
+// Slurm holds per-site scheduler feature flags. The plain-text formats
+// (squeue -O, sacct -P, scontrol -o) are the default and read the same on Slurm
+// 20.11 to 25.11; JSON is opt-in for sites whose Slurm prints the data_parser
+// clusterwand knows (25.11, v0.0.44).
+type Slurm struct {
+	JSON bool `yaml:"json"` // read squeue/sacct/scontrol nodes with --json
+}
+
 // Profile is one site.
 type Profile struct {
 	Name        string     `yaml:"name"`
@@ -86,6 +94,7 @@ type Profile struct {
 	Modules     Modules    `yaml:"modules"`
 	Charge      Charge     `yaml:"charge"`
 	Allocation  Allocation `yaml:"allocation"`
+	Slurm       Slurm      `yaml:"slurm"`
 	// Text replaces generic wording by key (see Text). {help}, {title} and
 	// {probe} are filled everywhere; some keys take more (documented at the call).
 	Texts map[string]string `yaml:"text"`

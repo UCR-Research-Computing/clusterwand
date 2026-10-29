@@ -43,7 +43,7 @@ func TestSubmitTwoStep(t *testing.T) {
 	}
 	// nothing submitted at prepare time
 	for _, c := range fx.Calls {
-		if strings.HasPrefix(c, "bash -c") || strings.HasPrefix(c, "sbatch --parsable") {
+		if strings.Contains(c, "exec sbatch --parsable") || strings.HasPrefix(c, "sbatch --parsable") {
 			t.Fatalf("prepare submitted something: %s", c)
 		}
 	}

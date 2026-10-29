@@ -50,8 +50,8 @@
       "backend": "fixture:testdata",
       "cached": true,
       "commands": [
-        "squeue --json -j 253",
-        "sacct --json -j 253",
+        "bash -c 'd=$'\\''\\037'\\''; SLURM_TIME_FORMAT=%s exec squeue -h -O \"JobID:$d,ArrayJobID:$d,ArrayTaskID:$d,UserName:$d,Account:$d,Partition:$d,State:$d,NumNodes:$d,NumCPUs:$d,tres-alloc:$d,TimeLimit:$d,SubmitTime:$d,StartTime:$d,EndTime:$d,RestartCnt:$d,Reason:$d,NodeList:$d,WorkDir:$d,StdOut:$d,StdErr:$d,Name:\" \"$@\"' clusterwand -j 253",
+        "bash -c 'f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,Restarts,WorkDir,StdOut,StdErr,SubmitLine,JobName; sacct --helpformat | grep -qw StdOut || f=JobID,JobIDRaw,UID,User,Account,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,TimelimitRaw,AllocTRES,ReqTRES,MaxRSS,WorkDir,SubmitLine,JobName; SLURM_TIME_FORMAT=%s exec sacct -P --noconvert --delimiter=$'\\''\\037'\\'' -o \"$f\" \"$@\"' clusterwand -j 253",
         "cat -- /apps/docs/catalog.json",
         "cat -- /apps/docs/catalog.json",
         "tail -n 80 -- /home/alice_ucr_edu/deep-research-lab/ws-demo/run_40/job.log"

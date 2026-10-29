@@ -1,0 +1,70 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "cores": {
+        "cores_asked": true,
+        "cores_per_node": 16,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 126976,
+        "node_share": 1
+      },
+      "est_max_cost_usd": 3445.2,
+      "issues": [
+        {
+          "line": 7,
+          "message": "module \"nosuchmod\" not found in the cluster catalog",
+          "severity": "error"
+        },
+        {
+          "line": 8,
+          "message": "module \"hdf5\" is MPI-built and needs `module load intel-oneapi-mpi` or `module load mpich` or `module load openmpi` first",
+          "severity": "error"
+        },
+        {
+          "message": "99 nodes requested; standard has 32",
+          "severity": "error"
+        },
+        {
+          "message": "64 CPUs per node requested; standard nodes have 16 physical cores (no hyperthreads)",
+          "severity": "error"
+        },
+        {
+          "message": "GPUs requested on standard, which has no GPUs; use gpul4",
+          "severity": "error"
+        },
+        {
+          "message": "bare `pip install` without a virtual environment; use `uv venv $TMPDIR/v` or a Pixi/conda env",
+          "severity": "warning"
+        },
+        {
+          "message": "apptainer --nv on a partition without GPUs",
+          "severity": "warning"
+        }
+      ],
+      "modules": [
+        "nosuchmod",
+        "hdf5"
+      ],
+      "note": "Static check only; nothing was submitted. standard gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": false,
+      "partition": "standard",
+      "request": {
+        "cpus-per-task": "64",
+        "gres": "gpu:1",
+        "nodes": "99",
+        "partition": "standard",
+        "time": "1-00:00:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "scontrol -o show partition",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

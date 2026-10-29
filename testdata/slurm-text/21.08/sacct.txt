@@ -1,0 +1,30 @@
+JobIDJobIDRawUIDUserAccountPartitionStateReasonExitCodeNodeListNNodesSubmitStartEndElapsedRawTotalCPUTimelimitRawAllocTRESReqTRESMaxRSSWorkDirSubmitLineJobName
+111000alicegeneralnormalCOMPLETEDNone0:0c1117932398401793239840179324014130100:00.0977200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch --wrap=sleep 300 -J we|ird namewe|ird name
+1.batch1.batchgeneralCOMPLETED0:0c1117932398401793239840179324014130100:00.097cpu=1,mem=500M,node=15611520batch
+221000alicegeneralnormalCANCELLED by 1000None0:0c21179323984017932398401793244203436300:00:007200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -o out/%x-%j.log --wrap=echo hi -J namednamed
+2.batch2.batchgeneralCANCELLEDc21179323984017932398401793244203436300:00:00cpu=1,mem=500M,node=1batch
+331000alicelabxdebugCANCELLED by 1000None0:0c31179323984017932398401793244203436300:00:007200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -p debug -A labx --wrap=hostnamewrap
+3.batch3.batchlabxCANCELLEDc31179323984017932398401793244203436300:00:00cpu=1,mem=500M,node=1batch
+4_151000alicegeneralnormalCOMPLETEDNone0:0c1117932398401793240141179324034120000:00.0777200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 1-2 --wrap=sleep 200wrap
+4_1.batch5.batchgeneralCOMPLETED0:0c1117932401411793240141179324034120000:00.077cpu=1,mem=500M,node=16197248batch
+4_241000alicegeneralnormalCOMPLETEDNone0:0c1117932398401793240341179324054120000:00.0367200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 1-2 --wrap=sleep 200wrap
+4_2.batch4.batchgeneralCOMPLETED0:0c1117932403411793240341179324054120000:00.036cpu=1,mem=500M,node=16197248batch
+6_171000alicegeneralnormalCOMPLETEDNone0:0c1117932409111793240911179324101110000:00.0277200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 1-3 --wrap=sleep 100 -J arrarr
+6_1.batch7.batchgeneralCOMPLETED0:0c1117932409111793240911179324101110000:00.027cpu=1,mem=500M,node=15599232batch
+6_281000alicegeneralnormalCOMPLETEDNone0:0c1117932409111793241011179324111110000:00.0297200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 1-3 --wrap=sleep 100 -J arrarr
+6_2.batch8.batchgeneralCOMPLETED0:0c1117932410111793241011179324111110000:00.029cpu=1,mem=500M,node=16189056batch
+6_361000alicegeneralnormalCOMPLETEDNone0:0c1117932409111793241111179324121110000:00.0247200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 1-3 --wrap=sleep 100 -J arrarr
+6_3.batch6.batchgeneralCOMPLETED0:0c1117932411111793241111179324121110000:00.024cpu=1,mem=500M,node=16246400batch
+991000alicegeneralnormalFAILEDNonZeroExitCode1:0c11179324182417932418251793241825000:00:007200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -J a-very-long-job-name-that-goes-past-twenty-chars x --wrap=sleep 100 -o /home/alice/%x/%u_%A_%a.%Na-very-long-job-name-that-goes-past-twenty-chars x
+9.batch9.batchgeneralFAILED1:0c11179324182517932418251793241825000:00:00cpu=1,mem=500M,node=1batch
+10101000alicegeneralnormalCOMPLETEDNone0:0c1117932427611793242761179324286110000:00.0297200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -J a-very-long-job-name-that-goes-past-twenty-chars x --wrap=sleep 100 -o /home/alice/lg/%u_%A_%a.%Na-very-long-job-name-that-goes-past-twenty-chars x
+10.batch10.batchgeneralCOMPLETED0:0c1117932427611793242761179324286110000:00.029cpu=1,mem=500M,node=15746688batch
+11111000alicegeneralnormalFAILEDNonZeroExitCode3:0c11179324420317932442031793244203000:00.0157200billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -J pipe|name -o out/%x-%j.log --wrap=echo hi; exit 3pipe|name
+11.batch11.batchgeneralFAILED3:0c11179324420317932442031793244203000:00.015cpu=1,mem=500M,node=1batch
+12121000alicelabxdebugRUNNINGNone0:0c3117932442031793244203Unknown800:00:0010billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -p debug -A labx -t 10 --wrap=hostnamewrap
+12.batch12.batchlabxRUNNING0:0c3117932442031793244203Unknown800:00:00cpu=1,mem=500M,node=1batch
+14141000alicegeneralnormalPENDINGNone0:0None assigned11793244203UnknownUnknown000:00:001billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -t 1 --wrap=sleep 600 -J longonelongone
+13_0151000alicegeneralnormalRUNNINGNone0:0c2117932442031793244203Unknown800:00:005billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 0-1 -t 5 --wrap=sleep 60wrap
+13_0.batch15.batchgeneralRUNNING0:0c2117932442031793244203Unknown800:00:00cpu=1,mem=500M,node=1batch
+13_1131000alicegeneralnormalRUNNINGNone0:0c1117932442031793244203Unknown800:00:005billing=1,cpu=1,mem=500M,node=1billing=1,cpu=1,mem=500M,node=1/home/alice/bin/sbatch -a 0-1 -t 5 --wrap=sleep 60wrap
+13_1.batch13.batchgeneralRUNNING0:0c1117932442031793244203Unknown800:00:00cpu=1,mem=500M,node=1batch

@@ -1,0 +1,1 @@
+15451545N/Aalice_ucr_edustaffcheckPENDING11cpu=1,mem=2G,node=1,billing=110:001793178916179326530017932659000BeginTime/home/alice_ucr_edu/ucr-slurm-production/apps/spack-envs/logs/xdmod/nightly-%j.log(null)xdmod-nightly

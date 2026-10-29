@@ -51,20 +51,13 @@ type ClusterStatus struct {
 
 // ClusterStatus reads node and queue state.
 func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
-	var nr slurm.NodesResponse
-	b, err := s.run(ctx, backend.Nodes())
+	ns, release, err := s.nodes(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := slurm.Decode(b, &nr); err != nil {
-		return nil, err
-	}
+	nr := slurm.NodesResponse{Nodes: ns}
 	var q slurm.QueueResponse
-	b, err = s.run(ctx, backend.SqueueAll())
-	if err != nil {
-		return nil, err
-	}
-	if err := slurm.Decode(b, &q); err != nil {
+	if q.Jobs, err = s.queue(ctx, queueSel{all: true}); err != nil {
 		return nil, err
 	}
 	cat, _ := s.Catalog(ctx)
@@ -77,7 +70,7 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 		}
 		return p
 	}
-	cs := &ClusterStatus{Cluster: s.Cfg.Cluster, SlurmVersion: nr.Meta.Slurm.Release, PendingByWhy: map[string]int{}}
+	cs := &ClusterStatus{Cluster: s.Cfg.Cluster, SlurmVersion: release, PendingByWhy: map[string]int{}}
 	for _, n := range nr.Nodes {
 		for _, pn := range n.Partitions {
 			p := get(pn)
@@ -172,6 +165,9 @@ type PartitionInfo struct {
 	// sites charged in service units: the node-hour rate in charge_unit
 	ChargePerNodeHour *float64 `json:"charge_per_node_hour,omitempty"`
 	ChargeUnit        string   `json:"charge_unit,omitempty"`
+	// RestrictedTo names the accounts or groups a lab-locked partition is
+	// limited to (the caller holds one, or it would not be listed).
+	RestrictedTo string `json:"restricted_to,omitempty"`
 }
 
 // Partitions lists partitions from the catalog with configured prices.
@@ -181,8 +177,12 @@ func (s *Service) Partitions(ctx context.Context) ([]PartitionInfo, error) {
 		return nil, err
 	}
 	var out []PartitionInfo
+	acc := s.partitionAccess(ctx)
 	for _, p := range cat.Partitions {
-		pi := PartitionInfo{CatalogPartition: p, CPU: s.Site.CPUNote(p.Name)}
+		if !acc.allowed(p.Name) {
+			continue // lab-locked to accounts or groups the caller does not hold
+		}
+		pi := PartitionInfo{CatalogPartition: p, CPU: s.Site.CPUNote(p.Name), RestrictedTo: acc.restrictedTo(p.Name)}
 		pi.CatalogPartition.USDPerNodeHr = nil
 		if v, ok := s.price(cat, p.Name); ok && s.Cfg.ShowCost {
 			v := v
@@ -518,6 +518,13 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 	} else {
 		if sc.Request["partition"] == "" {
 			add("info", 0, "no partition given; Slurm will use the default (%s)", part)
+		}
+		// lab-locked partitions: every member of a list must be usable
+		acc := s.partitionAccess(ctx)
+		for _, member := range strings.Split(sc.Partition, ",") {
+			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); why != "" {
+				add("error", 0, "%s", lockedNote(why, fix))
+			}
 		}
 		// the partition's MaxTime (catalog time_limit, e.g. check's 15:00): a longer
 		// --time is held by Slurm forever with reason PartitionTimeLimit (v0.9.9)

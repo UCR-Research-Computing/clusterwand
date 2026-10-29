@@ -1,0 +1,43 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "allocation": {
+        "lab_pct_after": null,
+        "person_pct_after": null
+      },
+      "committed_today_usd": 0,
+      "confirm_token": "<confirm_token>",
+      "day_cap_usd": 50,
+      "expires_at": "2026-10-01T13:33:21-04:00",
+      "job_name": "hello",
+      "next": "Show this plan to the user. Only if they approve, call job_submit_confirm with the confirm_token. Nothing has been submitted yet.",
+      "nodes": 1,
+      "overrides": [],
+      "partition": "computehigh",
+      "plan_hash": "c9466d01bd6e",
+      "remote_dir": "~/clusterwand-jobs/20261001-132321-hello",
+      "scheduler_test": "would start at 2026-10-01T19:14:40 on ucrslurmcl-c3nodeset-0 (computehigh)",
+      "script_bytes": 143,
+      "script_sha256": "92fc330a3aebe237",
+      "time_limit": "1 h",
+      "usd_per_node_hour": 1.87,
+      "warnings": [],
+      "worst_case_usd": 1.87
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "cached": true,
+      "commands": [
+        "cat -- /apps/docs/catalog.json",
+        "scontrol -o show partition",
+        "sinfo -h -o '%R|%h'",
+        "cat -- /apps/docs/catalog.json",
+        "sinfo -h -o '%R|%h'",
+        "sinfo -h -o '%R|%h'",
+        "sbatch --test-only --partition=computehigh --nodes=1 --time=60 --comment=clusterwand:c9466d01bd6e --job-name=hello",
+        "scontrol show nodes --json"
+      ]
+    }
+  }
+}
