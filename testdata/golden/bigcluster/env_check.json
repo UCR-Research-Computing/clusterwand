@@ -1,0 +1,52 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "commands": [
+        {
+          "command": "gcc",
+          "path": "/opt/gcc/13.5.0/bin/gcc",
+          "version": "gcc 13.5.0"
+        },
+        {
+          "command": "python"
+        },
+        {
+          "command": "nvcc"
+        },
+        {
+          "command": "mpirun"
+        }
+      ],
+      "job_id": "475",
+      "module_list": [
+        "gcc/13.5.0"
+      ],
+      "modules": [
+        {
+          "loaded": true,
+          "module": "gcc"
+        },
+        {
+          "error": "Lmod has detected the following error: The following module(s) are unknown: \"nosuch\"",
+          "loaded": false,
+          "module": "nosuch"
+        }
+      ],
+      "node": "node-probe-0",
+      "notes": [
+        "There is no bare `python` here; use python3 (or a conda/pixi environment).",
+        "nvcc comes from a cuda module and is only useful on GPU nodes.",
+        "MPI tools appear after `module load openmpi` (or mpich / intel-oneapi-mpi).",
+        "Checked in a one-core job on a debug compute node; other partitions usually share the same software tree, but GPU tools only run on GPU nodes."
+      ],
+      "partition": "debug"
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "srun -p debug -N 1 -n 1 -c 1 -t 3 --immediate=120 --quiet -J clusterwand-env-check bash -lc '[ -n \"${SLURM_JOB_ID:-}\" ] \u0026\u0026 printf '\\''J\\t%s\\t%s\\n'\\'' \"$SLURM_JOB_ID\" \"$(hostname -s)\"; n=$1; shift; i=0; while [ \"$i\" -lt \"$n\" ]; do m=$1; shift; i=$((i+1)); if module load \"$m\" \u003e/dev/null 2\u003e\u00261; then printf '\\''M\\t%s\\tok\\n'\\'' \"$m\"; else printf '\\''M\\t%s\\tfail\\t%s\\n'\\'' \"$m\" \"$(module load \"$m\" 2\u003e\u00261 | grep -v '\\''^[[:space:]]*$'\\'' | grep -m 3 -i -E '\\''error|unknown|not found|cannot|conflict|requires|prereq'\\'' | tr '\\''\\n\\t'\\'' '\\''  '\\'')\"; fi; done; echo L; module -t list 2\u003e\u00261 | grep -v '\\''^[[:space:]]*$'\\'' | grep -v '\\'':$'\\''; for a in \"$@\"; do c=${a#?:}; p=$(command -v -- \"$c\" 2\u003e/dev/null || true); v='\\'''\\''; if [ -n \"$p\" ] \u0026\u0026 [ \"${a%%:*}\" = v ]; then v=$(timeout 10 \"$c\" --version 2\u003e\u00261 \u003c/dev/null | grep -v '\\''^[[:space:]]*$'\\'' | head -n 1 | tr '\\''\\t'\\'' '\\'' '\\''); fi; printf '\\''C\\t%s\\t%s\\t%s\\n'\\'' \"$c\" \"$p\" \"$v\"; done' clusterwand 2 gcc nosuch v:gcc v:python v:nvcc v:mpirun"
+      ]
+    }
+  }
+}

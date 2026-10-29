@@ -1,0 +1,39 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "cluster": "bigcluster",
+      "jobs_pending": 0,
+      "jobs_running": 1,
+      "nodes_powered_up": 1,
+      "notes": [
+        "Partitions are whole-node (exclusive): a job gets and pays for whole nodes."
+      ],
+      "partitions": [
+        {
+          "allocated": 1,
+          "booting": 0,
+          "down_or_drained": 0,
+          "idle_powered_up": 0,
+          "jobs_pending": 0,
+          "jobs_running": 1,
+          "name": "fast",
+          "nodes_total": 6,
+          "powered_down": 5,
+          "powered_up": 1
+        }
+      ],
+      "problem_nodes": 0,
+      "slurm_version": "25.11.4"
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "scontrol show nodes --json",
+        "squeue --json",
+        "cat -- /opt/site/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

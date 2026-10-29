@@ -88,7 +88,7 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 	rep := &WasteReport{Since: in.Since, Scope: scope, ByKind: map[string]int{}, JobsScanned: len(a.Jobs),
 		Thresholds: map[string]any{"cpu_efficiency_percent": in.CPUThreshold, "min_node_hours": in.MinNodeHours}}
 	cost := func(part string, h float64) float64 {
-		if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost {
+		if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost && s.chargedInUSD() {
 			return round(p*h, 2)
 		}
 		return 0

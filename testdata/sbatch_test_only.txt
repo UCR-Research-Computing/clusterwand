@@ -1,0 +1,1 @@
+sbatch: Job 9001 to start at 2026-10-01T19:14:40 using 22 processors on nodes ucrslurmcl-c3nodeset-0 in partition computehigh

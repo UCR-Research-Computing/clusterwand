@@ -127,7 +127,7 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 				p.Default = cp.Default
 			}
 		}
-		if v, ok := s.price(cat, p.Name); ok && s.Cfg.ShowCost {
+		if v, ok := s.price(cat, p.Name); ok && s.Cfg.ShowCost && s.chargedInUSD() {
 			v := v
 			p.USDPerHour = &v
 			b := round(v*float64(p.PoweredUp), 2)
@@ -169,6 +169,9 @@ type PartitionInfo struct {
 	// CPU is the instruction-set note people need before compiling (v0.9.10),
 	// from the site profile (partitions.cpu, cpu_default).
 	CPU string `json:"cpu,omitempty"`
+	// sites charged in service units: the node-hour rate in charge_unit
+	ChargePerNodeHour *float64 `json:"charge_per_node_hour,omitempty"`
+	ChargeUnit        string   `json:"charge_unit,omitempty"`
 }
 
 // Partitions lists partitions from the catalog with configured prices.
@@ -183,7 +186,11 @@ func (s *Service) Partitions(ctx context.Context) ([]PartitionInfo, error) {
 		pi.CatalogPartition.USDPerNodeHr = nil
 		if v, ok := s.price(cat, p.Name); ok && s.Cfg.ShowCost {
 			v := v
-			pi.USD = &v
+			if s.chargedInUSD() {
+				pi.USD = &v
+			} else if s.canSeeCharge() {
+				pi.ChargePerNodeHour, pi.ChargeUnit = &v, s.Site.Unit()
+			}
 		}
 		out = append(out, pi)
 	}

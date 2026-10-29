@@ -1,0 +1,70 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "charge_unit": "SU",
+      "cores": {
+        "cores_asked": true,
+        "cores_per_node": 16,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 126976,
+        "node_share": 1
+      },
+      "est_max_charge": 38016,
+      "issues": [
+        {
+          "line": 7,
+          "message": "module \"nosuchmod\" not found in the cluster catalog",
+          "severity": "error"
+        },
+        {
+          "line": 8,
+          "message": "module \"hdf5\" is MPI-built and needs `module load intel-oneapi-mpi` or `module load mpich` or `module load openmpi` first",
+          "severity": "error"
+        },
+        {
+          "message": "99 nodes requested; cpu has 32",
+          "severity": "error"
+        },
+        {
+          "message": "64 CPUs per node requested; cpu nodes have 16 physical cores (no hyperthreads)",
+          "severity": "error"
+        },
+        {
+          "message": "GPUs requested on cpu, which has no GPUs; use gpu",
+          "severity": "error"
+        },
+        {
+          "message": "bare `pip install` without a virtual environment; use `uv venv $TMPDIR/v` or a Pixi/conda env",
+          "severity": "warning"
+        },
+        {
+          "message": "apptainer --nv on a partition without GPUs",
+          "severity": "warning"
+        }
+      ],
+      "modules": [
+        "nosuchmod",
+        "hdf5"
+      ],
+      "note": "Static check only; nothing was submitted. cpu gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": false,
+      "partition": "cpu",
+      "request": {
+        "cpus-per-task": "64",
+        "gres": "gpu:1",
+        "nodes": "99",
+        "partition": "cpu",
+        "time": "1-00:00:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

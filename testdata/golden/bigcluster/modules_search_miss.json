@@ -1,0 +1,16 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "hint": "Not a module or prebuilt container. Python packages come from the site's Python module or a uv/Pixi/conda env; anything on Docker Hub runs with apptainer (docker://image:tag). See install_tools in recipes.",
+      "how_to_load": "module load \u003cname\u003e[/\u003cversion\u003e]; MPI-built packages appear after `module load openmpi` (or mpich / intel-oneapi-mpi). Compilers: gcc/13.5.0 is the default toolchain of the Spack stack. `module spider \u003cname\u003e` shows how to reach any module.",
+      "matches": []
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json"
+      ]
+    }
+  }
+}

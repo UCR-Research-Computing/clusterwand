@@ -1,0 +1,6 @@
+computehigh|EXCLUSIVE
+gpul4|EXCLUSIVE
+highmem|EXCLUSIVE
+nvmescratch|EXCLUSIVE
+spot|EXCLUSIVE
+standard|EXCLUSIVE

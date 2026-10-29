@@ -328,3 +328,53 @@ func runGolden(t *testing.T, gs goldenSite) string {
 func TestGoldenUrsaMajor(t *testing.T) {
 	runGolden(t, ursaGolden)
 }
+
+// bigGolden is a synthetic second site (scripts/make_second_site.py): another
+// cluster's names, paths and users, charged in service units, no cloud nodes,
+// no site wording. Its fixtures hold no Ursa string, so any Ursa string in an
+// answer comes from the code.
+var bigGolden = goldenSite{
+	name: "bigcluster", fixtures: "../../testdata/sites/bigcluster", user: "bob42",
+	siteFile:     "../../testdata/sites/bigcluster-profile/site.yaml",
+	script:       "#!/bin/bash\n#SBATCH -p fast\n#SBATCH -N 1\n#SBATCH -t 01:00:00\n#SBATCH -J hello\nmodule load python-sci\npython -c 'print(42)' > answer.txt\n",
+	badScript:    "#!/bin/bash\n#SBATCH -p cpu\n#SBATCH -N 99\n#SBATCH -c 64\n#SBATCH --gres=gpu:1\n#SBATCH -t 1-00:00:00\nmodule load nosuchmod\nmodule load hdf5\npip install numpy\npython x.py\napptainer exec --nv x.sif y\n",
+	avxScript:    "#!/bin/bash\n#SBATCH -p preempt\n#SBATCH -N 2\n#SBATCH --ntasks-per-node=16\n#SBATCH -t 20:00\ngcc -march=native -O3 x.c\nmpirun ./a.out\n",
+	spotScript:   "#!/bin/bash\n#SBATCH -p preempt\n#SBATCH -c 4\n#SBATCH -t 1:00:00\n#SBATCH --gres=gpu:1\npython3 x.py\n",
+	module:       "gromacs",
+	gpuPartition: "gpu",
+	home:         "/users/bob42", scratch: "/work/bob42",
+}
+
+// ursaWords must never appear in another site's answers: Ursa Major's
+// partitions, paths, provider and wording.
+var ursaWords = regexp.MustCompile(`(?i)ursa|\bucr\b|ucr[ _-]|google|\bgcp\b|slurm-gcp|us-central|computehigh|gpul4|nvmescratch|\bhighmem\b|\bstandard\b partition|on standard|\bspot\b partition|\bcheck\b partition|/scratch/|/apps/|/data/shared|\be2\b|sapphire|\bL4\b|rocky (linux|8)|python-sci/python-ml|research computing`)
+
+// reDollars finds a non-zero dollar figure in an answer.
+var reDollars = regexp.MustCompile(`"[a-z_]*usd[a-z_]*": [1-9]|\$[0-9]+\.[0-9]{2}\b`)
+
+func TestGoldenSecondSite(t *testing.T) {
+	out := runGolden(t, bigGolden)
+	// the site charges service units: no answer may carry a dollar figure
+	for _, line := range strings.Split(out, "\n") {
+		if reDollars.MatchString(line) && !strings.Contains(line, "hpc://catalog") {
+			t.Errorf("dollar figure on an SU site: %s", strings.TrimSpace(line))
+		}
+	}
+	seen := map[string]bool{}
+	for _, m := range ursaWords.FindAllString(out, -1) {
+		seen[m] = true
+	}
+	if len(seen) > 0 {
+		var ws []string
+		for w := range seen {
+			ws = append(ws, w)
+		}
+		sort.Strings(ws)
+		for _, line := range strings.Split(out, "\n") {
+			if ursaWords.MatchString(line) {
+				t.Logf("leak: %s", strings.TrimSpace(line))
+			}
+		}
+		t.Fatalf("Ursa Major strings in another site's answers: %v", ws)
+	}
+}

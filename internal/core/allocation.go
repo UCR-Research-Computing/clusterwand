@@ -164,6 +164,7 @@ func (s *Service) allocationUsage(ctx context.Context) (personUsed, labUsed floa
 		nodes := float64(max(j.AllocationNodes, 1))
 		cores := float64(j.TRES.Allocated.Get("cpu"))
 		price, priced := s.price(cat, j.Partition)
+		priced = priced && s.chargedInUSD() // allocations are in dollars
 		cost := 0.0
 		if priced {
 			cost = price * nodes * hrs * allocShare(cat, j.Partition, int64(nodes), int64(cores), j.TRES.Allocated.Get("mem"))

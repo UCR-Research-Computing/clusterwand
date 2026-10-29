@@ -34,7 +34,7 @@ type Fixture struct {
 	NextJobID int
 	// Files are fake remote job folders: folder -> relative path -> content.
 	Files map[string]map[string]string
-	// TestOnly is the fake `sbatch --test-only` answer ("" = a start estimate).
+	// TestOnly is the fake `sbatch --test-only` answer ("" = Dir/sbatch_test_only.txt).
 	TestOnly string
 	// MPIOnly lists module names that `module show` only finds after a
 	// `module load <mpi>` (hierarchical Lmod), as on the real cluster.
@@ -52,7 +52,7 @@ type Fixture struct {
 	// Slurm that ignored the list would (tests clusterwand's own job_ids filter).
 	IgnoreJobFilter bool
 	// Sharing answers `sinfo -h -o %R|%h` (partition|OverSubscribe lines); empty
-	// means every partition is EXCLUSIVE, as on the real cluster in 2026-10.
+	// means the recorded Dir/sharing.txt.
 	Sharing string
 }
 
@@ -101,12 +101,12 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		return b, nil
 	case "sinfo":
 		if len(a) > 1 && a[1] == "-h" {
-			// PartitionSharing: the test's Sharing text, else today's real
-			// cluster (every partition EXCLUSIVE)
+			// PartitionSharing: the test's Sharing text, else the recorded
+			// sharing.txt (partition|OverSubscribe lines)
 			if f.Sharing != "" {
 				return []byte(f.Sharing), nil
 			}
-			return []byte("computehigh|EXCLUSIVE\ngpul4|EXCLUSIVE\nhighmem|EXCLUSIVE\nnvmescratch|EXCLUSIVE\nspot|EXCLUSIVE\nstandard|EXCLUSIVE\n"), nil
+			return read("sharing.txt")
 		}
 		return read("sinfo.json")
 	case "scontrol":
@@ -208,7 +208,7 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 			}
 			return []byte(f.TestOnly), nil
 		}
-		return []byte("sbatch: Job 9001 to start at 2026-10-01T19:14:40 using 22 processors on nodes ucrslurmcl-c3nodeset-0 in partition computehigh\n"), nil
+		return read("sbatch_test_only.txt")
 	case "scancel":
 		return nil, nil
 	case "find":

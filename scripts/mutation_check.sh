@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go"
+FILES="internal/core/inflight.go internal/core/shared_cache.go internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -60,9 +60,9 @@ mutate "A1 plan hash check"   internal/core/a1.go 'if submitHash(p.Dir, p.Opts, 
 mutate "MPI prerequisite"     internal/core/cluster.go 'if loadedBefore(lines, mpi) {' 'if true {'
 mutate "A1 node cap"          internal/core/a1.go 'if nodes > caps.MaxNodes {' 'if false {'
 mutate "A1 hour cap"          internal/core/a1.go 'if float64(mins) > caps.MaxHours*60 {' 'if false {'
-mutate "A1 job cost cap"      internal/core/a1.go 'if worst > caps.MaxCostPerJobUSD {' 'if false {'
-mutate "A1 day cap (prepare)" internal/core/a1.go 'if spent+worst > caps.MaxCostPerDayUSD {' 'if false {'
-mutate "A1 day cap (confirm)" internal/core/a1.go 'if spent+p.WorstUSD > s.Cfg.Caps.MaxCostPerDayUSD {' 'if false {'
+mutate "A1 job cost cap"      internal/core/a1.go 'if worst > jobCap {' 'if false {'
+mutate "A1 day cap (prepare)" internal/core/a1.go 'if spent+worst > dayCap {' 'if false {'
+mutate "A1 day cap (confirm)" internal/core/a1.go 'if spent+p.WorstUSD > dayCap {' 'if false {'
 mutate "A1 time required"     internal/core/a1.go 'if !ok || mins <= 0 {' 'if false {'
 mutate "A1 kind check"        internal/core/a1.go 'if p.Kind != kind {' 'if false {'
 mutate "results traversal"    internal/core/results.go 'if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {' 'if false {'
@@ -192,7 +192,7 @@ mutate "v096 env partition checked" internal/backend/files.go '	if !rePartition.
 mutate "v096 env uses config"      internal/core/helpers.go '	c, err := backend.EnvCheck(s.Cfg.EnvPartition, modules, commands, versionCommands)' '	c, err := backend.EnvCheck("standard", modules, commands, versionCommands)'
 mutate "v096 env reports job"      internal/core/helpers.go '			r.JobID, r.Node = policy.CleanLabel(f[1], 20), policy.CleanLabel(f[2], 80)' '			_ = f'
 mutate "v096 env timeout"          internal/backend/files.go '	return Command{argv: argv, kind: KindNoCache, timeout: 200 * time.Second}, nil' '	return Command{argv: argv, kind: KindNoCache, timeout: 120 * time.Second}, nil'
-mutate "v096 config partition"     internal/config/config.go '	if !rePartitionName.MatchString(c.EnvPartition) {' '	if false {'
+mutate "v096 config partition"     internal/config/config.go '	if c.EnvPartition != "" && !rePartitionName.MatchString(c.EnvPartition) {' '	if false {'
 mutate "v097 job_ids uncached"     internal/backend/command.go '	return Command{argv: []string{"squeue", "--json", "-j", list}, kind: KindNoCache, okExit: []int{1}}, nil' '	return Command{argv: []string{"squeue", "--json", "-j", list}, kind: KindQueue, okExit: []int{1}}, nil'
 mutate "v097 job_ids by id"        internal/core/jobs.go '	byID := len(want) > 0 && !in.All' '	byID := false'
 mutate "v097 own queue rows only"  internal/core/jobs.go '		if byID && j.UserName != who {' '		if false {'
@@ -200,20 +200,18 @@ mutate "v097 own acct rows only"   internal/core/jobs.go '		if byID && j.User !=
 mutate "v097 job list validated"   internal/backend/command.go '		if err := ValidJobID(id); err != nil {
 			return "", err' '		if false {
 			return "", nil'
-mutate "v098 idle alt order"       internal/core/a1.go '	altPartitions     = []string{"standard", "spot", "computehigh", "nvmescratch", "highmem"}' '	altPartitions     = []string{"computehigh", "standard", "spot", "nvmescratch", "highmem"}'
-mutate "v098 cold alt order"       internal/core/a1.go '	altColdPartitions = []string{"standard", "spot", "computehigh"}' '	altColdPartitions = []string{"computehigh", "standard", "spot"}'
+mutate "v098 idle alt order"       internal/core/a1.go '	for _, p := range s.Site.Partitions.FallbackIdle {' '	for _, p := range s.Site.Partitions.FallbackCold {'
+mutate "v098 cold alt order"       internal/core/a1.go '		for _, p := range s.Site.Partitions.FallbackCold {' '		for _, p := range s.Site.Partitions.FallbackIdle {'
 mutate "v099 time over MaxTime"     internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); false && ok && hasTime && maxMin > 0 && mins > maxMin {'
 mutate "v099 time unlimited ok"    internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); hasTime && mins > maxMin && ok || p.TimeLimit == "infinite" {'
-mutate "v099 avx partitions"       internal/core/cluster.go '		if avx2OnlyPartitions[part] {' '		if true {'
+mutate "v099 avx partitions"       internal/core/cluster.go '		if s.Site.AVX2Only(part) {' '		if true {'
 mutate "v099 avx comments"         internal/core/cluster.go '			if m := reAVX512.FindString(codeOnly(script)); m != "" {' '			if m := reAVX512.FindString(script); m != "" {'
-mutate "v099 mpi hint multinode"   internal/core/cluster.go '		if part == "standard" && nodes > 1 && reMPIRun.MatchString(codeOnly(script)) {' '		if part == "standard" && reMPIRun.MatchString(codeOnly(script)) {'
-mutate "v099 waste ch standard"    internal/core/p2.go '			if j.Partition == "computehigh" && cores <= 16 {' '			if j.Partition == "computehigh" && cores <= 0 {'
-mutate "v099 waste ch only"        internal/core/p2.go '			if j.Partition == "computehigh" && cores <= 16 {' '			if cores <= 16 {'
+mutate "v099 mpi hint multinode"   internal/core/cluster.go 'ok && nodes > 1 && reMPIRun.MatchString(codeOnly(script)) {' 'ok && reMPIRun.MatchString(codeOnly(script)) {'
+mutate "v099 waste ch standard"    internal/core/p2.go 'j.Partition == fast && cores <= float64(cpusOf(cat, gen)) {' 'j.Partition == fast && cores <= 0 {'
+mutate "v099 waste ch only"        internal/core/p2.go 'j.Partition == fast && cores <= float64(cpusOf(cat, gen)) {' 'cores <= float64(cpusOf(cat, gen)) {'
 mutate "v0910 sigill not crash"    internal/rules/rules.go '			if r.id == "tool-crash" && hasRule(out, "illegal-instruction") {' '			if false {'
 mutate "v0910 sigill exit quiet"   internal/rules/rules.go '"tool-crash", "illegal-instruction", "oom"' '"tool-crash", "oom"'
-mutate "v0910 cpu note"            internal/core/cluster.go '	if avx2OnlyPartitions[part] {
-		return "AVX2 only (e2)"' '	if false {
-		return "AVX2 only (e2)"'
+mutate "v0910 cpu note"            internal/site/site.go '	if n, ok := p.Partitions.CPU[part]; ok {' '	if n, ok := p.Partitions.CPU[part]; false && ok {'
 mutate "v0911 db- lists all"     internal/core/catalog.go '		return append([]Dataset(nil), c.Datasets.Items...)' '		return nil'
 mutate "v0911 storage db note"   internal/core/helpers.go 'len(cat.Datasets.Items) > 0 {' 'len(cat.Datasets.Items) > 9999 {'
 mutate "v0912 db download warn"   internal/core/dbcheck.go '				if !ok || seen[name] {' '				if true {'
@@ -238,7 +236,7 @@ mutate "v0914 user validated"      internal/backend/command.go '	if err := Valid
 		return Command{}, nil
 	}
 	return sacctSummary('
-mutate "v0914 script note"         internal/core/jobs.go '				d.ScriptNote = "Slurm did not store' '				_ = "Slurm did not store'
+mutate "v0914 script note"         internal/core/jobs.go '				d.ScriptNote = s.Site.Text("script_not_stored"' '				_ = s.Site.Text("script_not_stored"'
 mutate "v0914 du parallel"         internal/backend/files.go 'xargs -0 -r -P 8 -n 1' 'xargs -0 -r -P 1 -n 1'
 mutate "v0914 du budget"           internal/backend/files.go 'end=$(( $(date +%s) + 40 ))' 'end=$(( $(date +%s) + 100 ))'
 # v0.9.16 review fixes
@@ -252,6 +250,36 @@ mutate "v0916 state sealed"            internal/core/a1.go '	if s.StateSealer !=
 # v0.10.0 allocation framing (F4 show_cost_tiers, F5 allocations)
 mutate "v010 R1 never sees per-member figures" internal/core/allocation.go 'if !hasTier(s.Cfg.Tiers, "R2") {' 'if false {'
 mutate "v010 show_cost_tiers stripping"    internal/core/service.go 'stripCostFields(s, data)' '// stripCostFields(s, data)'
+# F1 (v0.2.0) site profiles: approval gate, path/partition validation, charge model gating
+mutate "f1 unapproved site refused"   internal/site/site.go '	if !p.Approved {' '	if false {'
+mutate "f1 catalog path checked"      internal/site/site.go '!path.IsAbs(p.Catalog) || path.Clean(p.Catalog) != p.Catalog' 'false'
+mutate "f1 user dir has user"         internal/site/site.go 'strings.Count(d, "{user}") == 1' 'true'
+mutate "f1 log roots checked"         internal/site/site.go '		if !strings.HasSuffix(r, "/") || !validUserDir(strings.TrimSuffix(r, "/")) {' '		if false {'
+mutate "f1 partition names checked"   internal/site/site.go '		if n != "" && !rePartition.MatchString(n) {' '		if false {'
+mutate "f1 site name checked"         internal/site/site.go '	if !reName.MatchString(name) {
+		return nil, fmt.Errorf("site name %q is not valid", name)' '	if false {
+		return nil, fmt.Errorf("site name %q is not valid", name)'
+mutate "f1 unknown yaml fields"       internal/site/site.go '	dec.KnownFields(true)' '	dec.KnownFields(false)'
+mutate "f1 su needs rates"            internal/site/site.go '		if len(p.Charge.Rates) == 0 {' '		if false {'
+mutate "f1 dollars only on usd sites" internal/core/service.go 'func (s *Service) chargedInUSD() bool { return s.Site.Model() == site.ChargeUSDPerNodeHour }' 'func (s *Service) chargedInUSD() bool { return true }'
+mutate "f1 no charge no figures"      internal/core/service.go '	if !s.Cfg.ShowCost || s.Site.Model() == site.ChargeNone {' '	if !s.Cfg.ShowCost {'
+mutate "f1 su site needs caps"        internal/core/a1.go '	if unit == "SU" && (jobCap <= 0 || dayCap <= 0) {' '	if false {'
+mutate "f1 unpriced partition refused" internal/core/a1.go '	if !priced && unit != "" {' '	if false {'
+mutate "f1 su rate per core"          internal/core/service.go '				return r * float64(p.CPUsPerNode), true' '				return r, true'
+mutate "f1 env needs probe"           internal/core/helpers.go '	if s.Cfg.EnvPartition == "" {' '	if false {'
+mutate "f1 roots from site"           internal/core/files.go '	roots = []string{site.Dir(s.Site.Paths.Home, user)}' '	roots = []string{site.Dir(s.Site.Paths.Home, user), "/home/" + user, "/scratch/" + user}'
+mutate "f1 bad site is an error"      internal/core/service.go '	if err != nil {
+		return cfg, nil, err
+	}' '	if err != nil {
+		sp, err = site.Generic(), nil
+	}'
+mutate "f1 sharing-only usd strip"    internal/core/service.go '	case *ScriptCheck:
+		if v != nil {
+			v.EstCostUSD = nil' '	case *ScriptCheck:
+		if v != nil {
+			_ = v'
+mutate "f1 waste price gated"         internal/core/p2.go 'if p, ok := s.price(cat, part); ok && s.canSeeCost() {' 'if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost {'
+mutate "f1 catalog resource stripped" internal/core/service.go '				v.Partitions[i].USDPerNodeHr = nil' '				_ = i'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

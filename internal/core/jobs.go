@@ -208,7 +208,7 @@ func (s *Service) queueSummary(j slurm.QueueJob, cat *Catalog) JobSummary {
 	if js.State == "RUNNING" && j.StartTime.Valid() {
 		js.ElapsedS = s.Now().Unix() - j.StartTime.Int()
 	}
-	if p, ok := s.price(cat, j.Partition); ok && s.Cfg.ShowCost && js.ElapsedS > 0 {
+	if p, ok := s.price(cat, j.Partition); ok && s.Cfg.ShowCost && s.chargedInUSD() && js.ElapsedS > 0 {
 		mem := j.MemoryPerNode.Int() * js.NodeCount
 		if mpc := j.MemoryPerCPU.Int(); mem <= 0 && mpc > 0 {
 			mem = mpc * js.CPUs
@@ -232,7 +232,7 @@ func (s *Service) acctSummary(j slurm.AcctJob, cat *Catalog) JobSummary {
 	if r := j.State.Reason; r != "" && r != "None" && js.State == "PENDING" {
 		js.Reason = r
 	}
-	if p, ok := s.price(cat, j.Partition); ok && s.Cfg.ShowCost && js.ElapsedS > 0 {
+	if p, ok := s.price(cat, j.Partition); ok && s.Cfg.ShowCost && s.chargedInUSD() && js.ElapsedS > 0 {
 		n := max(js.NodeCount, 1)
 		share := allocShare(cat, j.Partition, n, js.CPUs, j.TRES.Allocated.Get("mem"))
 		js.CostUSD = round(p*float64(n)*share*float64(js.ElapsedS)/3600, 2)
