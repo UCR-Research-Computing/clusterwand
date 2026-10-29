@@ -46,7 +46,7 @@ func ReadRange(p string, offset int64, n int) (Command, error) {
 	if offset < 0 || offset > 1<<50 {
 		return Command{}, fmt.Errorf("offset out of range")
 	}
-	if n < 1 {
+	if n < 1 || n > MaxReadBytes {
 		return Command{}, fmt.Errorf("bytes must be 1-%d", MaxReadBytes)
 	}
 	return Command{argv: []string{"bash", "-c", readRangeTemplate, "clusterwand", p, strconv.FormatInt(offset, 10), strconv.Itoa(n)}, kind: KindNoCache}, nil
