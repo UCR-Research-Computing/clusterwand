@@ -40,10 +40,7 @@ func (s *SSH) base(ctx context.Context) ([]string, string, error) {
 		return nil, "", fmt.Errorf("%w: ssh.host is not set", ErrUnreachable)
 	}
 	argv, dest := []string{"ssh"}, s.cfg.Host
-	dir := os.Getenv("XDG_RUNTIME_DIR")
-	if dir == "" {
-		dir = os.TempDir()
-	}
+	dir := controlDir(os.Getenv("XDG_RUNTIME_DIR"), os.TempDir())
 	persist := s.cfg.ControlPersist
 	if persist <= 0 {
 		persist = 900
@@ -121,4 +118,22 @@ func lastLine(s string) string {
 		return "no error text"
 	}
 	return l
+}
+
+// maxSocketPath is the shortest Unix socket path limit in use (macOS: 104
+// bytes including the NUL; Linux allows 108).
+const maxSocketPath = 103
+
+// controlDir picks the folder for the SSH control socket. ssh names it
+// <dir>/cw-<40 hex> and, while creating it, adds a 17-character random suffix;
+// macOS's per-user TMPDIR (/var/folders/...) is too long for that, so a
+// folder that would overflow the socket limit falls back to /tmp.
+func controlDir(runtime, tmp string) string {
+	for _, d := range []string{runtime, tmp} {
+		d = strings.TrimSuffix(d, "/")
+		if d != "" && len(d)+len("/cw-")+40+17 <= maxSocketPath {
+			return d
+		}
+	}
+	return "/tmp"
 }
