@@ -18,7 +18,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: build the live test
-        run: GOOS=linux GOARCH=amd64 go test -c -tags slurmlive -o cwlive.test ./internal/core
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -c -tags slurmlive -o cwlive.test ./internal/core
       - name: start Slurm 21.08.6 (giovtorres/docker-centos7-slurm)
         run: |
           docker run -dt --privileged --name slurm -h slurmctl giovtorres/docker-centos7-slurm:21.08.6
