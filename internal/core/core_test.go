@@ -702,6 +702,23 @@ func TestJobsListDefaultPage(t *testing.T) {
 // just those jobs on every call (no queue/accounting cache), so a job that ended is seen
 // at once (v0.9.7; the Lab's check jobs waited ~80 s for the cache before).
 func TestJobsListByIDsIsFresh(t *testing.T) {
+	// the --json path (site slurm.json) keeps the same rule
+	sj, fj := newTestService(t)
+	sj.Site.Slurm.JSON = true
+	for i := 0; i < 2; i++ {
+		if _, err := sj.JobsList(context.Background(), JobsListInput{JobIDs: []string{"260", "229"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := 0
+	for _, c := range fj.Calls {
+		if c == "squeue --json -j 229,260" {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("json path: each call must ask squeue (uncached): %d in %v", n, fj.Calls)
+	}
 	s, fx := newTestService(t)
 	ctx := context.Background()
 	for i := 0; i < 2; i++ {

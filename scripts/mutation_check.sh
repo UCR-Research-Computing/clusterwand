@@ -118,7 +118,7 @@ mutate "v072 failed job not a success"   internal/core/p2.go '	return j.State ==
 mutate "v072 jobs_list config cap"       internal/core/jobs.go '	if limit > s.Cfg.Limits.ListRows {
 		limit = s.Cfg.Limits.ListRows
 	}
-	var qc' '	var qc'
+	var qsel' '	var qsel'
 mutate "v080 no-core error on shared"   internal/core/cluster.go '		if shared && !cr.CoresAsked {' '		if false {'
 # v080's explicit shared-cores re-check is now backed up by v0.9.16's full static
 # check of the override; the guard disables both, so the pair is what is proven.
@@ -227,7 +227,9 @@ mutate "v0914 name keeps pipes"    internal/slurm/sacctrows.go '		f := strings.S
 mutate "v0914 cpu days"            internal/slurm/sacctrows.go '		days, s = atoi(d), rest' '		s = rest; _ = d'
 mutate "v0914 mem MB"              internal/slurm/sacctrows.go '			t.Count = memBytes(v) / (1024 * 1024)' '			t.Count = memBytes(v)'
 mutate "v0914 usage uses summary"  internal/core/cluster.go '		c, err = backend.SacctSummaryUser(firstNonEmpty(in.User, me), in.Since, in.Until)' '		c, err = backend.SacctUser(firstNonEmpty(in.User, me), in.Since, in.Until)'
-mutate "v0914 jobs uses summary"   internal/core/jobs.go '			ac, err = backend.SacctSummaryUser(who, in.Since, "")' '			ac, err = backend.SacctUser(who, in.Since, "")'
+mutate "v0914 jobs uses summary"   internal/core/jobs.go '		qsel = queueSel{user: who}
+		ac, err = backend.SacctSummaryUser(who, in.Since, "")' '		qsel = queueSel{user: who}
+		ac, err = backend.SacctUser(who, in.Since, "")'
 mutate "v0914 user not widened"    internal/backend/command.go '	return sacctSummary([]string{"-u", user}, since, until)' '	return sacctSummary([]string{"-a"}, since, until)'
 mutate "v0914 user validated"      internal/backend/command.go '	if err := ValidUser(user); err != nil {
 		return Command{}, err
