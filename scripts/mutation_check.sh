@@ -371,6 +371,20 @@ mutate "f4 results hidden download"    internal/core/results.go '		if hiddenRel(
 mutate "f4 results hidden component"   internal/core/results.go '		if hiddenOrSensitive(part) {
 			return true' '		if false {
 			return true'
+mutate "v051 array cost counts tasks"  internal/core/a1.go '	worst := round(price*float64(nodes)*share*float64(mins)/60*float64(tasks), 2)' '	worst := round(price*float64(nodes)*share*float64(mins)/60, 2)'
+mutate "v051 array uncountable"        internal/core/a1.go '		if !ok {
+			return nil, fmt.Errorf("--array=%s: cannot count' '		if false {
+			return nil, fmt.Errorf("--array=%s: cannot count'
+mutate "v051 array short flag"         internal/core/cluster.go '"A": "account", "a": "array"}' '"A": "account"}'
+mutate "v051 array step guard"         internal/core/dbcheck.go '		if b < a || step < 1 {' '		if b < a {'
+mutate "v051 hetjob refused"           internal/core/a1.go '	if req["hetjob"] != "" || req["packjob"] != "" {' '	if false {'
+mutate "v051 script_check array"       internal/core/cluster.go '					c = round(c*float64(n), 2)' '					_ = n'
+mutate "v051 results hidden job dir"   internal/core/results.go '			if hiddenRel(rel) {
+				return fmt.Errorf' '			if false {
+				return fmt.Errorf'
+mutate "v051 results link roots"       internal/core/results.go '		if err := s.checkLogPath(real+"/x", d.User); err != nil {' '		if false {'
+mutate "v051 results link hidden"      internal/core/results.go '		if err := s.checkJobDir(real, d.User); err != nil {' '		if false {'
+mutate "v051 audit not stdout"         internal/policy/audit.go 'var auditStream io.Writer = os.Stderr' 'var auditStream io.Writer = os.Stdout'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

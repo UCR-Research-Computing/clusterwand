@@ -27,8 +27,8 @@ two working days and to ship a fix for confirmed issues within a week.
 ## Design notes for reviewers
 
 - No tool runs arbitrary shell; `TestAllowListIsClosed` pins the command list.
-- `scripts/mutation_check.sh` disables each of 148 guards in turn and requires a test
-  to fail.
+- `scripts/mutation_check.sh` disables each safety guard (over 230) in turn and requires a
+  test to fail.
 - Text from users and programs is returned in `untrusted` blocks.
 - SSH only: ClusterWand runs on the user's own machine (CLI and stdio MCP) and reaches the
   cluster through the user's own OpenSSH config, keys and agent (see

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,12 +25,16 @@ type Record struct {
 	DurationMS int64          `json:"duration_ms"`
 }
 
-// Audit appends JSON lines to a file, or to stdout when the path is "-"
-// (Cloud Run: stdout goes to Cloud Logging). A nil *Audit is a no-op.
+// Audit appends JSON lines to a file, or to stderr when the path is "-"
+// (stdout carries the MCP stdio protocol and CLI answers, so the audit never
+// goes there). A nil *Audit is a no-op.
 type Audit struct {
 	mu   sync.Mutex
 	path string
 }
+
+// auditStream is where path "-" writes (a variable so a test can capture it).
+var auditStream io.Writer = os.Stderr
 
 // NewAudit opens (creating parent dirs) the audit file at path.
 func NewAudit(path string) (*Audit, error) {
@@ -70,7 +75,7 @@ func (a *Audit) Write(r Record) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.path == "-" {
-		_, err = os.Stdout.Write(append(b, '\n'))
+		_, err = auditStream.Write(append(b, '\n'))
 		return err
 	}
 	f, err := os.OpenFile(a.path, os.O_APPEND|os.O_WRONLY, 0o600)
