@@ -19,6 +19,7 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
 
 // ResultFile is one file in a job's folder.
@@ -80,7 +81,7 @@ func (s *Service) jobFolder(ctx context.Context, jobID string) (*JobDetail, stri
 	if err := s.checkLogPath(dir+"/x", d.User); err != nil {
 		return nil, "", err
 	}
-	home := "/home/" + d.User
+	home := site.Dir(s.Site.Paths.Home, d.User)
 	if dir == home || dir == home+"/" {
 		return nil, "", fmt.Errorf("job %s ran in your home folder itself (%s); listing it would show everything you own. Submit jobs with clusterwand (they run in ~/clusterwand-jobs/...) or give it a folder", jobID, dir)
 	}

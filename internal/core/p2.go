@@ -88,7 +88,7 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 	rep := &WasteReport{Since: in.Since, Scope: scope, ByKind: map[string]int{}, JobsScanned: len(a.Jobs),
 		Thresholds: map[string]any{"cpu_efficiency_percent": in.CPUThreshold, "min_node_hours": in.MinNodeHours}}
 	cost := func(part string, h float64) float64 {
-		if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost {
+		if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost && s.chargedInUSD() {
 			return round(p*h, 2)
 		}
 		return 0
@@ -124,10 +124,10 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 		if eff < in.CPUThreshold {
 			kind := "low-cpu"
 			sug := "Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n)."
-			if j.Partition == "computehigh" && cores <= 16 {
-				// computehigh is the fast-core MPI specialist (2026-10-03); single-node work
-				// that leaves cores idle is cheaper on standard (e2, the cheapest cores)
-				sug += fmt.Sprintf(" Single-node work like this is cheaper on standard (%s/node-hour vs %s).", priceText(s, cat, "standard"), priceText(s, cat, "computehigh"))
+			if fast, gen := s.Site.Partitions.Fast, s.Site.Partitions.General; fast != "" && gen != "" && j.Partition == fast && cores <= float64(cpusOf(cat, gen)) {
+				// the fast-core MPI specialist: single-node work that leaves cores idle
+				// is cheaper on the general partition (the cheapest cores)
+				sug += fmt.Sprintf(s.Site.Text("waste_fast_single_node", " Single-node work like this is cheaper on {general} (%s/node-hour vs %s)."), priceText(s, cat, gen), priceText(s, cat, fast))
 			}
 			if isWarmWorker(j) {
 				kind = "warm-worker"
@@ -142,11 +142,13 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 				NodeHours: nh, WasteHours: nh * (1 - eff/100), Suggestion: sug})
 		}
 		if peak, alloc := j.MaxRSSBytes()/(1024*1024), j.TRES.Allocated.Get("mem"); peak > 0 && alloc > 0 && st == "COMPLETED" {
-			if cp, ok := partitionOf(cat, j.Partition); ok && j.Partition == "highmem" && float64(peak) < 0.25*float64(alloc) {
+			if hm := s.Site.Partitions.HighMem; hm != "" && j.Partition == hm && float64(peak) < 0.25*float64(alloc) {
+				cp, _ := partitionOf(cat, hm)
+				gen, _ := partitionOf(cat, s.Site.Partitions.General)
 				add(WasteItem{Kind: "oversized-memory", JobID: fmt.Sprint(j.JobID), User: j.User, Partition: j.Partition,
-					Detail:    fmt.Sprintf("peak memory %d MB of %d MB on highmem (%.0f GB nodes)", peak, alloc, cp.MemGBPerNode),
+					Detail:    fmt.Sprintf("peak memory %d MB of %d MB on %s (%.0f GB nodes)", peak, alloc, hm, cp.MemGBPerNode),
 					NodeHours: nh, WasteHours: 0,
-					Suggestion: fmt.Sprintf("Fits a cheaper partition: standard has 124 GB per node. highmem costs %s/node-hour.", priceText(s, cat, "highmem"))})
+					Suggestion: fmt.Sprintf(s.Site.Text("waste_highmem_fits", "Fits a cheaper partition: {general} has %.0f GB per node. {highmem} costs %s/node-hour."), gen.MemGBPerNode, priceText(s, cat, hm))})
 			}
 		}
 	}
@@ -171,8 +173,10 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 			Suggestion: "Each failed start still boots and bills a node. Run job_explain on one of them and fix the cause before resubmitting; test small with an interactive job first."})
 	}
 
-	// 3. Powered-up nodes with no job, and long-running jobs using no CPU now.
-	if nb, err := s.run(ctx, backend.Nodes()); err == nil {
+	// 3. Powered-up nodes with no job, and long-running jobs using no CPU now
+	// (cloud sites only: a fixed node bills the same idle or not).
+	if !s.Site.CloudNodes {
+	} else if nb, err := s.run(ctx, backend.Nodes()); err == nil {
 		var nr slurm.NodesResponse
 		if slurm.Decode(nb, &nr) == nil {
 			now := s.Now().Unix()
@@ -193,7 +197,7 @@ func (s *Service) Waste(ctx context.Context, in WasteInput) (*WasteReport, error
 					add(WasteItem{Kind: "idle-node", Node: n.Name, Partition: part,
 						Detail:    fmt.Sprintf("powered up with no job for %.1f h", idleH),
 						NodeHours: idleH, WasteHours: idleH,
-						Suggestion: "Billing while idle. Check SuspendTime for this partition (slurm-gcp powers nodes down after it), or whether something keeps it warm on purpose."})
+						Suggestion: s.Site.Text("waste_idle_node", "Billing while idle. Check SuspendTime for this partition (power saving turns nodes off after it), or whether something keeps it warm on purpose.")})
 				case n.HasState("ALLOCATED") && n.CPULoad < 10 && n.BootTime.Valid() && now-n.BootTime.Int() > 3600:
 					upH := float64(now-n.BootTime.Int()) / 3600
 					add(WasteItem{Kind: "allocated-idle-node", Node: n.Name, Partition: part,
@@ -236,6 +240,12 @@ func isWarmWorker(j slurm.AcctJob) bool {
 	return strings.Contains(n, "warm") || strings.Contains(n, "keepalive") || strings.Contains(n, "keep-alive")
 }
 
+// cpusOf is a partition's cores per node (0 when unknown).
+func cpusOf(cat *Catalog, name string) int {
+	p, _ := partitionOf(cat, name)
+	return p.CPUsPerNode
+}
+
 func partitionOf(cat *Catalog, name string) (CatalogPartition, bool) {
 	if cat == nil {
 		return CatalogPartition{}, false
@@ -244,7 +254,7 @@ func partitionOf(cat *Catalog, name string) (CatalogPartition, bool) {
 }
 
 func priceText(s *Service, cat *Catalog, part string) string {
-	if p, ok := s.price(cat, part); ok && s.Cfg.ShowCost {
+	if p, ok := s.price(cat, part); ok && s.canSeeCost() {
 		return fmt.Sprintf("$%.2f", p)
 	}
 	return "more"
@@ -319,15 +329,15 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 		case n.Broken():
 			add(HealthIssue{Severity: "error", Kind: "node-down", Subject: n.Name, Since: since,
 				Detail: strings.Join(n.State, "+") + ": " + reason,
-				Advice: "On slurm-gcp a cloud node that failed to boot or was lost goes DOWN; check the resume log on the controller and `scontrol update nodename=... state=resume` once fixed (admin)."})
+				Advice: s.Site.Text("health_node_down", "A node that failed or was lost goes DOWN; check slurmd and the node, then `scontrol update nodename=... state=resume` once fixed (admin).")})
 		case n.HasState("DRAIN") || n.HasState("DRAINING") || n.HasState("DRAINED"):
 			add(HealthIssue{Severity: "warning", Kind: "node-drained", Subject: n.Name, Since: since,
 				Detail: strings.Join(n.State, "+") + ": " + reason, Advice: "Drained nodes take no new jobs. Confirm the reason is still current."})
 		case n.HasState("POWERING_UP") && n.BootTime.Valid() && n.BootTime.Int() > 0 && now-n.BootTime.Int() > 900:
 			add(HealthIssue{Severity: "warning", Kind: "slow-boot", Subject: n.Name,
-				Detail: "powering up for more than 15 minutes", Advice: "Likely a GCP stockout or a resume failure; check the zone's capacity and the slurm-gcp resume log."})
+				Detail: "powering up for more than 15 minutes", Advice: s.Site.Text("health_slow_boot", "Likely a capacity shortage or a resume failure; check the power-saving resume log.")})
 		}
-		if n.PoweredUp() && n.HasState("IDLE") && n.LastBusy.Valid() && n.LastBusy.Int() > 0 && now-n.LastBusy.Int() > 2*3600 {
+		if s.Site.CloudNodes && n.PoweredUp() && n.HasState("IDLE") && n.LastBusy.Valid() && n.LastBusy.Int() > 0 && now-n.LastBusy.Int() > 2*3600 {
 			add(HealthIssue{Severity: "info", Kind: "idle-billing", Subject: n.Name,
 				Detail: fmt.Sprintf("powered up and idle for %.1f h", float64(now-n.LastBusy.Int())/3600),
 				Advice: "Idle cloud nodes still bill; check SuspendTime."})
@@ -346,14 +356,14 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 		switch j.State() {
 		case "PENDING":
 			if j.SubmitTime.Valid() && now-j.SubmitTime.Int() > 3600 && j.StateReason != "BeginTime" && j.StateReason != "Dependency" && !strings.HasPrefix(j.StateReason, "JobHeld") {
-				m, adv := rules.PendingReason(j.StateReason)
+				m, adv := rules.PendingReason(s.Site, j.StateReason)
 				add(HealthIssue{Severity: "warning", Kind: "long-pending", Subject: fmt.Sprintf("job %d (%s, %s)", j.JobID, j.UserName, j.Partition),
 					Since:  numTS(j.SubmitTime),
 					Detail: fmt.Sprintf("pending %.1f h, reason %s: %s", float64(now-j.SubmitTime.Int())/3600, j.StateReason, m), Advice: adv})
 			}
 			if j.StateReason == "launch failed requeued held" || strings.Contains(j.StateReason, "Nodes required for job are DOWN") {
 				add(HealthIssue{Severity: "error", Kind: "boot-failures", Subject: fmt.Sprintf("job %d", j.JobID),
-					Detail: "reason " + j.StateReason, Advice: "Node launch failed (often a GCP stockout or a bad image). Check the slurm-gcp resume log."})
+					Detail: "reason " + j.StateReason, Advice: s.Site.Text("health_launch_failed", "Node launch failed (a node problem or, on cloud nodes, a capacity shortage). Check the node and slurmd logs.")})
 			}
 		case "RUNNING":
 			if j.TimeLimit.Valid() && j.StartTime.Valid() && j.TimeLimit.Int() == 0 {
@@ -403,7 +413,7 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 		for p, n := range nodeFail {
 			add(HealthIssue{Severity: "error", Kind: "boot-failures", Subject: "partition " + p,
 				Detail: fmt.Sprintf("%d job(s) ended NODE_FAIL/BOOT_FAIL in 24 h", n),
-				Advice: "Cloud nodes failed under jobs or did not boot; check GCP quota/stockouts for the zone."})
+				Advice: s.Site.Text("health_boot_failures", "Nodes failed under jobs or did not boot; check the nodes (and, on cloud nodes, provider quota and capacity).")})
 		}
 	}
 
@@ -415,7 +425,7 @@ func (s *Service) Health(ctx context.Context) (*Health, error) {
 			h.OK = false
 		}
 	}
-	h.Notes = []string{"Read-only checks over scontrol, squeue and the last day of sacct. Stockouts show up as slow boots, NODE_FAIL/BOOT_FAIL or launch-failed holds; the slurm-gcp resume log on the controller has the GCP error text."}
+	h.Notes = []string{s.Site.Text("health_note", "Read-only checks over scontrol, squeue and the last day of sacct. Node trouble shows up as DOWN/DRAIN nodes, NODE_FAIL/BOOT_FAIL or launch-failed holds.")}
 	return h, nil
 }
 
@@ -509,7 +519,7 @@ func (s *Service) TicketDraft(ctx context.Context, in TicketDraftInput) (*Ticket
 		}
 		t.Summary = fmt.Sprintf("Job %s: %s.", j.JobID, strings.ToLower(errs[0].Title[:1])+errs[0].Title[1:])
 	}
-	t.Reply = replyText(t, errs, ex)
+	t.Reply = replyText(t, errs, ex, s.Site.Text("ticket_site", ""))
 	t.InternalNote = fmt.Sprintf("clusterwand ticket_draft, %d finding(s), confidence %s. Commands: see source in the envelope.", len(ex.Findings), t.Confidence)
 	if ex.LogError != "" {
 		t.InternalNote += " Log not readable: " + ex.LogError
@@ -520,10 +530,10 @@ func (s *Service) TicketDraft(ctx context.Context, in TicketDraftInput) (*Ticket
 	return t, nil
 }
 
-func replyText(t *TicketDraft, errs []rules.Finding, ex *Explanation) string {
+func replyText(t *TicketDraft, errs []rules.Finding, ex *Explanation, site string) string {
 	var b strings.Builder
 	b.WriteString("Hi,\n\n")
-	b.WriteString("I looked at job " + t.JobID + " on Ursa Major. ")
+	b.WriteString("I looked at job " + t.JobID + site + ". ")
 	b.WriteString(t.WhatHappened[0] + "\n\n")
 	if len(errs) == 0 && jobSucceeded(ex.Job) {
 		b.WriteString("The job finished normally: Slurm recorded it as COMPLETED with exit code 0, and nothing in the accounting record or the end of the log points to a failure. ")

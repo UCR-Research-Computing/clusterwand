@@ -560,12 +560,13 @@ func TestStateLockIsHonored(t *testing.T) {
 // TestAlternativeOrder: standard (cheap e2, any zone) is offered first, then spot (same
 // nodes), then the specialist partitions (v0.9.8).
 func TestAlternativeOrder(t *testing.T) {
+	s, _ := a1Service(t)
 	want := []string{"standard", "spot", "computehigh", "nvmescratch", "highmem"}
-	if strings.Join(altPartitions, ",") != strings.Join(want, ",") {
-		t.Errorf("altPartitions = %v, want %v", altPartitions, want)
+	if got := s.Site.Partitions.FallbackIdle; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("fallback_idle = %v, want %v", got, want)
 	}
-	if strings.Join(altColdPartitions, ",") != "standard,spot,computehigh" {
-		t.Errorf("altColdPartitions = %v", altColdPartitions)
+	if got := s.Site.Partitions.FallbackCold; strings.Join(got, ",") != "standard,spot,computehigh" {
+		t.Errorf("fallback_cold = %v", got)
 	}
 }
 

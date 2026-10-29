@@ -1,0 +1,196 @@
+==== status
+ursa-major (Slurm 25.11.4): 1 running, 0 pending, 1 node(s) powered up, now $1.87/hour
+
+PARTITION    NODES  UP  ALLOC  IDLE-UP  BOOT  DOWN  RUN  PEND  $/NODE-H  $/H NOW
+computehigh  6      1   1      0        0     0     1    0     $1.87     $1.87
+
+* default partition. Powered-down cloud nodes cost nothing.
+==== partitions
+PARTITION    NODES  CORES  MEM GB  GPU                 TIME LIMIT  CPU             $/NODE-H  USE FOR
+computehigh  16     22     85      -                   none        AVX-512         $1.87     Intel Sapphire Rapids c3-highcpu-44, Tier_1 networ...
+gpul4        8      8      62      1x NVIDIA L4 24 GB  none        AVX-512         $1.15     One NVIDIA L4 (24 GB) per node. ML training/infere...
+highmem      8      32     497     -                   none        AVX-512         $4.19     n2-highmem-64 with ~496 GB RAM. Genome assembly, l...
+nvmescratch  8      8      62      -                   none        AVX-512         $0.84     c2-standard-16 with 100 GB pd-ssd boot disk (no lo...
+spot         32     16     124     -                   none        AVX2 only (e2)  $0.74     Same nodes as standard at about half price, but Go...
+standard*    32     16     124     -                   none        AVX2 only (e2)  $1.45     Default. AMD EPYC Milan c2d-standard-32. General C...
+==== jobs
+JOBID  STATE      PARTITION    NODES  ELAPSED  EXIT  EST $  NAME
+261    COMPLETED  computehigh  1      19m20s   0     0.60   lab-warm
+260    RUNNING    computehigh  1      19h37m         36.69  lab-warm
+253    TIMEOUT    computehigh  1      1h30m    0     2.81   lab-demo-40-text-analysis-of-chronic
+236    FAILED     gpul4        1      1m00s    1     0.02   lab-76-gpu-lbm-throughput-and-m
+229    FAILED     gpul4        1      1m52s    255   0.04   lab-61-gpu-lbm-throughput-and-m
+212    FAILED     computehigh  1      0m04s    139   -      lab-38-tflm-greedymemoryplanner
+203    FAILED     standard     1      0m05s    1     -      lab-30-tflm-greedymemoryplanner
+195    FAILED     standard     1      0m35s    1     0.01   lab-16-treetime-phylodynamics-a
+93     CANCELLED  computehigh  1      1h22m    0     2.58   ucr-stack
+45     FAILED     gpul4        1      16m10s   1     0.31   lab-6-vllm-prefill-decode-disa
+41     FAILED     standard     1      0m17s    1     0.01   lab-4-chsh-bell-inequality-vio
+37     FAILED     gpul4        1      18m14s   1     0.35   lab-1-llm-inference-prefill-vs
+==== job show 236
+Job 236  FAILED  user alice_ucr_edu  partition gpul4
+name: lab-76-gpu-lbm-throughput-and-m
+submitted 2026-09-29T18:44:28-04:00  started 2026-09-29T18:48:19-04:00  ended 2026-09-29T18:49:19-04:00  elapsed 1m00s  limit 15m
+nodes 1 (ucrslurmcl-gpunodeset-0)  cpus 8  exit 1
+CPU efficiency 8.0%  memory peak 4576 MB of 63216 MB (7.2%)
+estimated cost $0.02
+stdout /home/alice_ucr_edu/deep-research-lab/run_76/job.log
+  step 236.batch    FAILED     exit 1      1m00s  maxrss 4576 MB
+==== job explain 236
+Job 236  FAILED  partition gpul4  exit 1  elapsed 1m00s
+
+[ERROR] Python package not installed in the environment (python-import)
+  evidence: log: ModuleNotFoundError: No module named 'pandas'
+  fix: Package "pandas" is missing. Load python-sci (CPU) or python-ml (PyTorch/GPU), or create a uv/Pixi environment in the job. Check that the environment is activated in the same shell that runs python.
+
+log: /home/alice_ucr_edu/deep-research-lab/run_76/job.log (clusterwand job log 236)
+==== job show 212
+Job 212  FAILED  user alice_ucr_edu  partition computehigh
+name: lab-38-tflm-greedymemoryplanner
+submitted 2026-09-29T09:56:47-04:00  started 2026-09-29T09:57:47-04:00  ended 2026-09-29T09:57:51-04:00  elapsed 0m04s  limit 15m
+nodes 1 (ucrslurmcl-c3nodeset-0)  cpus 22  exit 139
+CPU efficiency 5.9%  memory peak 267 MB of 87054 MB (0.3%)
+stdout /home/alice_ucr_edu/deep-research-lab/run_38/job.log
+  step 212.batch    FAILED     exit 139    0m04s  maxrss 267 MB
+==== job explain 212
+Job 212  FAILED  partition computehigh  exit 139  elapsed 0m04s
+
+[ERROR] A program crashed (segmentation fault) (exit-signal)
+  evidence: exit code 139 = 128+11, SIGSEGV
+  fix: Usually an input it did not expect, a bug, or code built for AVX-512 running on the AVX2-only standard/spot nodes (try computehigh). Run it under gdb or with core dumps to find where.
+
+log: /home/alice_ucr_edu/deep-research-lab/run_38/job.log (clusterwand job log 212)
+==== job show 253
+Job 253  TIMEOUT  user alice_ucr_edu  partition computehigh
+name: lab-demo-40-text-analysis-of-chronic
+submitted 2026-09-30T14:40:12-04:00  started 2026-09-30T14:41:29-04:00  ended 2026-09-30T16:11:29-04:00  elapsed 1h30m  limit 90m
+nodes 1 (ucrslurmcl-c3nodeset-2)  cpus 22  exit 0
+CPU efficiency 0.0%  memory peak 551 MB of 87054 MB (0.6%)
+estimated cost $2.81
+stdout /home/alice_ucr_edu/deep-research-lab/ws-demo/run_40/job.log
+  step 253.batch    CANCELLED  exit signal 15 (TERM) 1h30m  maxrss 551 MB
+==== job explain 253
+Job 253  TIMEOUT  partition computehigh  exit 0  elapsed 1h30m
+
+[ERROR] Job hit its time limit (timeout)
+  evidence: state TIMEOUT
+  evidence: time limit 1h30m, ran 1h30m
+  fix: Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).
+
+[WARNING] Most allocated cores sat idle (low-cpu-efficiency)
+  evidence: CPU efficiency 0% (22 cores x 1h30m)
+  fix: The program used few cores: enable its threading/MPI options (-ntomp, OMP_NUM_THREADS, srun) or ask for fewer cores (on a shared partition only the cores held bill; on a whole-node partition idle cores still bill).
+
+log: /home/alice_ucr_edu/deep-research-lab/ws-demo/run_40/job.log (clusterwand job log 253)
+==== recipes
+GROMACS (CPU, MPI)  [molecular dynamics, partition computehigh]
+  module load openmpi gromacs/2026.1
+  srun gmx_mpi mdrun -deffnm md -ntomp $SLURM_CPUS_PER_TASK
+  note: Use thread/rank counts with small prime factors (16, 20), not 22.
+
+GROMACS (GPU)  [molecular dynamics, partition gpul4]
+  module load openmpi gromacs/2026.1-cuda
+  gmx_mpi mdrun -deffnm md -nb gpu -pme gpu
+
+==== modules
+database: ncbi-blast 2026-09-28 in /data/shared/ncbi-blast/2026-09-28  ->  module load db-ncbi-blast/2026-09-28 (sets BLASTDB, NCBI_DB)
+database: swissprot 2026_03 in /data/shared/swissprot/2026_03  ->  module load db-swissprot/2026_03 (sets BLASTDB, SWISSPROT_DB, UNIPROT_DB)
+MODULE      VERSIONS  NEEDS FIRST  GPU
+blast-plus  2.17.0                 
+==== check
+OK  partition highmem  worst-case cost $8.38
+==== usage
+Usage since 2026-09-01 by partition
+
+PARTITION    JOBS  FAILED  NODE-H  CORE-H  GPU-H  CPU EFF  EST $
+computehigh  5     2       22.73   500.0   0.00   2.8%     42.50
+gpul4        4     4       0.62    5.0     0.62   11.8%    0.71
+standard     3     3       0.02    0.3     0.00   1.8%     0.02
+total        12    9       23.37   505.3   0.62   2.9%     43.24
+
+note: Estimated cost = partition list price x nodes x elapsed hours x the share of each node the job held (1 on whole-node partitions; cores or memory share, whichever is larger, on shared ones); it excludes boot/idle time and credits. Treat as an estimate.
+==== allocation
+Ursa Major allocation for period 2026-10 (resets 2026-11-01T00:00:00Z)
+Basis: list-price estimate, covered by Research Computing / UCR ITS
+
+Person: no personal allocation configured
+Lab: no lab allocation configured
+==== waste
+Waste since 2026-09-01 (all users): 8 item(s), 3.12 wasted node-hours, about $5.42 (12 jobs scanned)
+
+timeout-idle        253 alice_ucr_edu [computehigh] 1.50 wasted node-h ~$2.81
+  TIMEOUT, CPU efficiency 0% on 22 cores for 1h30m
+  -> Ran to its time limit while barely using the CPU: likely stuck (waiting on a download, a lock, input). Check the log before resubmitting with more time.
+
+low-cpu             93 alice_ucr_edu [computehigh] 0.74 wasted node-h ~$1.38
+  CANCELLED, CPU efficiency 46% on 22 cores for 1h22m
+  -> Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).
+
+warm-worker         261 alice_ucr_edu [computehigh] 0.32 wasted node-h ~$0.60
+  COMPLETED, CPU efficiency 0% on 22 cores for 19m20s
+  -> A keep-warm job that holds a node so later work starts without a boot wait. Its idle time is the price of that latency: compare it with ~2-5 min cold boots and shorten or stop it when nothing is queued.
+
+low-cpu             37 alice_ucr_edu [gpul4] 0.29 wasted node-h ~$0.33
+  FAILED, CPU efficiency 5% on 8 cores for 18m14s
+  -> Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).
+
+low-cpu             45 alice_ucr_edu [gpul4] 0.22 wasted node-h ~$0.25
+  FAILED, CPU efficiency 20% on 8 cores for 16m10s
+  -> Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).
+
+low-cpu             229 alice_ucr_edu [gpul4] 0.03 wasted node-h ~$0.03
+  FAILED, CPU efficiency 4% on 8 cores for 1m52s
+  -> Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).
+
+low-cpu             236 alice_ucr_edu [gpul4] 0.02 wasted node-h ~$0.02
+  FAILED, CPU efficiency 8% on 8 cores for 1m00s
+  -> Most cores sat idle. Ask for fewer cores (--cpus-per-task): on shared partitions you pay for the cores you hold. Or use the program's threading/MPI options (OMP_NUM_THREADS, -ntomp, srun -n).
+
+allocated-idle-node ucrslurmcl-c3nodeset-0 [computehigh] 0.00 wasted node-h
+  allocated but load 0.00, up 19.6 h (a warm or sleeping job holds it)
+  -> A job holds the node without computing. If it is a warm worker kept on purpose, weigh its hourly price against start-up latency; otherwise cancel it.
+
+note: Wasted node-hours = billed node-hours x (1 - CPU efficiency over the allocated cores): an upper bound, because some programs are I/O- or GPU-bound by design. On shared partitions only the share of the node a job held is billed.
+==== health
+Health: OK, 1 issue(s); last 24 h: 11 jobs ended, 82% failed
+
+[WARNING] high-failure-rate: last 24 h
+  9 of 11 jobs failed (82%)
+  -> Look for a shared cause: a broken module, a full filesystem, one user's retry loop (waste_report shows repeats).
+==== ticket
+Ticket draft for job 203 (user alice_ucr_edu), confidence high
+Job 203: python package not installed in the environment.
+
+What happened:
+  Job 203 ("lab-30-tflm-greedymemoryplanner") on partition standard ended FAILED after 5s, exit code 1.
+  It used 6% of its CPU time and a peak of 583 MB of 126832 MB memory.
+Evidence:
+  [python-import] Python package not installed in the environment: log: ModuleNotFoundError: No module named 'matplotlib'
+  [download] A download failed: log: curl: (22) The requested URL returned error: 404
+  log: /home/alice_ucr_edu/deep-research-lab/run_30/job.log
+
+----- reply draft (edit before sending) -----
+Hi,
+
+I looked at job 203 on Ursa Major. Job 203 ("lab-30-tflm-greedymemoryplanner") on partition standard ended FAILED after 5s, exit code 1.
+
+What went wrong:
+- Python package not installed in the environment (the log shows: ModuleNotFoundError: No module named 'matplotlib')
+- A download failed (the log shows: curl: (22) The requested URL returned error: 404)
+
+What to change:
+- Package "matplotlib" is missing. Load python-sci (CPU) or python-ml (PyTorch/GPU), or create a uv/Pixi environment in the job. Check that the environment is activated in the same shell that runs python.
+- Check the URL still exists (404) or the site blocks scripts (403/429): send a User-Agent, retry with backoff, or fetch elsewhere and stage the data in $SCRATCH.
+
+Let me know if it still fails after that and I will take another look.
+---------------------------------------------
+clusterwand ticket_draft, 2 finding(s), confidence high. Commands: see source in the envelope.
+==== submit
+Plan (nothing submitted yet):
+  job        hello
+  partition  computehigh, 1 node(s), time limit 1 h
+  folder     ~/clusterwand-jobs/20261001-132321-hello (on the cluster)
+  script     121 bytes, sha256 97573f1f2f407b08
+  scheduler  would start at 2026-10-01T19:14:40 on ucrslurmcl-c3nodeset-0 (computehigh)
+  worst case $1.87  (today so far $0.00 of $50.00 day cap)
+  token      <confirm_token> (expires 2026-10-01T13:33:21-04:00)

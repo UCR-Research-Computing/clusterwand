@@ -1,0 +1,103 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": [
+      {
+        "cpu": "AVX-512",
+        "cpus_per_node": 22,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 16,
+        "mem_gb_per_node": 85,
+        "name": "computehigh",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 1.87,
+        "use_for": "Intel Sapphire Rapids c3-highcpu-44, Tier_1 networking. Fastest per core; best for tightly coupled MPI (GROMACS, LAMMPS, CFD)."
+      },
+      {
+        "cpu": "AVX-512",
+        "cpus_per_node": 8,
+        "default": false,
+        "gpu_type": "NVIDIA L4 24 GB",
+        "gpus_per_node": 1,
+        "max_nodes": 8,
+        "mem_gb_per_node": 62,
+        "name": "gpul4",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 1.15,
+        "use_for": "One NVIDIA L4 (24 GB) per node. ML training/inference, GPU MD (GROMACS/LAMMPS/OpenMM -cuda builds), LLMs up to ~8B (fp16) or ~14B (4-bit)."
+      },
+      {
+        "cpu": "AVX-512",
+        "cpus_per_node": 32,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 8,
+        "mem_gb_per_node": 497,
+        "name": "highmem",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 4.19,
+        "use_for": "n2-highmem-64 with ~496 GB RAM. Genome assembly, large in-memory analytics, big matrices."
+      },
+      {
+        "cpu": "AVX-512",
+        "cpus_per_node": 8,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 8,
+        "mem_gb_per_node": 62,
+        "name": "nvmescratch",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 0.84,
+        "use_for": "c2-standard-16 with 100 GB pd-ssd boot disk (no local NVMe despite the name). I/O-heavy staging."
+      },
+      {
+        "cpu": "AVX2 only (e2)",
+        "cpus_per_node": 16,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 32,
+        "mem_gb_per_node": 124,
+        "name": "spot",
+        "spot": true,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 0.74,
+        "use_for": "Same nodes as standard at about half price, but Google may reclaim a node with ~30 s notice. Use for job arrays, parameter sweeps and restartable work; add --requeue."
+      },
+      {
+        "cpu": "AVX2 only (e2)",
+        "cpus_per_node": 16,
+        "default": true,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 32,
+        "mem_gb_per_node": 124,
+        "name": "standard",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "usd_per_node_hour": 1.45,
+        "use_for": "Default. AMD EPYC Milan c2d-standard-32. General CPU work and MPI."
+      }
+    ],
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "cat -- /apps/docs/catalog.json"
+      ]
+    }
+  }
+}

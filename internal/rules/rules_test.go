@@ -4,7 +4,18 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
+
+// ursa is Facts carrying the Ursa Major profile (site-specific advice).
+func ursa() Facts {
+	sp, err := site.Embedded("ursa-major")
+	if err != nil {
+		panic(err)
+	}
+	return Facts{Site: sp}
+}
 
 func logFixture(t *testing.T, id string) string {
 	t.Helper()
@@ -63,7 +74,7 @@ func TestRealFailures(t *testing.T) {
 }
 
 func TestPipMissingGetsSpecificAdvice(t *testing.T) {
-	fs := Explain(Facts{State: "FAILED", ExitCode: "1", Log: logFixture(t, "41"), LogReadable: true})
+	fs := Explain(Facts{State: "FAILED", ExitCode: "1", Log: logFixture(t, "41"), LogReadable: true, Site: ursa().Site})
 	f := want(t, fs, "python-import")
 	if !strings.Contains(f.Suggestion, "pixi add pip") {
 		t.Errorf("suggestion: %s", f.Suggestion)
@@ -82,7 +93,7 @@ func TestTimeoutFromStateAndLog(t *testing.T) {
 }
 
 func TestOOM(t *testing.T) {
-	fs := Explain(Facts{State: "OUT_OF_MEMORY", MemReqMB: 4000, MaxRSSMB: 3990, Partition: "standard"})
+	fs := Explain(Facts{State: "OUT_OF_MEMORY", MemReqMB: 4000, MaxRSSMB: 3990, Partition: "standard", Site: ursa().Site})
 	f := want(t, fs, "oom")
 	if !strings.Contains(f.Suggestion, "highmem") {
 		t.Errorf("suggestion: %s", f.Suggestion)
@@ -97,7 +108,7 @@ func TestOOM(t *testing.T) {
 		}
 	}
 	// already on highmem: different advice
-	fs = Explain(Facts{State: "OUT_OF_MEMORY", Partition: "highmem"})
+	fs = Explain(Facts{State: "OUT_OF_MEMORY", Partition: "highmem", Site: ursa().Site})
 	if !strings.Contains(want(t, fs, "oom").Suggestion, "Already on highmem") {
 		t.Error("highmem advice")
 	}
@@ -114,16 +125,20 @@ func TestLowEfficiency(t *testing.T) {
 }
 
 func TestPendingAndCancelled(t *testing.T) {
-	fs := Explain(Facts{State: "PENDING", Reason: "Resources"})
+	fs := Explain(Facts{State: "PENDING", Reason: "Resources", Site: ursa().Site})
 	f := want(t, fs, "pending")
 	if !strings.Contains(f.Suggestion, "boot") {
 		t.Errorf("Resources advice: %s", f.Suggestion)
 	}
-	m, _ := PendingReason("DependencyNeverSatisfied")
+	// a site without cloud nodes gets generic advice (no boot talk)
+	if f := want(t, Explain(Facts{State: "PENDING", Reason: "Resources"}), "pending"); strings.Contains(f.Suggestion, "boot") {
+		t.Errorf("generic Resources advice mentions boots: %s", f.Suggestion)
+	}
+	m, _ := PendingReason(nil, "DependencyNeverSatisfied")
 	if !strings.Contains(m, "never start") {
 		t.Error(m)
 	}
-	m, _ = PendingReason("SomethingNew")
+	m, _ = PendingReason(nil, "SomethingNew")
 	if !strings.Contains(m, "SomethingNew") {
 		t.Error("unknown reasons should be passed through")
 	}
@@ -215,7 +230,7 @@ func TestScriptOwnPythonError(t *testing.T) {
 // rule missed it and the job fell through to "no known pattern" (exit 5).
 func TestMakeCommandNotFoundCapitalC(t *testing.T) {
 	log := "[21:31:11] +4s cloned\nFAIL: build\nmake: python: Command not found\nmake: *** [buildsystem/Makefile.config:12: build/gadgetconfig.h] Error 127\ncat: build/gadgetconfig.h: No such file or directory\n"
-	fs := Explain(Facts{State: "FAILED", ExitCode: "5", Log: log, LogReadable: true})
+	fs := Explain(Facts{State: "FAILED", ExitCode: "5", Log: log, LogReadable: true, Site: ursa().Site})
 	f := want(t, fs, "command-not-found")
 	if !strings.Contains(f.Suggestion, "PYTHON=python3") {
 		t.Errorf("python advice missing: %q", f.Suggestion)
@@ -233,7 +248,7 @@ func TestCommandNotFoundAdvice(t *testing.T) {
 		"nvcc":            "gpul4",
 		"pip":             "python3",
 	} {
-		if got := commandNotFoundAdvice(cmd); !strings.Contains(got, wantSub) {
+		if got := ursa().commandNotFoundAdvice(cmd); !strings.Contains(got, wantSub) {
 			t.Errorf("%s: %q lacks %q", cmd, got, wantSub)
 		}
 	}

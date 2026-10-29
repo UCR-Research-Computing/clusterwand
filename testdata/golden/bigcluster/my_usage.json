@@ -1,0 +1,60 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "charge_unit": "SU",
+      "group_by": "partition",
+      "notes": [
+        "Estimated charge (est_charge, in service units) = the site's SU per core-hour x cores per node x nodes x elapsed hours x the share of each node the job held. Treat as an estimate."
+      ],
+      "rows": [
+        {
+          "core_hours": 500,
+          "cpu_efficiency_percent": 2.8,
+          "est_charge": 750,
+          "failed": 2,
+          "jobs": 5,
+          "key": "fast",
+          "node_hours": 22.73
+        },
+        {
+          "core_hours": 5,
+          "cpu_efficiency_percent": 11.8,
+          "est_charge": 39.8,
+          "failed": 4,
+          "gpu_hours": 0.62,
+          "jobs": 4,
+          "key": "gpu",
+          "node_hours": 0.62
+        },
+        {
+          "core_hours": 0.3,
+          "cpu_efficiency_percent": 1.8,
+          "est_charge": 0.3,
+          "failed": 3,
+          "jobs": 3,
+          "key": "cpu",
+          "node_hours": 0.02
+        }
+      ],
+      "since": "2026-09-01",
+      "total": {
+        "core_hours": 505.3,
+        "cpu_efficiency_percent": 2.9,
+        "est_charge": 790.1,
+        "failed": 9,
+        "gpu_hours": 0.62,
+        "jobs": 12,
+        "key": "total",
+        "node_hours": 23.37
+      }
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "bash -c 'SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"' clusterwand -u bob42 -S 2026-09-01",
+        "cat -- /opt/site/catalog.json"
+      ]
+    }
+  }
+}

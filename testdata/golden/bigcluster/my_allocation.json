@@ -1,0 +1,20 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "basis": "list-price estimate",
+      "covered_by": "",
+      "enforcement": "warn",
+      "lab": null,
+      "notes": [],
+      "period": "2026-10",
+      "period_start": "2026-10-01T00:00:00Z",
+      "person": null,
+      "resets_at": "2026-11-01T00:00:00Z"
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": []
+    }
+  }
+}

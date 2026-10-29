@@ -1,0 +1,28 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "alternative": "salloc -p cpu -N 1 -t 2:00:00 -c 4   # then: srun --pty bash -l   (exit twice to release the node)",
+      "charge_per_hour": 16,
+      "charge_unit": "SU",
+      "command": "srun -p cpu -N 1 -t 2:00:00 -c 4 --pty bash -l",
+      "connect": "ssh \u003cyour cluster login host\u003e",
+      "notes": [
+        "clusterwand does not open shells. Run these yourself: first connect to the login node, then start the session.",
+        "The session is billed until it ends: exit as soon as you are done.",
+        "Do not run heavy work on the login node itself; that is what the interactive session is for."
+      ],
+      "partition": "cpu",
+      "time_limit": "2 h",
+      "warnings": [],
+      "worst_case_charge": 32
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

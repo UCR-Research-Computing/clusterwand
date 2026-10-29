@@ -13,12 +13,16 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
 	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 	"github.com/UCR-Research-Computing/clusterwand/internal/slurm"
 )
 
 // Service is the core: one per process.
 type Service struct {
-	Cfg     config.Config
+	Cfg config.Config
+	// Site is the cluster's profile: paths, partition roles, wording, charge
+	// model. Never nil after New/NewService (a generic profile when none is set).
+	Site    *site.Profile
 	Backend backend.Backend
 	Audit   *policy.Audit
 	Limiter *policy.Limiter
@@ -60,9 +64,58 @@ type Service struct {
 
 // NewService builds a Service around an existing backend and audit log (the
 // HTTP server makes one per signed-in user and shares one audit log).
+// It panics on a broken site profile; New returns the error instead.
 func NewService(cfg config.Config, be backend.Backend, audit *policy.Audit) *Service {
-	return &Service{Cfg: cfg, Backend: be, Audit: audit,
+	cfg, sp, err := ResolveSite(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return &Service{Cfg: cfg, Site: sp, Backend: be, Audit: audit,
 		Limiter: policy.NewLimiter(cfg.Limits.CallsPerMin), Now: time.Now, cache: map[string]cacheEntry{}}
+}
+
+// ResolveSite loads the site profile the config names (site, site_file, or a
+// cluster name that matches a shipped profile; else the generic profile) and
+// fills the config fields the profile provides (catalog_path, log_roots,
+// env_check_partition) where the config leaves them empty.
+func ResolveSite(cfg config.Config) (config.Config, *site.Profile, error) {
+	var sp *site.Profile
+	var err error
+	switch {
+	case cfg.SiteFile != "":
+		sp, err = site.File(config.Expand(cfg.SiteFile))
+	case cfg.Site != "":
+		sp, err = site.Embedded(cfg.Site)
+	case cfg.Cluster != "" && hasSite(cfg.Cluster):
+		sp, err = site.Embedded(cfg.Cluster)
+	default:
+		sp = site.Generic()
+	}
+	if err != nil {
+		return cfg, nil, err
+	}
+	if cfg.Cluster == "" {
+		cfg.Cluster = sp.Name
+	}
+	if cfg.CatalogPath == "" {
+		cfg.CatalogPath = sp.Catalog
+	}
+	if len(cfg.LogRoots) == 0 {
+		cfg.LogRoots = append([]string(nil), sp.Paths.LogRoots...)
+	}
+	if cfg.EnvPartition == "" {
+		cfg.EnvPartition = sp.Partitions.Probe
+	}
+	return cfg, sp, nil
+}
+
+func hasSite(name string) bool {
+	for _, n := range site.Names() {
+		if n == name {
+			return true
+		}
+	}
+	return false
 }
 
 type cacheEntry struct {
@@ -72,6 +125,10 @@ type cacheEntry struct {
 
 // New builds a Service from config (SSH or fixture backend).
 func New(cfg config.Config) (*Service, error) {
+	cfg, sp, err := ResolveSite(cfg)
+	if err != nil {
+		return nil, err
+	}
 	var be backend.Backend
 	switch cfg.Backend {
 	case "fixture":
@@ -84,7 +141,7 @@ func New(cfg config.Config) (*Service, error) {
 		return nil, fmt.Errorf("audit log: %w", err)
 	}
 	return &Service{
-		Cfg: cfg, Backend: be, Audit: audit,
+		Cfg: cfg, Site: sp, Backend: be, Audit: audit,
 		Limiter: policy.NewLimiter(cfg.Limits.CallsPerMin),
 		Now:     time.Now, cache: map[string]cacheEntry{},
 	}, nil
@@ -276,6 +333,9 @@ func (s *Service) User(ctx context.Context) (string, error) {
 
 // Catalog fetches (and caches) the cluster catalog.
 func (s *Service) Catalog(ctx context.Context) (*Catalog, error) {
+	if s.Cfg.CatalogPath == "" {
+		return nil, errors.New("no cluster catalog configured: set catalog_path, or use a site profile that names one")
+	}
 	c, err := backend.Catalog(s.Cfg.CatalogPath)
 	if err != nil {
 		return nil, err
@@ -284,21 +344,46 @@ func (s *Service) Catalog(ctx context.Context) (*Catalog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading cluster catalog %s: %w", s.Cfg.CatalogPath, err)
 	}
-	return parseCatalog(b)
+	cat, err := parseCatalog(b)
+	if err != nil {
+		return nil, err
+	}
+	cat.GPUModules = s.Site.Modules.GPU
+	return cat, nil
 }
 
-// price returns $/node-hour for a partition (config override, then catalog).
+// price returns what one node-hour of a partition costs in the site's charge
+// unit. usd_per_node_hour: config usd_per_node_hour, then the site's rates, then
+// the catalog. su_per_core_hour: the site's rate x the partition's cores per node
+// (a whole node; shared partitions bill the share held, so cores x rate). none:
+// nothing is priced.
 func (s *Service) price(cat *Catalog, partition string) (float64, bool) {
-	if v, ok := s.Cfg.Costs[partition]; ok {
-		return v, true
-	}
-	if cat != nil {
-		if p, ok := cat.Partition(partition); ok && p.USDPerNodeHr != nil {
-			return *p.USDPerNodeHr, true
+	switch s.Site.Model() {
+	case site.ChargeUSDPerNodeHour:
+		if v, ok := s.Cfg.Costs[partition]; ok {
+			return v, true
+		}
+		if v, ok := s.Site.Charge.Rates[partition]; ok {
+			return v, true
+		}
+		if cat != nil {
+			if p, ok := cat.Partition(partition); ok && p.USDPerNodeHr != nil {
+				return *p.USDPerNodeHr, true
+			}
+		}
+	case site.ChargeSUPerCoreHour:
+		if r, ok := s.Site.Charge.Rates[partition]; ok && cat != nil {
+			if p, ok := cat.Partition(partition); ok && p.CPUsPerNode > 0 {
+				return r * float64(p.CPUsPerNode), true
+			}
 		}
 	}
 	return 0, false
 }
+
+// chargedInUSD reports a site charged in dollars (the only unit the *_usd
+// fields carry).
+func (s *Service) chargedInUSD() bool { return s.Site.Model() == site.ChargeUSDPerNodeHour }
 
 // ---- calls (audit + policy wrapper) ---------------------------------------------
 
@@ -357,8 +442,12 @@ func Call[T any](ctx context.Context, s *Service, client, tool, tier string, arg
 }
 
 // canSeeCost reports whether this Service caller should see dollar figures.
-func (s *Service) canSeeCost() bool {
-	if !s.Cfg.ShowCost {
+func (s *Service) canSeeCost() bool { return s.chargedInUSD() && s.canSeeCharge() }
+
+// canSeeCharge reports whether this caller sees charge figures in any unit
+// (show_cost and show_cost_tiers apply to service units as to dollars).
+func (s *Service) canSeeCharge() bool {
+	if !s.Cfg.ShowCost || s.Site.Model() == site.ChargeNone {
 		return false
 	}
 	if s.ProgramOwnCaps {
@@ -422,6 +511,16 @@ func stripCostFields(s *Service, data any) {
 		if v != nil {
 			v.USDPerHour = 0
 			v.WorstCaseUSD = 0
+		}
+	case *ScriptCheck:
+		if v != nil {
+			v.EstCostUSD = nil
+		}
+	case *Catalog:
+		if v != nil {
+			for i := range v.Partitions {
+				v.Partitions[i].USDPerNodeHr = nil
+			}
 		}
 	}
 }

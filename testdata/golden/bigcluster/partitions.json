@@ -1,0 +1,109 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": [
+      {
+        "charge_per_node_hour": 33,
+        "charge_unit": "SU",
+        "cpu": "AVX-512",
+        "cpus_per_node": 22,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 16,
+        "mem_gb_per_node": 85,
+        "name": "fast",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "Intel fast cores fast node, Tier_1 networking. Fastest per core; best for tightly coupled MPI (GROMACS, LAMMPS, CFD)."
+      },
+      {
+        "charge_per_node_hour": 64,
+        "charge_unit": "SU",
+        "cpu": "AVX-512",
+        "cpus_per_node": 8,
+        "default": false,
+        "gpu_type": "NVIDIA A100 80 GB",
+        "gpus_per_node": 1,
+        "max_nodes": 8,
+        "mem_gb_per_node": 62,
+        "name": "gpu",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "One NVIDIA A100 (24 GB) per node. ML training/inference, GPU MD (GROMACS/LAMMPS/OpenMM -cuda builds), LLMs up to ~8B (fp16) or ~14B (4-bit)."
+      },
+      {
+        "charge_per_node_hour": 64,
+        "charge_unit": "SU",
+        "cpu": "AVX-512",
+        "cpus_per_node": 32,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 8,
+        "mem_gb_per_node": 497,
+        "name": "bigmem",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "big-memory node with ~496 GB RAM. Genome assembly, large in-memory analytics, big matrices."
+      },
+      {
+        "charge_per_node_hour": 8,
+        "charge_unit": "SU",
+        "cpu": "AVX-512",
+        "cpus_per_node": 8,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 8,
+        "mem_gb_per_node": 62,
+        "name": "io",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "io node with 100 GB pd-ssd boot disk (no local NVMe despite the name). I/O-heavy staging."
+      },
+      {
+        "charge_per_node_hour": 8,
+        "charge_unit": "SU",
+        "cpu": "AVX2 only",
+        "cpus_per_node": 16,
+        "default": false,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 32,
+        "mem_gb_per_node": 124,
+        "name": "preempt",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "Same nodes as cpu at about half price, but the owner may reclaim a node with ~30 s notice. Use for job arrays, parameter sweeps and restartable work; add --requeue."
+      },
+      {
+        "charge_per_node_hour": 16,
+        "charge_unit": "SU",
+        "cpu": "AVX-512",
+        "cpus_per_node": 16,
+        "default": true,
+        "gpu_type": null,
+        "gpus_per_node": 0,
+        "max_nodes": 32,
+        "mem_gb_per_node": 124,
+        "name": "cpu",
+        "spot": false,
+        "state": "up",
+        "time_limit": "infinite",
+        "use_for": "Default. AMD EPYC Milan cpu node. General CPU work and MPI."
+      }
+    ],
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json"
+      ]
+    }
+  }
+}

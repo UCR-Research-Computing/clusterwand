@@ -1,0 +1,40 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "charge_unit": "SU",
+      "cores": {
+        "cores_asked": true,
+        "cores_per_node": 16,
+        "exclusive": false,
+        "mem_asked": false,
+        "mem_mb_per_node": 126976,
+        "node_share": 1
+      },
+      "est_max_charge": 5.33,
+      "issues": [
+        {
+          "message": "-march=native compiles for AVX-512 or for the build host (-march=native), but preempt nodes have AVX2 only: the program can die with 'Illegal instruction'. Use -march=x86-64-v3, or run on a partition whose nodes have AVX-512",
+          "severity": "warning"
+        }
+      ],
+      "modules": [],
+      "note": "Static check only; nothing was submitted. preempt gives whole nodes, so cost is per node regardless of cores used.",
+      "ok": true,
+      "partition": "preempt",
+      "request": {
+        "nodes": "2",
+        "ntasks-per-node": "16",
+        "partition": "preempt",
+        "time": "20:00"
+      }
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json",
+        "sinfo -h -o '%R|%h'"
+      ]
+    }
+  }
+}

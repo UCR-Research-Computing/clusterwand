@@ -1,0 +1,33 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "closest": [
+        "cmake"
+      ],
+      "dataset_note": "Read-only for users. Throughput is shared by the whole cluster (~100 MiB/s).",
+      "dataset_use": "shared, read-only reference data in /refdata: `module load \u003cmodule\u003e` sets the variables listed under env; do not copy it into home or scratch",
+      "datasets": [
+        {
+          "env": [
+            "KRAKEN2_DB_PATH",
+            "KRAKEN2_DEFAULT_DB"
+          ],
+          "module": "db-kraken2-cpu/2025-10-15",
+          "name": "kraken2-cpu",
+          "path": "/refdata/kraken2-cpu/2025-10-15",
+          "size_gb": 91.2,
+          "version": "2025-10-15"
+        }
+      ],
+      "how_to_load": "module load \u003cname\u003e[/\u003cversion\u003e]; MPI-built packages appear after `module load openmpi` (or mpich / intel-oneapi-mpi). Compilers: gcc/13.5.0 is the default toolchain of the Spack stack. `module spider \u003cname\u003e` shows how to reach any module.",
+      "matches": []
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json"
+      ]
+    }
+  }
+}

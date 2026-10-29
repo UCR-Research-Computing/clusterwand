@@ -1,0 +1,23 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "built_for": [
+        "module load openmpi"
+      ],
+      "loaded_first": "openmpi",
+      "module": "gromacs",
+      "notes": [
+        "gromacs is built with MPI, so it was shown after `module load openmpi`; in a job script load that MPI before it."
+      ],
+      "show": "----------------------------------------------------------------------------\n   /opt/modulefiles/gromacs:\n----------------------------------------------------------------------------\nwhatis(\"GROMACS Molecular Dynamics Engine (v2026.3) \")\nprepend_path(\"PATH\",\"/opt/gromacs/.pixi/envs/default/bin\")\nprepend_path(\"LD_LIBRARY_PATH\",\"/opt/gromacs/.pixi/envs/default/lib\")\nhelp([[GROMACS 2026.3 Molecular Dynamics Engine\n]])\n\n"
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json",
+        "bash -lc 'module load openmpi \u003e/dev/null 2\u003e\u00261; module -t show gromacs 2\u003e\u00261'"
+      ]
+    }
+  }
+}

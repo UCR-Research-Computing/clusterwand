@@ -1,0 +1,77 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "group_by": "state",
+      "notes": [
+        "Estimated cost = partition list price x nodes x elapsed hours x the share of each node the job held (1 on whole-node partitions; cores or memory share, whichever is larger, on shared ones); it excludes boot/idle time and credits. Treat as an estimate."
+      ],
+      "rows": [
+        {
+          "core_hours": 429.5,
+          "cpu_efficiency_percent": 0,
+          "est_cost_usd": 36.51,
+          "failed": 0,
+          "jobs": 1,
+          "key": "RUNNING",
+          "node_hours": 19.52
+        },
+        {
+          "core_hours": 33,
+          "cpu_efficiency_percent": 0,
+          "est_cost_usd": 2.81,
+          "failed": 1,
+          "jobs": 1,
+          "key": "TIMEOUT",
+          "node_hours": 1.5
+        },
+        {
+          "core_hours": 30.4,
+          "cpu_efficiency_percent": 46.4,
+          "est_cost_usd": 2.58,
+          "failed": 0,
+          "jobs": 1,
+          "key": "CANCELLED",
+          "node_hours": 1.38
+        },
+        {
+          "core_hours": 5.2,
+          "cpu_efficiency_percent": 11.3,
+          "est_cost_usd": 0.74,
+          "failed": 8,
+          "gpu_hours": 0.62,
+          "jobs": 8,
+          "key": "FAILED",
+          "node_hours": 0.64
+        },
+        {
+          "core_hours": 7.1,
+          "cpu_efficiency_percent": 0,
+          "est_cost_usd": 0.6,
+          "failed": 0,
+          "jobs": 1,
+          "key": "COMPLETED",
+          "node_hours": 0.32
+        }
+      ],
+      "since": "2026-09-01",
+      "total": {
+        "core_hours": 505.3,
+        "cpu_efficiency_percent": 2.9,
+        "est_cost_usd": 43.24,
+        "failed": 9,
+        "gpu_hours": 0.62,
+        "jobs": 12,
+        "key": "total",
+        "node_hours": 23.37
+      }
+    },
+    "source": {
+      "backend": "fixture:testdata",
+      "commands": [
+        "bash -c 'SLURM_TIME_FORMAT=%s exec sacct -n -P --noconvert -o JobIDRaw,User,Partition,State,Reason,ExitCode,NodeList,NNodes,Submit,Start,End,ElapsedRaw,TotalCPU,AllocTRES,MaxRSS,Restarts,JobName \"$@\"' clusterwand -u alice_ucr_edu -S 2026-09-01",
+        "cat -- /apps/docs/catalog.json"
+      ]
+    }
+  }
+}

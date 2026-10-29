@@ -124,11 +124,10 @@ clusterwand config init          # writes ~/.config/clusterwand/config.yaml
 Edit the file and set your host alias.
 
 ```yaml
+site_file: ~/.config/clusterwand/mysite.yaml   # or site: ursa-major (a shipped profile)
 backend: ssh
 ssh:
   host: mycluster                # any ~/.ssh/config alias or user@host
-catalog_path: /home/you/clusterwand/catalog.json   # a file in your own home; no admin needed
-log_roots: ["/home/{user}/", "/scratch/{user}/"]
 tiers: [R1]                      # add A1 for two-step submit/cancel, R2 for staff tools
 ```
 
@@ -138,13 +137,17 @@ clusterwand status
 clusterwand jobs --state FAILED
 ```
 
-**Honest note for v0.1.0:** the tools still expect a cluster catalog JSON on the login node
-(`catalog_path`: partitions, prices, modules, recipes; see
-[`testdata/catalog.json`](testdata/catalog.json) for the shape), and the defaults are Ursa
-Major's. ClusterWand never needs anything installed or changed on the cluster: a normal
-researcher login is enough, and the catalog can live in your own home folder. Site
-profiles (F1) and `clusterwand discover` (F3) replace the hand-written catalog. On Ursa
-Major the defaults work as they are.
+**Site profiles (v0.2.0).** Everything ClusterWand knows about a cluster beyond plain Slurm
+is in a site profile: home and scratch paths, partition roles (probe, GPU, high-memory,
+general, fallbacks), CPU notes, the catalog location, the charge model
+(`usd_per_node_hour`, `su_per_core_hour` with SU caps, or `none`) and site wording. Ursa
+Major's is [`sites/ursa-major/site.yaml`](sites/ursa-major/site.yaml) (`site: ursa-major`);
+with no profile a generic one is used (home only, no catalog, no charges, no env_check
+partition). A profile of your own needs `approved: true`. Catalog-backed tools (partitions,
+modules, recipes, prices) still need a catalog JSON
+([`testdata/catalog.json`](testdata/catalog.json) shows the shape), which can live in your
+own home folder; `clusterwand discover` (F3) will draft both. ClusterWand never needs
+anything installed or changed on the cluster.
 
 ## Connect an AI assistant
 
@@ -259,14 +262,14 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 9.
 | `internal/rules/` | deterministic diagnosis rules for `job_explain` |
 | `internal/policy/` | redaction, untrusted wrapping, tiers, rate limit, audit |
 | `internal/mcpserver/` | MCP tools, resources, prompts |
-| `sites/ursa-major/` | Ursa Major's site notes (its site profile lands in F1) |
+| `internal/site/`, `sites/` | Site profiles: schema and validation; shipped profiles (`sites/ursa-major/site.yaml`) |
 
 ## Roadmap
 
 | Phase | What | Status |
 |---|---|---|
 | F0 | Fork and polish: renamed module, binary and paths; docs; CI | v0.1.0 |
-| F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | planned, v0.2.0 |
+| F1 | Site profiles: every Ursa constant moves to `sites/ursa-major/site.yaml`; charge models (USD per node-hour, SU per core-hour, none); golden tests | done, v0.2.0 |
 | F2 | Slurm adapter: text-format parsers for older Slurm, JSON behind a flag; lab-locked partitions | planned, v0.3.0 |
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey | planned, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH | planned, v0.5.0 |

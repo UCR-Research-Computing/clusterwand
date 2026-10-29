@@ -1,0 +1,267 @@
+{
+  "result": {
+    "as_of": "2026-10-01T13:23:21-04:00",
+    "data": {
+      "install_tools": [
+        {
+          "available": true,
+          "how": "on PATH everywhere (/opt/bin/uv)",
+          "name": "uv",
+          "use": "uv venv $TMPDIR/v \u0026\u0026 . $TMPDIR/v/bin/activate \u0026\u0026 uv pip install \u003cpkgs\u003e; fastest way to get PyPI packages"
+        },
+        {
+          "available": true,
+          "how": "on PATH everywhere (/opt/pixi/bin/pixi)",
+          "name": "pixi",
+          "use": "conda-forge/bioconda environments without root: pixi init \u0026\u0026 pixi add \u003cpkgs\u003e"
+        },
+        {
+          "available": true,
+          "how": "module load miniforge3",
+          "name": "conda/mamba",
+          "use": "mamba create -p $SCRATCH/envs/x -c conda-forge -c bioconda \u003cpkgs\u003e"
+        },
+        {
+          "available": true,
+          "how": "module load apptainer",
+          "name": "apptainer",
+          "use": "apptainer pull x.sif docker://\u003cimage\u003e; apptainer exec [--nv] x.sif \u003ccmd\u003e; unprivileged, /dev/fuse available"
+        },
+        {
+          "available": true,
+          "how": "source /opt/spack/share/spack/setup-env.sh (admins)",
+          "name": "spack",
+          "use": "compiled HPC codes; the shared stack is maintained by the HPC team"
+        },
+        {
+          "available": true,
+          "how": "python -m pip install",
+          "name": "pip (inside any env)",
+          "use": "wheels need LD_LIBRARY_PATH=$CONDA_PREFIX/lib inside Pixi/conda envs (the node OS libstdc++ is old)"
+        }
+      ],
+      "job_header": {
+        "path": "/opt/site/job-header.sh",
+        "use": "source it near the top of every job script (. /opt/site/job-header.sh): sets TMPDIR, SCRATCH, package caches, SITE_CONTAINERS; site_conda_libs fixes pip wheels inside Pixi/conda envs"
+      },
+      "recipes": [
+        {
+          "field": "molecular dynamics",
+          "load": [
+            "openmpi",
+            "gromacs/2026.1"
+          ],
+          "name": "GROMACS (CPU, MPI)",
+          "notes": "Use thread/rank counts with small prime factors (16, 20), not 22.",
+          "partition": "fast",
+          "run": "srun gmx_mpi mdrun -deffnm md -ntomp $SLURM_CPUS_PER_TASK"
+        },
+        {
+          "field": "molecular dynamics",
+          "gpus": 1,
+          "load": [
+            "openmpi",
+            "gromacs/2026.1-cuda"
+          ],
+          "name": "GROMACS (GPU)",
+          "partition": "gpu",
+          "run": "gmx_mpi mdrun -deffnm md -nb gpu -pme gpu"
+        },
+        {
+          "field": "molecular dynamics / materials",
+          "load": [
+            "openmpi",
+            "lammps/20250722.4"
+          ],
+          "name": "LAMMPS (CPU, MPI)",
+          "partition": "fast",
+          "run": "srun lmp -in in.script"
+        },
+        {
+          "field": "molecular dynamics / materials",
+          "gpus": 1,
+          "load": [
+            "openmpi",
+            "lammps/20250722.4-cuda"
+          ],
+          "name": "LAMMPS (GPU)",
+          "partition": "gpu",
+          "run": "lmp -sf gpu -pk gpu 1 -in in.script"
+        },
+        {
+          "field": "molecular dynamics",
+          "gpus": 1,
+          "load": [
+            "openmm/8.5.2-cuda"
+          ],
+          "name": "OpenMM (GPU)",
+          "partition": "gpu",
+          "run": "python sim.py  # platform='CUDA'"
+        },
+        {
+          "field": "electronic structure / DFT",
+          "load": [
+            "openmpi",
+            "quantum-espresso/7.6"
+          ],
+          "name": "Quantum ESPRESSO",
+          "partition": "fast",
+          "run": "srun pw.x -in scf.in \u003e scf.out"
+        },
+        {
+          "field": "electronic structure / ab initio MD",
+          "load": [
+            "openmpi",
+            "cp2k/2026.2"
+          ],
+          "name": "CP2K",
+          "partition": "fast",
+          "run": "srun cp2k.psmp -i input.inp -o out.log"
+        },
+        {
+          "field": "chemistry",
+          "load": [
+            "xtb/6.5.1"
+          ],
+          "name": "xtb (semi-empirical QM)",
+          "partition": "cpu",
+          "run": "xtb mol.xyz --opt --gfn 2"
+        },
+        {
+          "field": "numerical PDEs",
+          "load": [
+            "openmpi",
+            "petsc/3.25.5"
+          ],
+          "name": "PETSc / Trilinos (build your own solver)",
+          "partition": "fast",
+          "run": "mpicc solver.c $(pkg-config --cflags --libs PETSc) \u0026\u0026 srun ./a.out"
+        },
+        {
+          "field": "data analysis / scientific Python",
+          "load": [
+            "python-sci"
+          ],
+          "name": "Scientific Python (site env, CPU)",
+          "notes": "Python 3.12 with numpy scipy pandas matplotlib seaborn scikit-learn statsmodels sympy numba xarray netCDF4 h5py zarr dask polars pyarrow astropy astroquery skyfield sunpy cartopy geopandas rasterio networkx biopython pysam scikit-image opencv jupyterlab; cutadapt, multiqc, snakemake. Extra packages: uv venv --system-site-packages $TMPDIR/v. Every package is import-tested together. Do not combine with other Python modules.",
+          "partition": "cpu",
+          "run": "python analysis.py"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "busco/6.1.0"
+          ],
+          "name": "BUSCO (genome completeness)",
+          "partition": "cpu",
+          "run": "busco -i asm.fa -m genome -l bacteria_odb12 -c $SLURM_CPUS_ON_NODE --download_path $SCRATCH/busco_downloads"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "prokka/1.14.6"
+          ],
+          "name": "Prokka (prokaryote annotation)",
+          "partition": "cpu",
+          "run": "prokka --cpus $SLURM_CPUS_ON_NODE --outdir ann --prefix x asm.fa"
+        },
+        {
+          "field": "machine learning",
+          "gpus": 1,
+          "load": [
+            "python-ml"
+          ],
+          "name": "PyTorch (site env, CUDA 12.4)",
+          "notes": "Python 3.12, torch 2.5.1+cu124, numpy, scipy, pandas, scikit-learn, transformers, JupyterLab.",
+          "partition": "gpu",
+          "run": "python train.py"
+        },
+        {
+          "field": "machine learning",
+          "gpus": 1,
+          "load": [],
+          "name": "Current PyTorch (CUDA 13)",
+          "notes": "Driver 580 runs CUDA \u003c= 13.0 wheels.",
+          "partition": "gpu",
+          "run": "uv venv $TMPDIR/v \u0026\u0026 . $TMPDIR/v/bin/activate \u0026\u0026 uv pip install torch --index-url https://download.pytorch.org/whl/cu130"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "blast-plus"
+          ],
+          "name": "BLAST+",
+          "partition": "cpu",
+          "run": "blastn -query q.fa -db db -outfmt 6 -num_threads $SLURM_CPUS_ON_NODE"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "bwa",
+            "samtools/1.23.1",
+            "bcftools/1.23.1"
+          ],
+          "name": "Read mapping + variant calling",
+          "partition": "cpu",
+          "run": "bwa mem -t $SLURM_CPUS_ON_NODE ref.fa r1.fq r2.fq | samtools sort -o aln.bam; bcftools mpileup -f ref.fa aln.bam | bcftools call -mv"
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "gatk/4.5.0.0"
+          ],
+          "name": "GATK",
+          "partition": "cpu",
+          "run": "gatk HaplotypeCaller ..."
+        },
+        {
+          "field": "bioinformatics",
+          "load": [
+            "spades/3.15.5"
+          ],
+          "name": "SPAdes assembly",
+          "partition": "bigmem",
+          "run": "spades.py -1 r1.fq -2 r2.fq -o asm -t $SLURM_CPUS_ON_NODE -m 480"
+        },
+        {
+          "field": "statistics",
+          "load": [
+            "r/4.5.3"
+          ],
+          "name": "R",
+          "notes": "Or /opt/containers/r-tidyverse-4.5.sif.",
+          "partition": "cpu",
+          "run": "Rscript analysis.R"
+        },
+        {
+          "field": "HPC",
+          "load": [
+            "gcc/13.5.0",
+            "openmpi/5.0.10"
+          ],
+          "name": "Multi-node MPI (your own code)",
+          "notes": "Also mpich and intel-oneapi-mpi.",
+          "partition": "fast",
+          "run": "mpicc prog.c -O3 -march=x86-64-v3 -o prog \u0026\u0026 srun ./prog"
+        }
+      ],
+      "site_rules": [
+        "Python: load exactly one Python environment module: python-sci (CPU science stack) or python-ml (PyTorch/GPU). There are no per-package Python modules (no py-numpy etc.) and no bare python module; for anything else use a Pixi/conda or uv environment inside the job.",
+        "Slurm CPUs are physical cores (ThreadsPerCore=1); never request more CPUs per node than the partition lists.",
+        "Nodes are created on demand: the first job on a cold partition waits ~90 s-5 min for boot.",
+        "Every job task gets a private $TMPDIR (/tmp/job-\u003cid\u003e-\u003cuser\u003e, node-local) and shared $SCRATCH (/work/$USER, 2.5 TB, not backed up).",
+        "/home and /apps are shared NFS (Filestore) on every node.",
+        "Nodes have outbound internet through Cloud NAT (pip, conda, docker pulls, dataset downloads all work).",
+        "OS: the node OS, glibc 2.28, system GCC 8.5; use module gcc/* for modern compilers.",
+        "Code built for AVX-512 crashes on the AMD cpu/preempt nodes; the site stack targets x86-64-v3 (AVX2).",
+        "Partitions are exclusive: a job gets whole nodes."
+      ]
+    },
+    "source": {
+      "backend": "fixture:bigcluster",
+      "commands": [
+        "cat -- /opt/site/catalog.json"
+      ]
+    }
+  }
+}

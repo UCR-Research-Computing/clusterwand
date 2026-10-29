@@ -47,17 +47,28 @@ type Caps struct {
 	MaxCostPerDayUSD  float64 `yaml:"max_cost_usd_per_day"`
 	MaxSubmitsPerDay  int     `yaml:"max_submits_per_day"`
 	ConfirmTTLMinutes int     `yaml:"confirm_ttl_minutes"`
+	// Service-unit caps for sites charged in SU (charge model su_per_core_hour);
+	// 0 = the site profile's charge.max_su_per_job / max_su_per_day.
+	MaxSUPerJob float64 `yaml:"max_su_per_job,omitempty"`
+	MaxSUPerDay float64 `yaml:"max_su_per_day,omitempty"`
 }
 
 // Config is the whole file.
 type Config struct {
+	// Site names a shipped site profile (sites/<name>/site.yaml); SiteFile is
+	// a profile of your own. With neither, a cluster name that matches a shipped
+	// profile selects it, else a generic profile is used. Values set here
+	// (catalog_path, log_roots, env_check_partition, usd_per_node_hour) win over
+	// the profile.
+	Site          string             `yaml:"site,omitempty"`
+	SiteFile      string             `yaml:"site_file,omitempty"`
 	Cluster       string             `yaml:"cluster"`
 	ClusterUser   string             `yaml:"cluster_user,omitempty"` // default: `id -un` on the login node
 	Backend       string             `yaml:"backend"`                // ssh | fixture
 	FixturesDir   string             `yaml:"fixtures_dir,omitempty"`
 	SSH           SSH                `yaml:"ssh"`
-	CatalogPath   string             `yaml:"catalog_path"`
-	LogRoots      []string           `yaml:"log_roots"` // allowed log prefixes; {user} expands
+	CatalogPath   string             `yaml:"catalog_path,omitempty"` // default: the site profile's catalog
+	LogRoots      []string           `yaml:"log_roots,omitempty"`    // allowed log prefixes; {user} expands; default: the site's
 	Costs         map[string]float64 `yaml:"usd_per_node_hour,omitempty"`
 	ShowCost      bool               `yaml:"show_cost"`
 	ShowCostTiers []string           `yaml:"show_cost_tiers,omitempty"`
@@ -69,9 +80,10 @@ type Config struct {
 	StatePath     string             `yaml:"state_path"`  // A1 plans, tokens and spend ledger
 	ResultsDir    string             `yaml:"results_dir"` // local folder for downloaded results
 	JobsRoot      string             `yaml:"jobs_root"`   // remote folder under $HOME for submitted jobs
-	// EnvPartition is where env_check runs its one-core job (never the login node).
-	EnvPartition string `yaml:"env_check_partition"`
-	// Allocation configures optional Ursa Major allocations (local single-user CLI path).
+	// EnvPartition is where env_check runs its one-core job (never the login
+	// node); default: the site profile's probe partition.
+	EnvPartition string `yaml:"env_check_partition,omitempty"`
+	// Allocation configures optional allocations (local single-user CLI path).
 	Allocation *AllocationConfig `yaml:"allocation,omitempty"`
 	Path       string            `yaml:"-"`
 }
@@ -113,13 +125,10 @@ var rePartitionName = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
 // Default returns a configuration with every default filled in (no SSH target).
 func Default() Config {
 	return Config{
-		Cluster:     "ursa-major",
-		Backend:     "ssh",
-		SSH:         SSH{ControlPersist: 900, ConnectTimeout: 30},
-		CatalogPath: "/apps/docs/catalog.json",
-		LogRoots:    []string{"/home/{user}/", "/scratch/{user}/"},
-		ShowCost:    true,
-		Tiers:       []string{"R1"},
+		Backend:  "ssh",
+		SSH:      SSH{ControlPersist: 900, ConnectTimeout: 30},
+		ShowCost: true,
+		Tiers:    []string{"R1"},
 		TTL: TTL{
 			Queue:   Duration{20 * time.Second},
 			Nodes:   Duration{30 * time.Second},
@@ -134,11 +143,10 @@ func Default() Config {
 			UntrustedCh: 16000,
 			CallsPerMin: 60,
 		},
-		AuditPath:    "~/.local/share/clusterwand/audit.jsonl",
-		StatePath:    "~/.local/share/clusterwand/a1.json",
-		ResultsDir:   "~/clusterwand-results",
-		JobsRoot:     "clusterwand-jobs",
-		EnvPartition: "check",
+		AuditPath:  "~/.local/share/clusterwand/audit.jsonl",
+		StatePath:  "~/.local/share/clusterwand/a1.json",
+		ResultsDir: "~/clusterwand-results",
+		JobsRoot:   "clusterwand-jobs",
 		Caps: Caps{MaxNodes: 4, MaxHours: 24, MaxCostPerJobUSD: 25, MaxCostPerDayUSD: 50,
 			MaxSubmitsPerDay: 20, ConfirmTTLMinutes: 10},
 	}
@@ -191,8 +199,14 @@ func (c Config) Validate() error {
 	default:
 		return fmt.Errorf("config: unknown backend %q (ssh or fixture)", c.Backend)
 	}
-	if !rePartitionName.MatchString(c.EnvPartition) {
-		return errors.New("config: env_check_partition must be a partition name (default check)")
+	if c.EnvPartition != "" && !rePartitionName.MatchString(c.EnvPartition) {
+		return errors.New("config: env_check_partition must be a partition name (default: the site's probe partition)")
+	}
+	if c.Site != "" && c.SiteFile != "" {
+		return errors.New("config: set site or site_file, not both")
+	}
+	if c.Caps.MaxSUPerJob < 0 || c.Caps.MaxSUPerDay < 0 {
+		return errors.New("config: SU caps must not be negative")
 	}
 	if c.JobsRoot != "clusterwand-jobs" {
 		return errors.New("config: jobs_root must be clusterwand-jobs (other folders are not supported yet)")
@@ -231,7 +245,10 @@ func Expand(p string) string {
 
 // Example is the file `clusterwand config init` writes.
 const Example = `# clusterwand configuration
-cluster: ursa-major
+# Site profile: a shipped one (site: <name>, see sites/ in the repo) or your own
+# file (site_file: ~/.config/clusterwand/mysite.yaml). It holds the cluster's
+# paths, partition roles, catalog location and charge model.
+site: ursa-major
 backend: ssh              # ssh | fixture
 
 ssh:
@@ -241,16 +258,15 @@ ssh:
   control_persist: 900
   connect_timeout: 30
 
-# Published by the cluster (ursa-catalog): partitions, prices, modules, recipes
-catalog_path: /apps/docs/catalog.json
+# The site profile sets these; uncomment to override
+# catalog_path: /path/to/catalog.json        # partitions, prices, modules, recipes
+# log_roots: ["/home/{user}/"]               # job logs are read only under these
+# env_check_partition: debug                 # env_check's one-core job
 
-# Job logs may only be read under these prefixes ({user} = your cluster user)
-log_roots: ["/home/{user}/", "/scratch/{user}/"]
-
-# Dollar figures in usage and status output (prices come from the catalog;
-# override per partition below)
+# Cost figures in usage and status output (rates come from the catalog or the
+# site profile; override dollars per node-hour per partition below)
 show_cost: true
-# usd_per_node_hour: {computehigh: 1.87}
+# usd_per_node_hour: {mypartition: 1.50}
 
 # Tiers for the local user: R1 own jobs + cluster facts, R2 staff (all users),
 # A1 submit/cancel/hold/release own jobs (two-step confirm, capped below)

@@ -3,7 +3,9 @@
 // Each rule looks at facts from the accounting record and, optionally, the log
 // tail, and returns a finding with the evidence that fired it. No model runs here.
 // The log rules are seeded from deep-research's FAILURE_CLASSES (lab.py) and real
-// failed jobs on Ursa Major; every rule has a test in rules_test.go.
+// failed jobs on a production cluster; every rule has a test in rules_test.go.
+// Suggestions are generic; a site profile replaces them with site-specific advice
+// (text keys rule_*), so no partition, path or hardware name lives here.
 package rules
 
 import (
@@ -11,6 +13,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
 
 // Facts is what the rules look at. Built by core from sacct (+ squeue) and the log.
@@ -31,6 +35,8 @@ type Facts struct {
 	Log           string // log tail (may be empty)
 	LogReadable   bool
 	SpotPartition bool
+	// Site words the suggestions (nil = generic wording).
+	Site *site.Profile
 }
 
 // Severity of a finding.
@@ -51,6 +57,7 @@ type Finding struct {
 
 type logRule struct {
 	id, title, suggestion string
+	key                   string // site text key that replaces suggestion
 	severity              string
 	re                    *regexp.Regexp
 }
@@ -64,23 +71,23 @@ var logRules = []logRule{
 	},
 	{
 		id: "container", severity: Error, title: "Container image could not be pulled or opened",
-		re:         regexp.MustCompile(`FATAL:\s+While (?:making image|pulling)|unable to parse image name`),
-		suggestion: "Local .sif files are run directly (`apptainer exec /apps/containers/x.sif ...`), not pulled; for registry images use docker://name:tag. List /apps/containers for prebuilt images.",
+		re:  regexp.MustCompile(`FATAL:\s+While (?:making image|pulling)|unable to parse image name`),
+		key: "rule_container", suggestion: "Local .sif files are run directly (`apptainer exec /path/to/x.sif ...`), not pulled; for registry images use docker://name:tag.",
 	},
 	{
 		id: "illegal-instruction", severity: Error, title: "A program used a CPU instruction this node does not have",
-		re:         regexp.MustCompile(`Illegal instruction|illegal hardware instruction|SIGILL|signal 4\b|requires AVX-?512|AVX512\w* (?:is )?not supported|This TensorFlow binary is optimized to use available CPU instructions|CPU does not support (?:AVX|the required)`),
-		suggestion: "The program was built for a newer CPU (usually AVX-512, or -march=native on another machine). standard, spot and check run e2 nodes with AVX2 only. Rebuild with -march=x86-64-v3 (what the site software uses), use the site module or a container, or run on computehigh (Intel Sapphire Rapids, AVX-512).",
+		re:  regexp.MustCompile(`Illegal instruction|illegal hardware instruction|SIGILL|signal 4\b|requires AVX-?512|AVX512\w* (?:is )?not supported|This TensorFlow binary is optimized to use available CPU instructions|CPU does not support (?:AVX|the required)`),
+		key: "rule_illegal_instruction", suggestion: "The program was built for a newer CPU than this node has (usually AVX-512, or -march=native on another machine). Rebuild with -march=x86-64-v3, use the site module or a container, or run on a partition whose nodes have the instructions (partitions lists each one's CPU).",
 	},
 	{
 		id: "tool-crash", severity: Error, title: "A program crashed (assertion or segfault)",
-		re:         regexp.MustCompile(`Assertion '.*' failed|Segmentation fault|core dumped|signal 11|\*\*\* Process received signal`),
-		suggestion: "Usually an input it did not expect (name or format), or code built for AVX-512 on the AVX2-only standard/spot nodes (e2). Check inputs; try computehigh (Intel, AVX-512) to rule out the CPU.",
+		re:  regexp.MustCompile(`Assertion '.*' failed|Segmentation fault|core dumped|signal 11|\*\*\* Process received signal`),
+		key: "rule_tool_crash", suggestion: "Usually an input it did not expect (name or format), or code built for a newer CPU than the node has. Check inputs; try a partition with newer CPUs to rule out the CPU.",
 	},
 	{
 		id: "glibc", severity: Error, title: "Binary needs a newer glibc than the nodes have",
-		re:         regexp.MustCompile("version `GLIBC_2\\.\\d+' not found"),
-		suggestion: "Nodes run Rocky 8 (glibc 2.28). Use the module, a container, or an older build (conda-forge keeps old versions).",
+		re:  regexp.MustCompile("version `GLIBC_2\\.\\d+' not found"),
+		key: "rule_glibc", suggestion: "The nodes' glibc is older than the binary needs. Use the module, a container, or an older build (conda-forge keeps old versions).",
 	},
 	{
 		id: "module-missing", severity: Error, title: "A module could not be loaded",
@@ -89,8 +96,8 @@ var logRules = []logRule{
 	},
 	{
 		id: "python-import", severity: Error, title: "Python package not installed in the environment",
-		re:         regexp.MustCompile(`ModuleNotFoundError: No module named '([^']+)'|ImportError: No module named ([\w.]+)|python[\d.]*: No module named ([\w.]+)`),
-		suggestion: "Load python-sci (CPU) or python-ml (PyTorch/GPU), or create a uv/Pixi environment in the job. Check that the environment is activated in the same shell that runs python.",
+		re:  regexp.MustCompile(`ModuleNotFoundError: No module named '([^']+)'|ImportError: No module named ([\w.]+)|python[\d.]*: No module named ([\w.]+)`),
+		key: "rule_python_import", suggestion: "Load the site's Python module, or create a uv/Pixi/conda environment in the job. Check that the environment is activated in the same shell that runs python.",
 	},
 	{
 		id: "tls", severity: Error, title: "HTTPS certificate verification failed",
@@ -129,18 +136,18 @@ var logRules = []logRule{
 	},
 	{
 		id: "cuda", severity: Error, title: "GPU/CUDA problem",
-		re:         regexp.MustCompile(`CUDA error|no CUDA-capable device|CUDA out of memory|torch\.cuda\.OutOfMemoryError|NVIDIA-SMI has failed`),
-		suggestion: "GPU memory is 24 GB per L4: reduce batch size or model size. If no device is found, request --gres=gpu:1 on gpul4 and use `apptainer exec --nv` for containers.",
+		re:  regexp.MustCompile(`CUDA error|no CUDA-capable device|CUDA out of memory|torch\.cuda\.OutOfMemoryError|NVIDIA-SMI has failed`),
+		key: "rule_cuda", suggestion: "Out of GPU memory: reduce batch size or model size. If no device is found, request a GPU (--gres=gpu:1) on a GPU partition and use `apptainer exec --nv` for containers.",
 	},
 	{
 		id: "disk-full", severity: Error, title: "Out of disk space or quota",
-		re:         regexp.MustCompile(`No space left on device|Disk quota exceeded`),
-		suggestion: "Write large outputs to $SCRATCH (/scratch/$USER) and temp files to $TMPDIR; clean up old runs. Public reference databases are already in /data/shared (module load db-<name>), so do not download private copies.",
+		re:  regexp.MustCompile(`No space left on device|Disk quota exceeded`),
+		key: "rule_disk_full", suggestion: "Write large outputs to scratch and temp files to $TMPDIR; clean up old runs. Check storage_usage for what fills your folders.",
 	},
 	{
 		id: "permission", severity: Error, title: "Permission denied",
-		re:         regexp.MustCompile(`Permission denied`),
-		suggestion: "Check file permissions and that paths are under your home or scratch; scripts need chmod +x if executed directly. /data/shared (reference databases) and /apps are read-only: write outputs to $SCRATCH and point tools at the database with its db-* module.",
+		re:  regexp.MustCompile(`Permission denied`),
+		key: "rule_permission", suggestion: "Check file permissions and that paths are under your home or scratch; scripts need chmod +x if executed directly. Shared software and data trees are read-only: write outputs to your own folders.",
 	},
 	{
 		id: "command-not-found", severity: Error, title: "A command was not found",
@@ -164,22 +171,22 @@ func Explain(f Facts) []Finding {
 	case "OUT_OF_MEMORY":
 		add(Finding{Rule: "oom", Severity: Error, Title: "Job ran out of memory",
 			Evidence:   []string{"state OUT_OF_MEMORY", memEvidence(f)},
-			Suggestion: memSuggestion(f)})
+			Suggestion: f.memSuggestion()})
 	case "TIMEOUT":
 		ev := []string{"state TIMEOUT"}
 		if f.LimitMin > 0 {
 			ev = append(ev, fmt.Sprintf("time limit %s, ran %s", minutes(f.LimitMin), dur(f.ElapsedSec)))
 		}
 		add(Finding{Rule: "timeout", Severity: Error, Title: "Job hit its time limit", Evidence: ev,
-			Suggestion: "Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock)."})
+			Suggestion: f.text("rule_timeout", "Raise --time (up to the partition's limit), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).")})
 	case "NODE_FAIL":
 		add(Finding{Rule: "node-fail", Severity: Error, Title: "The node failed under the job",
 			Evidence:   []string{"state NODE_FAIL", fmt.Sprintf("restart count %d", f.RestartCnt)},
-			Suggestion: "Usually not the user's fault (cloud node lost). Resubmit; add --requeue for long jobs."})
+			Suggestion: f.text("rule_node_fail", "Usually not the user's fault (the node was lost). Resubmit; add --requeue for long jobs.")})
 	case "PREEMPTED":
 		add(Finding{Rule: "preempted", Severity: Warning, Title: "Job was preempted",
 			Evidence:   []string{"state PREEMPTED", "partition " + f.Partition},
-			Suggestion: "Spot nodes can be reclaimed with ~30 s notice. Add --requeue and checkpointing, or use standard for work that cannot restart."})
+			Suggestion: f.text("rule_preempted", "Preemptible nodes can be reclaimed at short notice. Add --requeue and checkpointing, or use a non-preemptible partition for work that cannot restart.")})
 	case "CANCELLED":
 		ev := []string{"state CANCELLED"}
 		if f.KilledBy != "" {
@@ -196,7 +203,7 @@ func Explain(f Facts) []Finding {
 			sev = Error
 		}
 		add(Finding{Rule: "memory-near-limit", Severity: sev, Title: "Peak memory reached the allocation",
-			Evidence: []string{memEvidence(f)}, Suggestion: memSuggestion(f)})
+			Evidence: []string{memEvidence(f)}, Suggestion: f.memSuggestion()})
 	}
 
 	if f.Log != "" {
@@ -206,7 +213,7 @@ func Explain(f Facts) []Finding {
 		}
 		if m := regexp.MustCompile(`oom-kill|Out Of Memory|out of memory|MemoryError|(?m)Killed\s*$`).FindString(tail); m != "" && st != "OUT_OF_MEMORY" {
 			add(Finding{Rule: "oom-log", Severity: Error, Title: "Out-of-memory kill in the log",
-				Evidence: []string{"log: " + clip(lineOf(tail, m), 200), memEvidence(f)}, Suggestion: memSuggestion(f)})
+				Evidence: []string{"log: " + clip(lineOf(tail, m), 200), memEvidence(f)}, Suggestion: f.memSuggestion()})
 		}
 		if st != "TIMEOUT" && regexp.MustCompile(`DUE TO TIME LIMIT`).MatchString(tail) {
 			add(Finding{Rule: "timeout", Severity: Error, Title: "Job hit its time limit",
@@ -229,9 +236,12 @@ func Explain(f Facts) []Finding {
 				ev = append(ev, fmt.Sprintf("%d matching lines", len(locs)))
 			}
 			sug := r.suggestion
+			if r.key != "" {
+				sug = f.text(r.key, r.suggestion)
+			}
 			if r.id == "command-not-found" {
 				if m := r.re.FindStringSubmatch(tail[last[0]:]); len(m) > 1 {
-					sug = commandNotFoundAdvice(strings.TrimSuffix(m[1], ":"))
+					sug = f.commandNotFoundAdvice(strings.TrimSuffix(m[1], ":"))
 				}
 			}
 			if r.id == "python-import" {
@@ -256,7 +266,7 @@ func Explain(f Facts) []Finding {
 	if st == "FAILED" || st == "OUT_OF_MEMORY" {
 		if sig, ok := signalExits[f.ExitCode]; ok && !hasRule(out, "tool-crash", "illegal-instruction", "oom", "oom-log", "memory-near-limit") {
 			add(Finding{Rule: "exit-signal", Severity: Error, Title: sig.title,
-				Evidence: []string{"exit code " + f.ExitCode + " = " + sig.meaning}, Suggestion: sig.fix})
+				Evidence: []string{"exit code " + f.ExitCode + " = " + sig.meaning}, Suggestion: f.text(sig.key, sig.fix)})
 		}
 	}
 
@@ -274,7 +284,7 @@ func Explain(f Facts) []Finding {
 	if st == "FAILED" && f.ExitCode == "127" && !hasRule(out, "command-not-found") {
 		add(Finding{Rule: "command-not-found", Severity: Error, Title: "A command was not found",
 			Evidence:   []string{"exit code 127 = the shell could not find a command"},
-			Suggestion: "Check the first \"command not found\" line in the log (job_log_tail). Load the module that provides the program, or use its full path. There is no bare `python` on the nodes: use python3, or load python-sci / python-ml."})
+			Suggestion: f.text("rule_exit127", "Check the first \"command not found\" line in the log (job_log_tail). Load the module that provides the program, or use its full path (many nodes have python3 but no bare python).")})
 	}
 
 	if st == "FAILED" && len(out) == 0 {
@@ -288,20 +298,23 @@ func Explain(f Facts) []Finding {
 	}
 
 	if st == "PENDING" {
-		add(pendingFinding(f.Reason))
+		add(pendingFinding(f.Site, f.Reason))
 	}
 
 	sort.SliceStable(out, func(i, j int) bool { return rank(out[i].Severity) < rank(out[j].Severity) })
 	return dedupe(out)
 }
 
-// PendingReason decodes a Slurm pending reason into plain words.
-func PendingReason(reason string) (meaning, advice string) {
+// PendingReason decodes a Slurm pending reason into plain words; sp words the
+// advice for the site (nil = generic).
+func PendingReason(sp *site.Profile, reason string) (meaning, advice string) {
+	f := Facts{Site: sp}
+	help := f.text("rule_help", "{help}")
 	switch reason {
 	case "Priority":
 		return "Other jobs with higher priority are ahead of it.", "Wait, or ask for fewer nodes/less time so backfill can start it earlier."
 	case "Resources":
-		return "It is next in line, waiting for nodes to free up or (on cloud partitions) to boot.", "Cold partitions take ~90 s-5 min to boot a node; GCP stockouts can delay longer. Try another partition if it waits more than 15 minutes."
+		return "It is next in line, waiting for nodes to free up or (on cloud partitions) to boot.", f.text("rule_pending_resources", "Wait for running jobs to end, or ask for fewer nodes/less time so it fits sooner; another partition may have free nodes.")
 	case "BeginTime":
 		return "It was submitted with a start time in the future (--begin).", "Nothing to do; it will start at the requested time."
 	case "Dependency":
@@ -311,11 +324,11 @@ func PendingReason(reason string) (meaning, advice string) {
 	case "JobHeldUser":
 		return "Held by its owner (scontrol hold).", "Release it with `scontrol release <id>`."
 	case "JobHeldAdmin":
-		return "Held by an administrator.", "Ask Research Computing."
+		return "Held by an administrator.", "Ask " + help + "."
 	case "ReqNodeNotAvail", "ReqNodeNotAvail, UnavailableNodes":
 		return "A node it needs is down, drained or reserved.", "Remove --nodelist/--exclude constraints or pick another partition."
 	case "PartitionDown", "PartitionInactive":
-		return "The partition is not accepting jobs.", "Use another partition and tell Research Computing."
+		return "The partition is not accepting jobs.", "Use another partition and tell " + help + "."
 	case "PartitionTimeLimit":
 		return "The requested time is over the partition's limit.", "Lower --time."
 	case "PartitionNodeLimit":
@@ -325,29 +338,29 @@ func PendingReason(reason string) (meaning, advice string) {
 	case "QOSMaxCpuPerUserLimit", "AssocGrpCpuLimit", "QOSGrpCpuLimit":
 		return "You (or your group) are at the CPU limit.", "It starts when running jobs free cores."
 	case "launch failed requeued held":
-		return "The node failed to launch the job and Slurm held it.", "Release it (`scontrol release <id>`); if it repeats, report the node to Research Computing."
+		return "The node failed to launch the job and Slurm held it.", "Release it (`scontrol release <id>`); if it repeats, report the node to " + help + "."
 	case "BadConstraints":
 		return "The request cannot be met by any node (features, memory or CPUs per node).", "Check the request against the partition sizes (partitions tool)."
 	case "None", "":
 		return "No reason recorded yet (it was just submitted).", "Check again in a minute."
 	}
-	return "Slurm reason: " + reason, "Look up the reason in the Slurm squeue documentation or ask Research Computing."
+	return "Slurm reason: " + reason, "Look up the reason in the Slurm squeue documentation or ask " + help + "."
 }
 
-type signalExit struct{ title, meaning, fix string }
+type signalExit struct{ title, meaning, fix, key string }
 
 // signalExits maps shell exit codes 128+N (and Slurm's "signal N") to causes.
 var signalExits = map[string]signalExit{
-	"139":              {"A program crashed (segmentation fault)", "128+11, SIGSEGV", "Usually an input it did not expect, a bug, or code built for AVX-512 running on the AVX2-only standard/spot nodes (try computehigh). Run it under gdb or with core dumps to find where."},
-	"signal 11 (SEGV)": {"A program crashed (segmentation fault)", "SIGSEGV", "Usually an input it did not expect, a bug, or AVX-512 code on the AVX2-only standard/spot nodes (try computehigh)."},
-	"137":              {"A program was killed (SIGKILL)", "128+9, SIGKILL", "Most often the out-of-memory killer: check peak memory and request more (--mem) or use highmem."},
-	"signal 9 (KILL)":  {"The job was killed (SIGKILL)", "SIGKILL", "Most often out of memory or a time limit; check job_show for peak memory and limits."},
-	"134":              {"A program aborted (SIGABRT)", "128+6, SIGABRT", "An assertion or a library detected a fatal error; read the lines just before the end of the log."},
-	"signal 6 (ABRT)":  {"A program aborted (SIGABRT)", "SIGABRT", "An assertion or a library detected a fatal error; read the end of the log."},
-	"135":              {"A program crashed (bus error)", "128+7, SIGBUS", "Often a file truncated while being read (memory-mapped) or a full disk."},
-	"132":              {"A program used a CPU instruction this node does not have", "128+4, SIGILL", "Usually code built for AVX-512 or -march=native running on the AVX2-only standard/spot/check nodes (e2): rebuild with -march=x86-64-v3, or run on computehigh."},
-	"signal 4 (ILL)":   {"A program used a CPU instruction this node does not have", "SIGILL", "Code built for AVX-512 or another CPU, on the AVX2-only e2 nodes: rebuild with -march=x86-64-v3 or use computehigh."},
-	"143":              {"The job was terminated (SIGTERM)", "128+15, SIGTERM", "Sent by scancel, a time limit or node shutdown (spot reclaim)."},
+	"139":              {"A program crashed (segmentation fault)", "128+11, SIGSEGV", "Usually an input it did not expect, a bug, or code built for a newer CPU than the node has. Run it under gdb or with core dumps to find where.", "rule_sig_139"},
+	"signal 11 (SEGV)": {"A program crashed (segmentation fault)", "SIGSEGV", "Usually an input it did not expect, a bug, or code built for a newer CPU than the node has.", "rule_sig_segv"},
+	"137":              {"A program was killed (SIGKILL)", "128+9, SIGKILL", "Most often the out-of-memory killer: check peak memory and request more (--mem) or use a large-memory partition.", "rule_sig_137"},
+	"signal 9 (KILL)":  {"The job was killed (SIGKILL)", "SIGKILL", "Most often out of memory or a time limit; check job_show for peak memory and limits.", ""},
+	"134":              {"A program aborted (SIGABRT)", "128+6, SIGABRT", "An assertion or a library detected a fatal error; read the lines just before the end of the log.", ""},
+	"signal 6 (ABRT)":  {"A program aborted (SIGABRT)", "SIGABRT", "An assertion or a library detected a fatal error; read the end of the log.", ""},
+	"135":              {"A program crashed (bus error)", "128+7, SIGBUS", "Often a file truncated while being read (memory-mapped) or a full disk.", ""},
+	"132":              {"A program used a CPU instruction this node does not have", "128+4, SIGILL", "Usually code built for AVX-512 or -march=native on a node without it: rebuild with -march=x86-64-v3, or run on a partition with newer CPUs.", "rule_sig_132"},
+	"signal 4 (ILL)":   {"A program used a CPU instruction this node does not have", "SIGILL", "Code built for AVX-512 or another CPU: rebuild with -march=x86-64-v3 or use a partition with newer CPUs.", "rule_sig_ill"},
+	"143":              {"The job was terminated (SIGTERM)", "128+15, SIGTERM", "Sent by scancel, a time limit or node shutdown (preemption).", "rule_sig_143"},
 }
 
 func hasRule(fs []Finding, ids ...string) bool {
@@ -370,8 +383,8 @@ func firstNonEmpty(v ...string) string {
 	return ""
 }
 
-func pendingFinding(reason string) Finding {
-	m, a := PendingReason(reason)
+func pendingFinding(sp *site.Profile, reason string) Finding {
+	m, a := PendingReason(sp, reason)
 	return Finding{Rule: "pending", Severity: Info, Title: "Job is waiting to start",
 		Evidence: []string{"reason " + reason, m}, Suggestion: a}
 }
@@ -386,12 +399,27 @@ func memEvidence(f Facts) string {
 	return "memory use not recorded"
 }
 
-func memSuggestion(f Facts) string {
-	s := "Request more memory (--mem) or use the highmem partition (~497 GB per node)."
-	if f.Partition == "highmem" {
-		s = "Already on highmem: reduce the working set (chunking, streaming, smaller batches) or split the work across nodes."
+func (f Facts) memSuggestion() string {
+	hm := ""
+	if f.Site != nil {
+		hm = f.Site.Partitions.HighMem
 	}
-	return s
+	if hm != "" && f.Partition == hm {
+		return "Already on " + hm + ": reduce the working set (chunking, streaming, smaller batches) or split the work across nodes."
+	}
+	return f.text("rule_mem", "Request more memory (--mem) or use a large-memory partition (partitions lists memory per node).")
+}
+
+// text is the site's wording for key, else def.
+func (f Facts) text(key, def string) string {
+	if key == "" {
+		return def
+	}
+	sp := f.Site
+	if sp == nil {
+		sp = site.Generic()
+	}
+	return sp.Text(key, def)
 }
 
 func rank(s string) int {
@@ -461,23 +489,23 @@ func dur(sec int64) string {
 	return fmt.Sprintf("%ds", s)
 }
 
-// commandNotFoundAdvice tailors the fix to the missing command. Ursa Major
-// nodes have python3 but no bare python, which breaks many Makefiles and
-// build scripts (GADGET-4's build calls `python`).
-func commandNotFoundAdvice(cmd string) string {
+// commandNotFoundAdvice tailors the fix to the missing command. Many clusters'
+// nodes have python3 but no bare python, which breaks many Makefiles and build
+// scripts (GADGET-4's build calls `python`).
+func (f Facts) commandNotFoundAdvice(cmd string) string {
 	base := cmd
 	if i := strings.LastIndex(base, ":"); i >= 0 {
 		base = strings.TrimSpace(base[i+1:])
 	}
 	switch base {
 	case "python", "pip":
-		return fmt.Sprintf("%q does not exist on the nodes (only python3, and pip inside an environment). Load python-sci or python-ml first, call python3, or for a Makefile pass PYTHON=python3 (make PYTHON=python3).", base)
+		return fmt.Sprintf(f.text("rule_cnf_python", "%q does not exist on the nodes (only python3, and pip inside an environment). Load the site's Python module or an environment first, call python3, or for a Makefile pass PYTHON=python3 (make PYTHON=python3)."), base)
 	case "module":
-		return "The `module` command is missing in this shell: start the script with #!/bin/bash -l, or source /apps/docs/templates/job-header.sh."
+		return f.text("rule_cnf_module", "The `module` command is missing in this shell: start the script with #!/bin/bash -l so the module system is set up.")
 	case "mpirun", "mpiexec", "mpicc", "mpicxx", "mpif90":
 		return fmt.Sprintf("%q comes from an MPI module: add `module load openmpi` before it (or use srun to launch).", base)
 	case "nvcc", "nvidia-smi":
-		return fmt.Sprintf("%q is only on the GPU nodes (partition gpul4, --gres=gpu:1); nvcc also needs `module load cuda`.", base)
+		return fmt.Sprintf(f.text("rule_cnf_nvcc", "%q is only on GPU nodes (a GPU partition, --gres=gpu:1); nvcc also needs `module load cuda`."), base)
 	}
 	return fmt.Sprintf("%q is not on PATH in the job: load the module that provides it (modules_search %s) or use its full path.", base, base)
 }

@@ -1,0 +1,33 @@
+# Synthetic second site for tests: an on-premises cluster charged in service
+# units, with different partition names, paths and no site wording. Golden tests
+# run every tool against it (testdata/golden/bigcluster) and check that no Ursa
+# Major string appears in any answer.
+name: bigcluster
+title: Big Cluster
+description: Example University HPC, on premises
+approved: true
+help: the HPC help desk
+catalog: /opt/site/catalog.json
+paths:
+  home: /users/{user}
+  scratch: /work/{user}
+cloud_nodes: false
+partitions:
+  probe: debug
+  gpu: gpu
+  highmem: bigmem
+  general: cpu
+  fast: fast
+  fallback_idle: [cpu, fast]
+  fallback_cold: [cpu]
+  avx2_only: [preempt]
+  cpu: {preempt: AVX2 only}
+  cpu_default: AVX-512
+modules:
+  python: [python-sci, python-ml]
+  gpu: [python-ml]
+charge:
+  model: su_per_core_hour
+  rates: {cpu: 1, preempt: 0.5, fast: 1.5, gpu: 8, bigmem: 2, io: 1, debug: 0}
+  max_su_per_job: 2000
+  max_su_per_day: 5000

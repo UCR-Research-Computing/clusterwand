@@ -34,7 +34,7 @@ import (
 	"github.com/UCR-Research-Computing/clusterwand/internal/version"
 )
 
-const usage = `clusterwand - read-only bridge between AI assistants and the Ursa Major Slurm cluster
+const usage = `clusterwand - read-only bridge between AI assistants and your Slurm cluster (over your own SSH)
 
 Usage:
   clusterwand mcp                              run the MCP server on stdio
@@ -48,7 +48,7 @@ Usage:
   clusterwand module [--mpi M] <name>          module show (MPI-built ones under their MPI)
   clusterwand recipes [query]                  known-good recipes and site rules
   clusterwand check <script.sh|->              static check of a batch script
-  clusterwand allocation                       your Ursa Major allocation and use
+  clusterwand allocation                       your allocation and use
   clusterwand usage [--since T] [--until T] [--by partition|state|user] [--all]
   clusterwand waste [--since T] [--cpu PCT] [--all] [--user U]   avoidable spend
   clusterwand health                           down/drained nodes, stockouts, stuck jobs (R2)
@@ -151,7 +151,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "status":
 		r, err := core.Call(ctx, svc, "cli", "cluster_status", "R1", nil, false, svc.ClusterStatus)
-		return out(stdout, stderr, g, r, err, func(w io.Writer) { printStatus(w, r.Data) })
+		return out(stdout, stderr, g, r, err, func(w io.Writer) { printStatus(w, r.Data, svc.Site) })
 	case "partitions":
 		r, err := core.Call(ctx, svc, "cli", "partitions", "R1", nil, false, svc.Partitions)
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printPartitions(w, r.Data) })
@@ -259,7 +259,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "allocation":
 		r, err := core.Call(ctx, svc, "cli", "my_allocation", "R1", nil, false,
 			func(ctx context.Context) (*core.MyAllocation, error) { return svc.MyAllocation(ctx) })
-		return out(stdout, stderr, g, r, err, func(w io.Writer) { printAllocation(w, r.Data) })
+		return out(stdout, stderr, g, r, err, func(w io.Writer) { printAllocation(w, r.Data, svc.Site) })
 	case "waste":
 		fs := newFlags("waste")
 		since := fs.String("since", "now-7days", "start")
