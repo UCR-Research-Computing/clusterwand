@@ -316,21 +316,30 @@ func sizeOf(fs []ResultFile, p string) int64 {
 // results_dir/<job_id>: regular files and folders only, no absolute paths, no
 // "..", no links; existing files are kept (a numbered copy is written).
 func (s *Service) download(ctx context.Context, dir, jobID string, files []string) (string, []string, error) {
+	dest := filepath.Join(config.Expand(s.Cfg.ResultsDir), jobID)
+	d, saved, _, err := s.downloadTo(ctx, dir, dest, files)
+	return d, saved, err
+}
+
+func (s *Service) downloadTo(ctx context.Context, dir, dest string, files []string) (string, []string, int64, error) {
 	tc, err := backend.TarDir(dir, files)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	b, err := s.run(ctx, tc)
 	if err != nil {
-		return "", nil, fmt.Errorf("downloading %s: %w", dir, err)
+		return "", nil, 0, fmt.Errorf("downloading %s: %w", dir, err)
 	}
-	dest := filepath.Join(config.Expand(s.Cfg.ResultsDir), jobID)
+	dest, err = filepath.Abs(dest)
+	if err != nil {
+		return "", nil, 0, err
+	}
 	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	gz, err := gzip.NewReader(bytes.NewReader(b))
 	if err != nil {
-		return "", nil, fmt.Errorf("unpacking: %w", err)
+		return "", nil, 0, fmt.Errorf("unpacking: %w", err)
 	}
 	tr := tar.NewReader(gz)
 	var saved []string
@@ -341,43 +350,43 @@ func (s *Service) download(ctx context.Context, dir, jobID string, files []strin
 			break
 		}
 		if err != nil {
-			return "", nil, fmt.Errorf("unpacking: %w", err)
+			return "", nil, 0, fmt.Errorf("unpacking: %w", err)
 		}
 		name := path.Clean(strings.TrimPrefix(h.Name, "./"))
 		if name == "." {
 			continue
 		}
 		if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {
-			return "", nil, fmt.Errorf("refusing unsafe path in archive: %q", h.Name)
+			return "", nil, 0, fmt.Errorf("refusing unsafe path in archive: %q", h.Name)
 		}
 		if hiddenRel(name) {
 			continue // hidden or credential-like: never written to this machine
 		}
 		target := filepath.Join(dest, filepath.FromSlash(name))
 		if !strings.HasPrefix(target, dest+string(os.PathSeparator)) {
-			return "", nil, fmt.Errorf("refusing path outside the results folder: %q", h.Name)
+			return "", nil, 0, fmt.Errorf("refusing path outside the results folder: %q", h.Name)
 		}
 		switch h.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0o755); err != nil {
-				return "", nil, err
+				return "", nil, 0, err
 			}
 		case tar.TypeReg:
 			total += h.Size
 			if total > maxDownload {
-				return "", nil, errors.New("archive larger than the download limit")
+				return "", nil, 0, errors.New("archive larger than the download limit")
 			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return "", nil, err
+				return "", nil, 0, err
 			}
 			target = freeName(target)
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 			if err != nil {
-				return "", nil, err
+				return "", nil, 0, err
 			}
 			if _, err := io.Copy(f, io.LimitReader(tr, h.Size)); err != nil {
 				f.Close()
-				return "", nil, err
+				return "", nil, 0, err
 			}
 			f.Close()
 			rel, _ := filepath.Rel(dest, target)
@@ -387,7 +396,7 @@ func (s *Service) download(ctx context.Context, dir, jobID string, files []strin
 		}
 	}
 	sort.Strings(saved)
-	return dest, saved, nil
+	return dest, saved, total, nil
 }
 
 // freeName returns p, or p.1, p.2 ... when p exists (never overwrite).

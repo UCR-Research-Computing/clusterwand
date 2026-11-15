@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/UCR-Research-Computing/clusterwand/internal/backend"
+	"github.com/UCR-Research-Computing/clusterwand/internal/config"
 	"github.com/UCR-Research-Computing/clusterwand/internal/policy"
 	"github.com/UCR-Research-Computing/clusterwand/internal/site"
 )
@@ -201,28 +203,60 @@ func checkUserPath(p string, roots []string) error {
 	return fmt.Errorf("%w: %s is outside your home and scratch folders (%s)", policy.ErrDenied, p, strings.Join(roots, ", "))
 }
 
-// resolveUserPath expands ~, checks the path, resolves symlinks on the cluster
-// and checks the resolved path again (a link must not lead out of the roots or
-// into a hidden folder).
+// publicRoots are optional site-published read-only trees (such as /apps/docs or
+// /apps/containers) configured in the site profile.
+func (s *Service) publicRoots() []string {
+	var out []string
+	for _, r := range s.Site.Paths.PublicRoots {
+		d := strings.TrimSuffix(r, "/")
+		if d != "" && path.IsAbs(d) && path.Clean(d) == d {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func hasDotDot(p string) bool {
+	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/../") || strings.HasSuffix(p, "/..")
+}
+
+// resolveUserPath expands ~ and relative paths, checks the path, resolves symlinks
+// on the cluster and checks the resolved path again (a link must not lead out of
+// its root group or into a hidden folder).
 func (s *Service) resolveUserPath(ctx context.Context, p string) (string, error) {
-	_, roots, err := s.userRoots(ctx)
+	return s.resolveReadPath(ctx, p, true)
+}
+
+func (s *Service) resolveReadPath(ctx context.Context, p string, allowPublic bool) (string, error) {
+	_, uRoots, err := s.userRoots(ctx)
 	if err != nil {
 		return "", err
 	}
 	p = strings.TrimSpace(p)
 	switch {
-	case p == "" || p == "~":
-		p = roots[0]
+	case p == "" || p == "~" || p == ".":
+		p = uRoots[0]
 	case strings.HasPrefix(p, "~/"):
-		p = roots[0] + "/" + strings.TrimPrefix(p, "~/")
-	case !strings.HasPrefix(p, "/"):
-		p = roots[0] + "/" + p
+		p = uRoots[0] + "/" + strings.TrimPrefix(p, "~/")
+	case strings.HasPrefix(p, "./") && !hasDotDot(p):
+		rest := strings.TrimPrefix(p, "./")
+		if rest == "" {
+			p = uRoots[0]
+		} else {
+			p = uRoots[0] + "/" + rest
+		}
+	case !strings.HasPrefix(p, "/") && !hasDotDot(p):
+		p = uRoots[0] + "/" + p
 	}
 	p = strings.TrimSuffix(p, "/")
 	if p == "" {
 		p = "/"
 	}
-	if err := checkUserPath(p, roots); err != nil {
+	pRoots := s.publicRoots()
+	inPublic := false
+	if allowPublic && len(pRoots) > 0 && checkUserPath(p, pRoots) == nil {
+		inPublic = true
+	} else if err := checkUserPath(p, uRoots); err != nil {
 		return "", err
 	}
 	rc, err := backend.Realpath(p)
@@ -237,8 +271,14 @@ func (s *Service) resolveUserPath(ctx context.Context, p string) (string, error)
 		return "", fmt.Errorf("%s does not exist or cannot be read", p)
 	}
 	real := strings.TrimSpace(string(out))
-	if err := checkUserPath(real, roots); err != nil {
-		return "", fmt.Errorf("%s is a link to %s: %w", p, real, err)
+	if inPublic {
+		if err := checkUserPath(real, pRoots); err != nil {
+			return "", fmt.Errorf("%s is a link to %s: %w", p, real, err)
+		}
+	} else {
+		if err := checkUserPath(real, uRoots); err != nil {
+			return "", fmt.Errorf("%s is a link to %s: %w", p, real, err)
+		}
 	}
 	return real, nil
 }
@@ -401,7 +441,7 @@ func (s *Service) FilesRead(ctx context.Context, in FilesReadInput) (*FileRead, 
 		return nil, err
 	}
 	_, roots, _ := s.userRoots(ctx)
-	for _, r := range roots {
+	for _, r := range append(roots, s.publicRoots()...) {
 		if p == r {
 			return nil, fmt.Errorf("%s is a folder; use files_list", p)
 		}
@@ -425,4 +465,79 @@ func (s *Service) FilesRead(ctx context.Context, in FilesReadInput) (*FileRead, 
 	r.Chunk, r.Text = info, policy.Wrap(text, 0)
 	markUntrusted(ctx)
 	return r, nil
+}
+
+// ---- files_download -----------------------------------------------------------
+
+// FileDownload is files_download's answer.
+type FileDownload struct {
+	RemotePath   string   `json:"remote_path"`
+	DownloadedTo string   `json:"downloaded_to"`
+	Saved        []string `json:"saved"`
+	TotalBytes   int64    `json:"total_bytes"`
+}
+
+// FilesDownloadInput selects one regular file under the caller's home or scratch
+// to copy to the local machine over SSH.
+type FilesDownloadInput struct {
+	Path string
+	// OutDir is optional on the CLI (--out); MCP always uses results_dir/files.
+	OutDir string
+}
+
+// FilesDownload copies one regular file (text or binary, such as PNG/HDF5/CSV)
+// from the caller's home or scratch folder to results_dir/files over SSH.
+func (s *Service) FilesDownload(ctx context.Context, in FilesDownloadInput) (*FileDownload, error) {
+	if strings.TrimSpace(in.Path) == "" {
+		return nil, errors.New("path is required")
+	}
+	// Public roots (/apps/...) are read-only reference trees, never bulk-downloaded.
+	real, err := s.resolveReadPath(ctx, in.Path, false)
+	if err != nil {
+		return nil, err
+	}
+	_, uRoots, _ := s.userRoots(ctx)
+	for _, r := range uRoots {
+		if real == r {
+			return nil, fmt.Errorf("%s is a folder; pass a file path (or use job_results download for a job folder)", real)
+		}
+	}
+	base := path.Base(real)
+	if err := backend.ValidRelPath(base); err != nil {
+		return nil, err
+	}
+	if hiddenOrSensitive(base) {
+		return nil, fmt.Errorf("%w: %q is hidden or looks like a credential; clusterwand does not download those", policy.ErrDenied, base)
+	}
+	// Probe with ReadRange(real, 0, 1) to confirm it is a regular file and check
+	// its size before streaming an archive over SSH.
+	rc, err := backend.ReadRange(real, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+	probe, err := s.run(ctx, rc)
+	if err != nil {
+		if strings.Contains(err.Error(), "not a regular file") {
+			return nil, fmt.Errorf("%s is not a regular file (for a job folder use job_results with download=true)", real)
+		}
+		return nil, err
+	}
+	nl := bytes.IndexByte(probe, '\n')
+	if nl > 0 {
+		if sz, perr := strconv.ParseInt(strings.TrimSpace(string(probe[:nl])), 10, 64); perr == nil && sz > maxDownload {
+			return nil, fmt.Errorf("%s is %d bytes, over the %d byte download limit; use rsync/scp over SSH for multi-GB datasets", real, sz, maxDownload)
+		}
+	}
+	dest := filepath.Join(config.Expand(s.Cfg.ResultsDir), "files")
+	if in.OutDir != "" {
+		dest = config.Expand(in.OutDir)
+	}
+	destAbs, saved, total, err := s.downloadTo(ctx, path.Dir(real), dest, []string{base})
+	if err != nil {
+		return nil, err
+	}
+	if len(saved) == 0 {
+		return nil, fmt.Errorf("%s could not be downloaded (hidden, symlink or empty)", real)
+	}
+	return &FileDownload{RemotePath: real, DownloadedTo: destAbs, Saved: saved, TotalBytes: total}, nil
 }

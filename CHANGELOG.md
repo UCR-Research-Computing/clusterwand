@@ -5,6 +5,54 @@ tag and a GitHub release. The design is in [docs/SPEC.md](docs/SPEC.md); the inh
 
 ## Unreleased
 
+## v0.7.0 - 2026-11-15
+
+Operational parity with `ursa-bifrost` v0.10.5–v0.10.12 plus native SSH file staging and
+download for any Slurm cluster.
+
+- **New R1 tool `job_wait` and CLI `clusterwand wait <id>...`.** Polls listed jobs or job
+  arrays until completion or `timeout_s` (default 120 s, safely below 180 s MCP client
+  timeouts; reserves 10 s before any caller deadline so timeouts return structured
+  `{timed_out: true, hint: ...}` instead of dropping the call). Streams MCP
+  `notifications/progress` when requested and automatically includes redacted stdout and
+  stderr log tails (`failure_tails`) for failed jobs.
+- **New R1 tool `files_download` and CLI `clusterwand download PATH [--out DIR]`.** Copies
+  one regular file (text or binary: PNG, HDF5, CSV...) from the caller's home or scratch
+  folder to `results_dir/files` over the shared SSH connection, refusing hidden/credential
+  files, symlinks escaping user roots, and shared public roots.
+- **Local-SSH input staging in `job_submit` (`inputs`, `unpack_archives`) and CLI
+  `clusterwand submit --input LOCAL[:REMOTE] --unpack`.** Validates local regular files or
+  inline text/base64 at prepare time (zero cluster writes), unpacks and checks `.tar.gz` /
+  `.tgz` archives in Go before confirmation (refusing symlinks, `..` traversal, non-regular
+  entries, hidden/credential names, and archive bombs), snapshots the verified archive
+  bound by SHA-256 into `plan_hash`, and streams it into `~/clusterwand-jobs/<run>/inputs/`
+  over SSH at confirm time.
+- **Slurm job-array rollups and task selection on both plain-text and `--json` paths.**
+  `ParseSacctText` and `AcctJob` now preserve array parent and task IDs (`1650_2`),
+  `jobs_list(job_ids=["1650"])` expands all array tasks without truncating to `len(job_ids)`
+  and attaches `array_summary` rollups (`"3 tasks: 1 COMPLETED, 1 FAILED, 1 RUNNING"`),
+  `job_show("1650_2")` selects task 2 instead of task 0, and `job_explain("1650")` surfaces
+  failed array tasks automatically. Empty `squeue -j` responses on `--json` now fall through
+  cleanly to `sacct`.
+- **`script_check` and site-profile upgrades:** optional `partition` override parameter
+  (`clusterwand check --partition P`), `--mem-per-cpu` x CPUs overflow check, per-member
+  validation across comma-separated fallback partition lists (`-p a,b`), partition-scoped
+  modules (`modules.module_partitions`), bare `apptainer`/`singularity` module check and
+  container CUDA hint, and updated `sites/ursa-major/site.yaml` (`arm`, `tpu`, `tpuspot`,
+  `tpu6spot`, `gpu1v1`, `python-tpu`, `pytorch-tpu`, `public_roots`, accurate `rule_timeout`).
+- **Path, log, status, and duration ergonomics:** relative path normalization (`.` and
+  `./sub`, keeping `..` strictly denied), site-configurable `paths.public_roots` with strict
+  symlink containment, duration shorthands (`24h`, `7d`, `30m`, `2w`, `now-1hour`,
+  `now-1day`), `cluster_status` optional `partition` filter, graceful empty-log answers when
+  a running job has not created its log file yet, and GPU/TPU-aware stockout fallback advice.
+- **Diagnosis rules, MCP annotations, and SSH hygiene:** `"untrusted log line: "` prefix on
+  quoted log evidence, `swallowed-exception` warning when an exit-0 `COMPLETED` job logged a
+  Python traceback, `requeued` warning on `RestartCnt > 0` pending jobs, CPU `oom-log`
+  suppressed on CUDA OOM, last 3 log lines quoted on `script-error`, `destructiveHint: true`
+  on `job_submit_confirm`, and `PYTHONPATH`/`PYTHONHOME` stripped from `ssh` subprocesses so
+  `ProxyCommand` helpers (`gcloud`, Python wrappers) never crash on leaked caller Python envs.
+- **Mutation check:** 10 new guards (`v070*`).
+
 ## v0.6.0 - 2026-10-29
 
 Cleanup: ClusterWand's core and spec now describe only what ClusterWand is.

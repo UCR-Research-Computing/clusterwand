@@ -9,6 +9,12 @@
     "description": "Live state of every partition: nodes powered up/down, allocated, idle, down/drained; running and pending jobs.",
     "inputSchema": {
       "additionalProperties": false,
+      "properties": {
+        "partition": {
+          "description": "optional partition name to filter to",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "name": "cluster_status",
@@ -89,6 +95,70 @@
       "type": "object"
     },
     "name": "env_check",
+    "outputSchema": {
+      "properties": {
+        "as_of": {
+          "description": "RFC 3339 time of the answer",
+          "type": "string"
+        },
+        "data": {
+          "description": "the result (object or array; see the tool description)"
+        },
+        "source": {
+          "description": "backend and the exact scheduler commands that produced the data",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "cached": {
+              "type": "boolean"
+            },
+            "commands": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "untrusted_note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "source",
+        "as_of"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Download a file"
+    },
+    "description": "Copies one regular file (text or binary, such as PNG, HDF5 or CSV) from the caller's home or scratch folder to results_dir/files on the local machine over SSH. Hidden and credential-like files are refused; nothing changes on the cluster.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "regular file under your home or scratch (text or binary, e.g. ~/project/plot.png) to copy to results_dir/files over SSH",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "files_download",
     "outputSchema": {
       "properties": {
         "as_of": {
@@ -1276,10 +1346,39 @@
       "readOnlyHint": false,
       "title": "Plan a job submission"
     },
-    "description": "[act] Step 1 of 2. Checks a batch script (script_check), enforces caps (nodes, hours, $/job, $/day), asks the scheduler with sbatch --test-only, and returns a plan with the worst-case cost and a single-use confirm_token. NOTHING is submitted. Show the plan to the user and call job_submit_confirm only after they approve.",
+    "description": "[act] Step 1 of 2. Checks a batch script (script_check), validates any local staged inputs, enforces caps (nodes, hours, $/job, $/day), asks the scheduler with sbatch --test-only, and returns a plan with the worst-case cost and a single-use confirm_token. NOTHING is submitted or uploaded yet. Show the plan to the user and call job_submit_confirm only after they approve.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "inputs": {
+          "description": "optional local files or inline text/base64 to stage into inputs/ over SSH when confirmed (max 32 files, 64 MiB)",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "content": {
+                "description": "inline UTF-8 text content when not using local_path",
+                "type": "string"
+              },
+              "content_base64": {
+                "description": "base64-encoded bytes when not using local_path",
+                "type": "string"
+              },
+              "local_path": {
+                "description": "local regular file to stage into inputs/ (symlinks and credential-like files are refused)",
+                "type": "string"
+              },
+              "path": {
+                "description": "relative destination path inside inputs/, e.g. config.yaml or data/in.csv (defaults to basename of local_path)",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "job_name": {
           "description": "override the job name",
           "type": "string"
@@ -1299,6 +1398,10 @@
         "time": {
           "description": "override the time limit (Slurm format: 30, 2:00:00, 1-00:00)",
           "type": "string"
+        },
+        "unpack_archives": {
+          "description": "unpack .tar.gz / .tgz staged inputs into inputs/ (validated before submission)",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1351,13 +1454,13 @@
   },
   {
     "annotations": {
-      "destructiveHint": false,
+      "destructiveHint": true,
       "idempotentHint": false,
       "openWorldHint": false,
       "readOnlyHint": false,
       "title": "Submit the approved job"
     },
-    "description": "[act] Step 2 of 2. Submits exactly the plan stored under confirm_token (it cannot be changed here). Spends money on the cluster. Call only after the user approved the plan from job_submit. Tokens are single use and expire.",
+    "description": "[act] Step 2 of 2. Submits exactly the plan (and any staged inputs) stored under confirm_token (it cannot be changed here). Spends compute allocation on the cluster. Call only after the user approved the plan from job_submit. Tokens are single use and expire.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1419,14 +1522,92 @@
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
-      "title": "My jobs"
+      "title": "Wait for jobs"
     },
-    "description": "The caller's jobs: queued and running now plus recent accounting, newest first; job_ids keeps only those jobs (one call for a watcher's active jobs). Rows carry restarts (requeues after node failures). Job names are user-written labels.",
+    "description": "Waits until the listed jobs or job arrays finish (or timeout_s elapses, default 120 s) and returns their states, exit codes, elapsed times, array_summary rollups, and redacted stdout/stderr tails for failed jobs. When timed_out is true, call job_wait again to continue waiting.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "job_ids": {
-          "description": "only these job ids (up to 100), e.g. a watcher's active jobs; since must reach back to when they ran",
+          "description": "1 to 100 Slurm job ids or array parent ids to wait on",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "poll_s": {
+          "description": "seconds between queue/accounting polls (default 10, 2-60)",
+          "type": "integer"
+        },
+        "timeout_s": {
+          "description": "max seconds to wait in this call (default 120, max 600; safely below 180 s client timeouts)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "job_ids"
+      ],
+      "type": "object"
+    },
+    "name": "job_wait",
+    "outputSchema": {
+      "properties": {
+        "as_of": {
+          "description": "RFC 3339 time of the answer",
+          "type": "string"
+        },
+        "data": {
+          "description": "the result (object or array; see the tool description)"
+        },
+        "source": {
+          "description": "backend and the exact scheduler commands that produced the data",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "cached": {
+              "type": "boolean"
+            },
+            "commands": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "untrusted_note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "source",
+        "as_of"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "My jobs"
+    },
+    "description": "The caller's jobs: queued and running now plus recent accounting, newest first; job_ids keeps only those jobs or expands array parents with array_summary rollups. Rows carry restarts (requeues after node failures). Job names are user-written labels.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "job_ids": {
+          "description": "only these job ids or array parent ids (up to 100), e.g. a watcher's active jobs",
           "items": {
             "type": "string"
           },
@@ -1440,7 +1621,7 @@
           "type": "integer"
         },
         "since": {
-          "description": "how far back in accounting: now-7days (default), now-12hours or YYYY-MM-DD",
+          "description": "how far back in accounting: now-7days (default), 24h, 7d, 30m or YYYY-MM-DD",
           "type": "string"
         },
         "state": {
@@ -1509,7 +1690,7 @@
           "type": "integer"
         },
         "since": {
-          "description": "how far back in accounting: now-7days (default), now-12hours or YYYY-MM-DD",
+          "description": "how far back in accounting: now-7days (default), 24h, 7d, 30m or YYYY-MM-DD",
           "type": "string"
         },
         "state": {
@@ -1766,7 +1947,7 @@
           "type": "string"
         },
         "since": {
-          "description": "start: now-30days (default), now-7days or YYYY-MM-DD",
+          "description": "start: now-30days (default), 7d, 24h or YYYY-MM-DD",
           "type": "string"
         },
         "until": {
@@ -1946,6 +2127,10 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "partition": {
+          "description": "optional partition override to check the script against",
+          "type": "string"
+        },
         "script": {
           "description": "the full batch script text (#!/bin/bash and #SBATCH lines)",
           "type": "string"
@@ -2138,7 +2323,7 @@
           "type": "string"
         },
         "since": {
-          "description": "start: now-30days (default), now-7days or YYYY-MM-DD",
+          "description": "start: now-30days (default), 7d, 24h or YYYY-MM-DD",
           "type": "string"
         },
         "until": {
@@ -2215,7 +2400,7 @@
           "type": "number"
         },
         "since": {
-          "description": "start: now-7days (default), now-30days or YYYY-MM-DD",
+          "description": "start: now-7days (default), 30d, 24h or YYYY-MM-DD",
           "type": "string"
         }
       },
@@ -2284,7 +2469,7 @@
           "type": "number"
         },
         "since": {
-          "description": "start: now-7days (default), now-30days or YYYY-MM-DD",
+          "description": "start: now-7days (default), 30d, 24h or YYYY-MM-DD",
           "type": "string"
         },
         "user": {

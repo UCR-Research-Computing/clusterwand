@@ -10,7 +10,7 @@
           ],
           "rule": "timeout",
           "severity": "error",
-          "suggestion": "Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).",
+          "suggestion": "Raise --time (up to the partition's MaxTime — check partitions; 30 days on general partitions, 7 days on spot, 1 day on tpu*/arm, 15 min on check), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).",
           "title": "Job hit its time limit"
         },
         {

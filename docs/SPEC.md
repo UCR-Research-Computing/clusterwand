@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v0.6.0 (2026-10-29). CLI and MCP server over stdio on the person's own machine, SSH only. Site profiles, plain-text Slurm reads, `discover`, live-tested on Ursa Major ([LIVE_CAMPAIGN_F4.md](LIVE_CAMPAIGN_F4.md)). |
+| Status | v0.7.0 (2026-11-15). CLI and MCP server over stdio on the person's own machine, SSH only. Site profiles, plain-text Slurm reads, `discover`, `job_wait`, `files_download` and local-SSH input staging, live-tested on Ursa Major ([LIVE_CAMPAIGN_F4.md](LIVE_CAMPAIGN_F4.md)). |
 | Owner | Chuck Forsyth (UCR Research Computing) |
 | Repo | https://github.com/UCR-Research-Computing/clusterwand (MIT) |
 | Binary | `clusterwand`, alias `wand` |
@@ -263,29 +263,31 @@ nodes advertise no CPU features), stockout reasons, the help desk and wording ke
 
 Every tool returns the envelope from section 4. Text written by users or programs (log
 lines, job names, scripts, file contents, submit lines) is returned only inside
-`untrusted` blocks. As built, with all tiers granted: 19 R1, 7 R2 and 8 A1 tools, 34 in
+`untrusted` blocks. As built, with all tiers granted: 21 R1, 7 R2 and 8 A1 tools, 36 in
 all; 2 resources; 4 prompts.
 
 ### 9.1 R1 (own jobs and cluster facts)
 
 | Tool | Inputs | Returns |
 |---|---|---|
-| `cluster_status` | none | Per partition: nodes by state (powered up, allocated, idle, booting, down), running and pending jobs, pending reasons, sharing notes; the current burn per hour when the caller sees dollars |
+| `cluster_status` | `partition?` | Per partition: nodes by state (powered up, allocated, idle, booting, down), running and pending jobs, pending reasons, sharing notes; the current burn per hour when the caller sees dollars |
 | `partitions` | none | Partitions the caller may use: nodes, cores and memory per node, GPUs, time limit, CPU note, spot, default, `restricted_to`; price per node-hour when the caller sees charges |
-| `jobs_list` | `state?`, `since?`, `limit?`, `job_ids[]?` | Caller's jobs (queue plus recent accounting, newest first), 50 rows unless `limit` (cap `limits.list_rows`); `job_ids` (up to 100) reads just those jobs, uncached |
+| `jobs_list` | `state?`, `since?`, `limit?`, `job_ids[]?` | Caller's jobs (queue plus recent accounting, newest first), 50 rows unless `limit` (cap `limits.list_rows`); `job_ids` (up to 100) reads just those jobs or expands array parents with `array_summary` rollups, uncached |
+| `job_wait` | `job_ids[]`, `timeout_s?`, `poll_s?` | Polls until listed jobs or job arrays finish (or `timeout_s`, default 120 s), streaming MCP progress notifications and returning `array_summary` rollups plus redacted stdout/stderr `failure_tails` on failure |
 | `job_show` | `job_id`, `include_script?` | Request vs use (CPU efficiency, peak memory), exit code, signal, nodes, timings, steps, log paths; a pending reason decoded with advice; `script_note` when the cluster stored no script |
 | `job_explain` | `job_id`, `lines?` | Deterministic findings (section 10) with evidence and suggestion, plus the redacted log tail as untrusted data |
 | `job_log_tail` | `job_id`, `stream`, `lines`, `start_line?`, `grep?` | A window of up to 1000 lines from the end or from `start_line`, or matching lines with context; `total_lines`, `first_line`, `last_line` for paging. The path comes from the job record, never from input |
 | `job_results` | `job_id`, `prefix?`, `pattern?`, `offset?`, `limit?`, `read?`, `read_offset?`, `read_bytes?`, `grep?`, `download?`, `files?` | The job's working directory, paged; one text file read in chunks or searched; download to `results_dir/<job_id>` over the same SSH connection |
 | `storage_usage` | none | Space used in home and scratch (largest top-level entries first, `du` 8 at a time within a 40 s budget) and filesystem fullness; points at shared reference data when the catalog lists it |
-| `files_list` | `path?`, `pattern?`, `offset?`, `limit?` | One folder under the caller's home or scratch |
-| `files_read` | `path`, `offset?`, `bytes?`, `grep?` | One text file under home or scratch, in chunks or searched |
+| `files_list` | `path?`, `pattern?`, `offset?`, `limit?` | One folder under the caller's home or scratch (or site-configured `public_roots`) |
+| `files_read` | `path`, `offset?`, `bytes?`, `grep?` | One text file under home or scratch (or `public_roots`), in chunks or searched |
+| `files_download` | `path` | Copies one regular file (text or binary) from the caller's home or scratch folder to `results_dir/files` over SSH |
 | `env_check` | `modules[]?`, `commands[]?` | Loads modules in a one-core job on the probe partition and reports which load, the module list, and where each command resolves with its version |
 | `interactive_help` | `partition?`, `nodes?`, `cpus?`, `gpus?`, `time?`, `memory?` | The exact `srun --pty`/`salloc` command and how to reach the login node, with hourly and worst-case cost when shown. Runs nothing |
 | `modules_search` | `query?` | Matching modules and versions with MPI prerequisites and GPU builds, prebuilt containers, recipes and shared reference databases from the catalog |
 | `module_show` | `name`, `mpi?` | What the module sets; MPI-built packages are shown after loading their MPI |
 | `recipes` | `query?` | Known-good recipes and site rules from the catalog |
-| `script_check` | `script` | Static check: partition exists and is allowed, limits fit (MaxTime too), modules exist with their MPI prerequisite, GPUs match, core request on shared partitions, AVX-512 builds on AVX2-only nodes, arrays and database downloads, worst-case cost. Never submits |
+| `script_check` | `script`, `partition?` | Static check: partition exists and is allowed, limits fit across every member of a partition list (MaxTime and `--mem-per-cpu` too), modules exist with MPI and partition scoping, GPUs/containers match, core request on shared partitions, AVX-512 builds on AVX2-only nodes, arrays and database downloads, worst-case cost. Never submits |
 | `my_usage` | `since?`, `until?`, `group_by?` | Node-hours, core-hours, GPU-hours, CPU efficiency and estimated cost, by partition (default), state, user or day |
 | `waste_report` | `since?`, `cpu_threshold?`, `min_node_hours?` | Avoidable use in the caller's jobs: low CPU efficiency, idle time before a timeout, keep-warm jobs, repeated fast failures, oversized memory, idle powered-up nodes; sorted by wasted node-hours with suggestions |
 | `my_allocation` | none | Current-period allocation and use for the caller and their lab (section 9.6) |
@@ -306,12 +308,12 @@ Registered only when the config grants R2. Descriptions start with `[staff]`.
 ### 9.3 A1 (own jobs, two steps)
 
 Registered only when the config grants A1. Descriptions start with `[act]`; annotations say
-not read-only (`job_cancel_confirm` is also destructive).
+not read-only (`job_submit_confirm` and `job_cancel_confirm` are also destructive).
 
 | Tool | Inputs | Behaviour |
 |---|---|---|
-| `job_submit` | `script`, `partition?`, `nodes?`, `time?`, `job_name?` | Runs `script_check` (errors block), enforces caps, runs `sbatch --test-only` with the enforced flags, and returns the plan, estimated start, worst-case cost, allocation impact and a single-use `confirm_token`. Nothing is submitted |
-| `job_submit_confirm` | `confirm_token` | Re-checks the plan hash, the day cap and the submit count, writes the script to a new `~/clusterwand-jobs/<stamp>-<name>/` and runs `sbatch --parsable --chdir --partition --nodes --time --job-name --comment=clusterwand:<plan hash>` |
+| `job_submit` | `script`, `partition?`, `nodes?`, `time?`, `job_name?`, `inputs[]?`, `unpack_archives?` | Runs `script_check` (errors block), validates any local staged inputs and Go-unpacked `.tar.gz`/`.tgz` archives, enforces caps, runs `sbatch --test-only` with the enforced flags, and returns the plan, estimated start, worst-case cost, allocation impact and a single-use `confirm_token`. Nothing is submitted or uploaded |
+| `job_submit_confirm` | `confirm_token` | Re-checks the plan hash, staged input snapshot SHA-256, the day cap and the submit count, stages any inputs into `~/clusterwand-jobs/<stamp>-<name>/inputs/` over SSH, writes `job.sbatch`, and runs `sbatch --parsable --chdir --partition --nodes --time --job-name --comment=clusterwand:<plan hash>` |
 | `job_cancel`, `job_hold`, `job_release` | `job_id` | Own jobs only; state checked (only pending or running jobs can be cancelled, only pending ones held or released); returns a plan and token |
 | `job_cancel_confirm`, `job_hold_confirm`, `job_release_confirm` | `confirm_token` | Ownership and state checked again, then `scancel` / `scontrol hold\|release`. Cancelling a never-started job releases its worst case from the day cap |
 
@@ -531,6 +533,7 @@ checks the config, SSH and the catalog. MCP client setup: [CLIENTS.md](CLIENTS.m
 | F3 | `discover` and host-key pinning | done, v0.4.0 |
 | F4 | Live campaign on Ursa Major over plain SSH | done, v0.5.0 (review fixes v0.5.1) |
 | Cleanup | Hosted-mode plumbing removed from core; this spec | done, v0.6.0 |
+| Parity + SSH staging | `job_wait`, `files_download`, local-SSH `job_submit` input/archive staging, job-array rollups (text + JSON), `script_check` & diagnosis upgrades | done, v0.7.0 |
 | Next | A second real cluster; multi-cluster configs | not started |
 
 ## 15. History
@@ -548,6 +551,7 @@ planning documents. None of the hosted code is in ClusterWand.
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-11-15 | v0.7.0 | Parity with `ursa-bifrost` v0.10.5–v0.10.12 plus local-SSH file staging: `job_wait` (120 s bound, progress notifications, failure stdout/stderr tails), `files_download`, `job_submit` `inputs` + `unpack_archives` over SSH, Slurm job-array rollups and task selection on both text and JSON paths, `script_check` upgrades (`partition`, `--mem-per-cpu`, per-member list checks, partition-scoped modules, container checks), relative paths and `public_roots` symlink containment, duration shorthands, `swallowed-exception` and `requeued` rules, `"untrusted log line: "` evidence prefix, `destructiveHint` on `job_submit_confirm`, SSH `PYTHONPATH` stripping. 10 new mutation guards |
 | 2026-10-29 | v0.6.0 | Cleanup. Removed hosted-mode plumbing that nothing in the CLI or the stdio MCP server reached: the cross-user shared cache and single-flight, the per-caller in-flight cap and server-wide accounting gate, program-client audit naming and the own-caps cost override, sealed A1 state, `Command.public`, the remote-download refusal. `cluster_status` and `partitions` descriptions no longer advertise cost the caller cannot see (site keys `tool_cluster_status_nocost`, `tool_partitions_nocost`). This spec rewritten for ClusterWand; the inherited spec moved to docs/history. 14 mutation guards for removed code dropped, 2 new |
 | 2026-10-29 | v0.5.1 | Review fixes: job arrays count every task against the caps; uncountable arrays and hetjobs refused; `job_results` resolves and checks the job folder itself; audit `"-"` goes to stderr. 10 new mutation guards |
 | 2026-10-29 | v0.5.0 | Live campaign on Ursa Major over plain SSH; `job_results` honours the hidden/credential rule; new `build-failure` rule; confirm-token error wording. 3 new mutation guards |

@@ -5,7 +5,7 @@
       "findings": [
         {
           "evidence": [
-            "log: ModuleNotFoundError: No module named 'matplotlib'"
+            "untrusted log line: ModuleNotFoundError: No module named 'matplotlib'"
           ],
           "rule": "python-import",
           "severity": "error",
@@ -14,7 +14,7 @@
         },
         {
           "evidence": [
-            "log: curl: (22) The requested URL returned error: 404"
+            "untrusted log line: curl: (22) The requested URL returned error: 404"
           ],
           "rule": "download",
           "severity": "error",

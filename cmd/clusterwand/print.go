@@ -358,6 +358,9 @@ func printSubmitPlan(w io.Writer, p *core.SubmitPlan) {
 	fmt.Fprintf(w, "Plan (nothing submitted yet):\n")
 	fmt.Fprintf(w, "  job        %s\n  partition  %s, %d node(s), time limit %s\n", p.JobName, p.Partition, p.Nodes, p.TimeLimit)
 	fmt.Fprintf(w, "  folder     %s (on the cluster)\n  script     %d bytes, sha256 %s\n", p.RemoteDir, p.ScriptBytes, p.ScriptSHA256)
+	if len(p.Inputs) > 0 {
+		fmt.Fprintf(w, "  inputs     %d file(s), %d bytes, sha256 %s\n", len(p.Inputs), p.InputsBytes, p.InputsSHA256)
+	}
 	fmt.Fprintf(w, "  scheduler  %s\n", p.Scheduler)
 	fmt.Fprintf(w, "  worst case $%.2f  (today so far $%.2f of $%.2f day cap)\n", p.WorstCaseUSD, p.SpentTodayUS, p.DayCapUSD)
 	for _, o := range p.Overrides {
@@ -367,6 +370,29 @@ func printSubmitPlan(w io.Writer, p *core.SubmitPlan) {
 		fmt.Fprintln(w, "  warning   ", x)
 	}
 	fmt.Fprintf(w, "  token      %s (expires %s)\n", p.Token, p.ExpiresAt)
+}
+
+func printWait(w io.Writer, r *core.JobWaitResult) {
+	if r == nil {
+		return
+	}
+	status := "complete"
+	if r.TimedOut {
+		status = "timed out"
+	}
+	fmt.Fprintf(w, "Wait %s (%ds, %d poll(s)): %d finished, %d active\n", status, r.WaitedS, r.Polls, r.Finished, r.Active)
+	printJobs(w, r.Jobs, false)
+	for _, ft := range r.FailureTails {
+		if ft.StdoutTail != nil && ft.StdoutTail.Text != "" {
+			fmt.Fprintf(w, "\n--- job %s (%s) stdout tail (untrusted, redacted) ---\n%s\n", ft.JobID, ft.State, strings.TrimRight(ft.StdoutTail.Text, "\n"))
+		}
+		if ft.StderrTail != nil && ft.StderrTail.Text != "" {
+			fmt.Fprintf(w, "\n--- job %s (%s) stderr tail (untrusted, redacted) ---\n%s\n", ft.JobID, ft.State, strings.TrimRight(ft.StderrTail.Text, "\n"))
+		}
+	}
+	if r.Hint != "" {
+		fmt.Fprintln(w, "hint:", r.Hint)
+	}
 }
 
 func printResults(w io.Writer, r *core.Results) {

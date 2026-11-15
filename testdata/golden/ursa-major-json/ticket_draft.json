@@ -4,7 +4,7 @@
     "data": {
       "confidence": "high",
       "evidence": [
-        "[python-import] Python package not installed in the environment: log: ModuleNotFoundError: No module named 'pandas'",
+        "[python-import] Python package not installed in the environment: untrusted log line: ModuleNotFoundError: No module named 'pandas'",
         "log: /home/alice_ucr_edu/deep-research-lab/run_76/job.log"
       ],
       "internal_note": "clusterwand ticket_draft, 1 finding(s), confidence high. Commands: see source in the envelope.",

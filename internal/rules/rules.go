@@ -217,52 +217,61 @@ func Explain(f Facts) []Finding {
 		if len(tail) > 40000 {
 			tail = tail[len(tail)-40000:]
 		}
-		if m := regexp.MustCompile(`oom-kill|Out Of Memory|out of memory|MemoryError|(?m)Killed\s*$`).FindString(tail); m != "" && st != "OUT_OF_MEMORY" {
-			add(Finding{Rule: "oom-log", Severity: Error, Title: "Out-of-memory kill in the log",
-				Evidence: []string{"log: " + clip(lineOf(tail, m), 200), memEvidence(f)}, Suggestion: f.memSuggestion()})
-		}
-		if st != "TIMEOUT" && regexp.MustCompile(`DUE TO TIME LIMIT`).MatchString(tail) {
-			add(Finding{Rule: "timeout", Severity: Error, Title: "Job hit its time limit",
-				Evidence:   []string{"log: " + clip(lineOf(tail, "DUE TO TIME LIMIT"), 200)},
-				Suggestion: "Raise --time or checkpoint and resubmit."})
-		}
-		matched := 0
-		for _, r := range logRules {
-			locs := r.re.FindAllStringIndex(tail, -1)
-			if len(locs) == 0 {
-				continue
+		if st == "COMPLETED" {
+			if m := regexp.MustCompile(`(?m)^Traceback \(most recent call last\):`).FindString(tail); m != "" {
+				add(Finding{Rule: "swallowed-exception", Severity: Warning, Title: "Job exited 0, but a Python traceback appeared in the log",
+					Evidence:   []string{"state COMPLETED (exit 0)", "untrusted log line: " + clip(lineOf(tail, m), 200)},
+					Suggestion: "An exception was raised and caught (or the batch script lacked `set -e` after a failed Python step). Inspect job_log_tail around the traceback to confirm outputs are valid."})
 			}
-			// an illegal instruction also "dumps core": one finding, the specific one
-			if r.id == "tool-crash" && hasRule(out, "illegal-instruction") {
-				continue
+		} else {
+			cudaOOM := regexp.MustCompile(`CUDA out of memory|torch\.cuda\.OutOfMemoryError`).MatchString(tail)
+			if m := regexp.MustCompile(`oom-kill|Out Of Memory|out of memory|MemoryError|(?m)Killed\s*$`).FindString(tail); m != "" && st != "OUT_OF_MEMORY" && !cudaOOM {
+				add(Finding{Rule: "oom-log", Severity: Error, Title: "Out-of-memory kill in the log",
+					Evidence: []string{"untrusted log line: " + clip(lineOf(tail, m), 200), memEvidence(f)}, Suggestion: f.memSuggestion()})
 			}
-			last := locs[len(locs)-1]
-			ev := []string{"log: " + clip(lineAt(tail, last[0]), 240)}
-			if len(locs) > 1 {
-				ev = append(ev, fmt.Sprintf("%d matching lines", len(locs)))
+			if st != "TIMEOUT" && regexp.MustCompile(`DUE TO TIME LIMIT`).MatchString(tail) {
+				add(Finding{Rule: "timeout", Severity: Error, Title: "Job hit its time limit",
+					Evidence:   []string{"untrusted log line: " + clip(lineOf(tail, "DUE TO TIME LIMIT"), 200)},
+					Suggestion: "Raise --time or checkpoint and resubmit."})
 			}
-			sug := r.suggestion
-			if r.key != "" {
-				sug = f.text(r.key, r.suggestion)
-			}
-			if r.id == "command-not-found" {
-				if m := r.re.FindStringSubmatch(tail[last[0]:]); len(m) > 1 {
-					sug = f.commandNotFoundAdvice(strings.TrimSuffix(m[1], ":"))
+			matched := 0
+			for _, r := range logRules {
+				locs := r.re.FindAllStringIndex(tail, -1)
+				if len(locs) == 0 {
+					continue
 				}
-			}
-			if r.id == "python-import" {
-				if m := r.re.FindStringSubmatch(tail[last[0]:]); len(m) > 1 {
-					pkg := firstNonEmpty(m[1:]...)
-					sug = fmt.Sprintf("Package %q is missing. ", pkg) + sug
-					if pkg == "pip" {
-						sug = "The environment has no pip (Pixi/conda envs do not include it by default): add pip to the environment (pixi add pip) or install with uv/pixi instead of python -m pip."
+				// an illegal instruction also "dumps core": one finding, the specific one
+				if r.id == "tool-crash" && hasRule(out, "illegal-instruction") {
+					continue
+				}
+				last := locs[len(locs)-1]
+				ev := []string{"untrusted log line: " + clip(lineAt(tail, last[0]), 240)}
+				if len(locs) > 1 {
+					ev = append(ev, fmt.Sprintf("%d matching lines", len(locs)))
+				}
+				sug := r.suggestion
+				if r.key != "" {
+					sug = f.text(r.key, r.suggestion)
+				}
+				if r.id == "command-not-found" {
+					if m := r.re.FindStringSubmatch(tail[last[0]:]); len(m) > 1 {
+						sug = f.commandNotFoundAdvice(strings.TrimSuffix(m[1], ":"))
 					}
 				}
-			}
-			add(Finding{Rule: r.id, Severity: r.severity, Title: r.title, Evidence: ev, Suggestion: sug})
-			matched++
-			if matched >= 4 {
-				break
+				if r.id == "python-import" {
+					if m := r.re.FindStringSubmatch(tail[last[0]:]); len(m) > 1 {
+						pkg := firstNonEmpty(m[1:]...)
+						sug = fmt.Sprintf("Package %q is missing. ", pkg) + sug
+						if pkg == "pip" {
+							sug = "The environment has no pip (Pixi/conda envs do not include it by default): add pip to the environment (pixi add pip) or install with uv/pixi instead of python -m pip."
+						}
+					}
+				}
+				add(Finding{Rule: r.id, Severity: r.severity, Title: r.title, Evidence: ev, Suggestion: sug})
+				matched++
+				if matched >= 4 {
+					break
+				}
 			}
 		}
 	}
@@ -297,6 +306,8 @@ func Explain(f Facts) []Finding {
 		ev := []string{"state FAILED", "exit code " + f.ExitCode}
 		if !f.LogReadable {
 			ev = append(ev, "log not readable")
+		} else {
+			ev = append(ev, lastNonEmptyLines(f.Log, 3)...)
 		}
 		add(Finding{Rule: "script-error", Severity: Error, Title: "The job script exited with an error",
 			Evidence:   ev,
@@ -304,6 +315,11 @@ func Explain(f Facts) []Finding {
 	}
 
 	if st == "PENDING" {
+		if f.RestartCnt > 0 && (f.Reason == "BeginTime" || f.Reason == "Resources") {
+			add(Finding{Rule: "requeued", Severity: Warning, Title: "Job was requeued after an earlier attempt",
+				Evidence:   []string{fmt.Sprintf("restarted %d time(s) before waiting (%s)", f.RestartCnt, f.Reason)},
+				Suggestion: "Slurm requeued the job after preemption or a node failure; BeginTime after a requeue is Slurm's requeue delay (not --begin), and it will start automatically once the hold timer or node wait clears."})
+		}
 		add(pendingFinding(f.Site, f.Reason))
 	}
 
@@ -473,6 +489,22 @@ func clip(s string, n int) string {
 		return s[:n] + "..."
 	}
 	return s
+}
+
+func lastNonEmptyLines(s string, maxLines int) []string {
+	var picked []string
+	raw := strings.Split(s, "\n")
+	for i := len(raw) - 1; i >= 0 && len(picked) < maxLines; i-- {
+		ln := strings.TrimSpace(raw[i])
+		if ln == "" {
+			continue
+		}
+		picked = append(picked, "untrusted log line: "+clip(ln, 200))
+	}
+	for i, j := 0, len(picked)-1; i < j; i, j = i+1, j-1 {
+		picked[i], picked[j] = picked[j], picked[i]
+	}
+	return picked
 }
 
 func mb(v int64) string {

@@ -40,7 +40,11 @@
           "severity": "warning"
         },
         {
-          "message": "apptainer --nv on a partition without GPUs",
+          "message": "apptainer/singularity --nv on cpu, which has no GPUs",
+          "severity": "warning"
+        },
+        {
+          "message": "calls apptainer/singularity without `module load apptainer`",
           "severity": "warning"
         }
       ],

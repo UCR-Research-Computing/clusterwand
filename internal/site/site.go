@@ -30,20 +30,24 @@ const (
 
 // Paths are the person's folders on the cluster; {user} is the cluster user.
 type Paths struct {
-	Home     string   `yaml:"home"`
-	Scratch  string   `yaml:"scratch"`
-	LogRoots []string `yaml:"log_roots"` // job logs and job folders may only be read here
+	Home        string   `yaml:"home"`
+	Scratch     string   `yaml:"scratch"`
+	LogRoots    []string `yaml:"log_roots"`    // job logs and job folders may only be read here
+	PublicRoots []string `yaml:"public_roots"` // optional read-only shared doc/container folders (never downloaded in bulk)
 }
 
 // Partitions gives partitions roles; every name must exist in the catalog to matter.
 type Partitions struct {
 	Probe        string            `yaml:"probe"`         // env_check's one-core job (never the login node)
 	GPU          string            `yaml:"gpu"`           // where GPU work goes
+	TPU          []string          `yaml:"tpu"`           // TPU / non-GPU accelerator partitions
 	HighMem      string            `yaml:"highmem"`       // large-memory partition
 	General      string            `yaml:"general"`       // cheapest general CPU partition
 	Fast         string            `yaml:"fast"`          // fast-core MPI partition
 	FallbackIdle []string          `yaml:"fallback_idle"` // suggested when a node is already up and idle
 	FallbackCold []string          `yaml:"fallback_cold"` // suggested otherwise
+	FallbackGPU  []string          `yaml:"fallback_gpu"`  // suggested when a GPU partition stocks out
+	FallbackTPU  []string          `yaml:"fallback_tpu"`  // suggested when a TPU partition stocks out
 	CPU          map[string]string `yaml:"cpu"`           // partition -> CPU note
 	CPUDefault   string            `yaml:"cpu_default"`   // CPU note for the rest
 	AVX2Only     []string          `yaml:"avx2_only"`     // nodes without AVX-512
@@ -53,8 +57,9 @@ type Partitions struct {
 
 // Modules names site modules with a meaning.
 type Modules struct {
-	Python []string `yaml:"python"` // modules that provide a Python environment
-	GPU    []string `yaml:"gpu"`    // modules flagged as GPU builds
+	Python           []string            `yaml:"python"`            // modules that provide a Python environment
+	GPU              []string            `yaml:"gpu"`               // modules flagged as GPU builds
+	ModulePartitions map[string][]string `yaml:"module_partitions"` // module base name -> allowed partitions only
 }
 
 // Charge is how use is charged.
@@ -213,15 +218,32 @@ func (p *Profile) Validate() error {
 			return fmt.Errorf("site profile %s: log root %q must be an absolute folder with {user}, ending in /", p.Name, r)
 		}
 	}
+	for _, r := range p.Paths.PublicRoots {
+		if !validPublicDir(r) {
+			return fmt.Errorf("site profile %s: public_roots entry %q must be a clean absolute shared folder ending in / (not / or a system/user root)", p.Name, r)
+		}
+	}
 	parts := p.Partitions
 	names := []string{parts.Probe, parts.GPU, parts.HighMem, parts.General, parts.Fast}
+	names = append(names, parts.TPU...)
 	names = append(names, parts.FallbackIdle...)
 	names = append(names, parts.FallbackCold...)
+	names = append(names, parts.FallbackGPU...)
+	names = append(names, parts.FallbackTPU...)
 	names = append(names, parts.AVX2Only...)
 	for _, m := range []map[string]string{parts.CPU, parts.TimeHint, parts.MultiNodeMPI} {
 		for k := range m {
 			names = append(names, k)
 		}
+	}
+	for mod, allowed := range p.Modules.ModulePartitions {
+		if mod == "" || strings.ContainsAny(mod, " /\x00\n") {
+			return fmt.Errorf("site profile %s: module_partitions key %q is not a module base name", p.Name, mod)
+		}
+		if len(allowed) == 0 {
+			return fmt.Errorf("site profile %s: module_partitions[%q] must name at least one partition", p.Name, mod)
+		}
+		names = append(names, allowed...)
 	}
 	for k := range p.Charge.Rates {
 		names = append(names, k)
@@ -250,6 +272,22 @@ func (p *Profile) Validate() error {
 
 func validUserDir(d string) bool {
 	return path.IsAbs(d) && path.Clean(d) == d && strings.Count(d, "{user}") == 1 && !strings.ContainsAny(d, " \x00\n")
+}
+
+func validPublicDir(r string) bool {
+	if !strings.HasSuffix(r, "/") || strings.Contains(r, "{") || strings.ContainsAny(r, " \x00\n") {
+		return false
+	}
+	d := strings.TrimSuffix(r, "/")
+	if d == "" || !path.IsAbs(d) || path.Clean(d) != d {
+		return false
+	}
+	for _, bad := range []string{"/etc", "/home", "/root", "/var", "/proc", "/sys", "/dev", "/tmp", "/run", "/usr", "/bin", "/sbin"} {
+		if d == bad || strings.HasPrefix(d, bad+"/") {
+			return false
+		}
+	}
+	return true
 }
 
 // Embedded loads a profile shipped in the binary.

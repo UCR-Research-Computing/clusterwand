@@ -30,6 +30,7 @@ paths:
   home: /home/{user}
   scratch: /scratch/{user}
   log_roots: ["/home/{user}/", "/scratch/{user}/"]
+  public_roots: ["/apps/docs/", "/apps/containers/"]
 
 # slurm-gcp: nodes power up on demand and bill while up.
 cloud_nodes: true
@@ -38,6 +39,7 @@ stockout_reasons: [RESOURCE_POOL_EXHAUSTED, stockout]
 partitions:
   probe: check            # env_check's one-core job (always-on, 15 min limit)
   gpu: gpul4
+  tpu: [tpu, tpuspot, tpu6spot]
   highmem: highmem
   general: standard       # e2, the cheapest cores
   fast: computehigh       # Intel Sapphire Rapids, Tier_1 networking
@@ -46,9 +48,19 @@ partitions:
   # specialists
   fallback_idle: [standard, spot, computehigh, nvmescratch, highmem]
   fallback_cold: [standard, spot, computehigh]
+  fallback_gpu: [gpul4]
+  fallback_tpu: [tpu, tpuspot, tpu6spot]
   # e2 hosts (x86-64-v3, no AVX-512) since 2026-10-03
   avx2_only: [standard, spot, check]
-  cpu: {standard: AVX2 only (e2), spot: AVX2 only (e2), check: AVX2 only (e2)}
+  cpu:
+    standard: AVX2 only (e2)
+    spot: AVX2 only (e2)
+    check: AVX2 only (e2)
+    arm: ARM64 (Neoverse-N1, c4a; x86 binaries do not run)
+    tpu: AVX-512 host + 4 v5litepod-4 TPU chips
+    tpuspot: AVX-512 host + 4 v5litepod-4 TPU chips
+    tpu6spot: AVX-512 host + 4 v6e-4 Trillium TPU chips
+    gpu1v1: AVX-512 + L4 GPUs
   cpu_default: AVX-512
   time_hint:
     check: ", or submit the real run to standard (check is for tests under 15 minutes)"
@@ -56,8 +68,11 @@ partitions:
     standard: "multi-node MPI on standard (e2 nodes, standard networking, any zone): fine for loosely coupled work; tightly coupled codes (GROMACS, LAMMPS, CFD) scale better on computehigh (Tier_1 networking, fast cores)"
 
 modules:
-  python: [python-sci, python-ml]
+  python: [python-sci, python-ml, python-tpu, pytorch-tpu]
   gpu: [python-ml]
+  module_partitions:
+    python-tpu: [tpu, tpuspot, tpu6spot]
+    pytorch-tpu: [tpu, tpuspot, tpu6spot]
 
 # Slurm is read as plain text (squeue -O, sacct -P, scontrol -o). Ursa runs Slurm
 # 25.11, whose --json clusterwand also understands; text is the default and gives
@@ -128,7 +143,7 @@ text:
   rule_cuda: "GPU memory is 24 GB per L4: reduce batch size or model size. If no device is found, request --gres=gpu:1 on gpul4 and use `apptainer exec --nv` for containers."
   rule_disk_full: "Write large outputs to $SCRATCH (/scratch/$USER) and temp files to $TMPDIR; clean up old runs. Public reference databases are already in /data/shared (module load db-<name>), so do not download private copies."
   rule_permission: "Check file permissions and that paths are under your home or scratch; scripts need chmod +x if executed directly. /data/shared (reference databases) and /apps are read-only: write outputs to $SCRATCH and point tools at the database with its db-* module."
-  rule_timeout: "Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock)."
+  rule_timeout: "Raise --time (up to the partition's MaxTime — check partitions; 30 days on general partitions, 7 days on spot, 1 day on tpu*/arm, 15 min on check), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock)."
   rule_node_fail: "Usually not the user's fault (cloud node lost). Resubmit; add --requeue for long jobs."
   rule_preempted: "Spot nodes can be reclaimed with ~30 s notice. Add --requeue and checkpointing, or use standard for work that cannot restart."
   rule_exit127: "Check the first \"command not found\" line in the log (job_log_tail). Load the module that provides the program, or use its full path. There is no bare `python` on the nodes: use python3, or load python-sci / python-ml."

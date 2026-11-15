@@ -82,6 +82,8 @@ func TestAllowListIsClosed(t *testing.T) {
 	o := SubmitOpts{Partition: "standard", Nodes: 1, TimeMin: 30, JobName: "x", Comment: "clusterwand:0123456789ab"}
 	to, _ := SbatchTestOnly(o, []byte("#!/bin/bash\n"))
 	sb, _ := SubmitBatch("clusterwand-jobs/20261001-120000-x", o, []byte("#!/bin/bash\n"))
+	si, _ := StageInputs("clusterwand-jobs/20261001-120000-x", []byte("gz"))
+	sbs, _ := SubmitStagedBatch("clusterwand-jobs/20261001-120000-x", o, []byte("#!/bin/bash\n"))
 	sc, _ := Scancel("1")
 	ho, _ := Hold("1")
 	re, _ := Release("1")
@@ -102,7 +104,7 @@ func TestAllowListIsClosed(t *testing.T) {
 	texts := []Command{SqueueAllText(), tu, tj, tjs, ta, tas, sb2, NodesText(), PartitionsText(), as, Groups(), SlurmVersion(),
 		ShowConfig(), ModuleAvail(), DiscoverEnv()} // F3 discover probes
 	writes := map[string]bool{}
-	for _, c := range []Command{sb, sc, ho, re} {
+	for _, c := range []Command{sb, si, sbs, sc, ho, re} {
 		writes[c.String()] = true
 		if !c.Write() {
 			t.Errorf("%v must be marked write", c.argv)
@@ -113,7 +115,7 @@ func TestAllowListIsClosed(t *testing.T) {
 			t.Errorf("read command marked write: %v", c.argv)
 		}
 	}
-	for _, c := range append([]Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), Nodes(), cat, tl, ms, to, sb, sc, ho, re, lf, hd, td, sqj, saj, sam}, texts...) {
+	for _, c := range append([]Command{Whoami(), u, SqueueAll(), j, st, a, au, aa, Sinfo(), Nodes(), cat, tl, ms, to, sb, si, sbs, sc, ho, re, lf, hd, td, sqj, saj, sam}, texts...) {
 		if !allowed[c.argv[0]] {
 			t.Errorf("unexpected program %q", c.argv[0])
 		}
@@ -123,7 +125,9 @@ func TestAllowListIsClosed(t *testing.T) {
 		if c.argv[0] == "scontrol" && (len(c.argv) < 2 || (c.argv[1] != "show" && c.argv[1] != "hold" && c.argv[1] != "release")) {
 			t.Errorf("scontrol may only show, hold or release: %v", c.argv)
 		}
-		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate && c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryCompat &&
+		if c.argv[0] == "bash" && !strings.HasPrefix(c.argv[2], "module -t show ") && c.argv[2] != submitTemplate &&
+			c.argv[2] != stageInputsTemplate && c.argv[2] != submitStagedTemplate &&
+			c.argv[2] != envTemplate && c.argv[2] != treeTemplate && c.argv[2] != sacctSummaryCompat &&
 			c.argv[2] != squeueTextTemplate && c.argv[2] != sacctTextTemplate && c.argv[2] != nodesTextTemplate &&
 			c.argv[2] != moduleAvailTemplate && c.argv[2] != discoverEnvTemplate {
 			t.Errorf("bash only runs module show or the fixed submit template: %v", c.argv)

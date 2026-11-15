@@ -181,6 +181,9 @@ func ParseSacctText(b []byte) ([]AcctJob, error) {
 		j.TRES.Allocated, j.TRES.Requested = tresOf(get("AllocTRES")), tresOf(get("ReqTRES"))
 		j.RestartCnt = atoi(get("Restarts"))
 		j.WorkDir, j.SubmitLine = get("WorkDir"), get("SubmitLine")
+		if disp := get("JobID"); strings.Contains(disp, "_") {
+			j.Array.JobID, j.Array.TaskID = arrayOf(disp, jid)
+		}
 		p := PatternJob{JobID: jid, User: j.User, Name: j.Name, Nodes: j.Nodes, WorkDir: j.WorkDir}
 		p.ArrayJobID, p.ArrayTaskID = arrayOf(get("JobID"), jid)
 		j.StdoutExpanded = ExpandPattern(get("StdOut"), p)

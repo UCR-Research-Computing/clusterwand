@@ -40,7 +40,7 @@ stdout /home/alice_ucr_edu/deep-research-lab/run_76/job.log
 Job 236  FAILED  partition gpul4  exit 1  elapsed 1m00s
 
 [ERROR] Python package not installed in the environment (python-import)
-  evidence: log: ModuleNotFoundError: No module named 'pandas'
+  evidence: untrusted log line: ModuleNotFoundError: No module named 'pandas'
   fix: Package "pandas" is missing. Load python-sci (CPU) or python-ml (PyTorch/GPU), or create a uv/Pixi environment in the job. Check that the environment is activated in the same shell that runs python.
 
 log: /home/alice_ucr_edu/deep-research-lab/run_76/job.log (clusterwand job log 236)
@@ -75,7 +75,7 @@ Job 253  TIMEOUT  partition computehigh  exit 0  elapsed 1h30m
 [ERROR] Job hit its time limit (timeout)
   evidence: state TIMEOUT
   evidence: time limit 1h30m, ran 1h30m
-  fix: Raise --time (partitions have no maximum here), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).
+  fix: Raise --time (up to the partition's MaxTime — check partitions; 30 days on general partitions, 7 days on spot, 1 day on tpu*/arm, 15 min on check), or checkpoint and resubmit. If it should have finished sooner, check it was not stuck waiting (I/O, a download, a lock).
 
 [WARNING] Most allocated cores sat idle (low-cpu-efficiency)
   evidence: CPU efficiency 0% (22 cores x 1h30m)
@@ -165,8 +165,8 @@ What happened:
   Job 203 ("lab-30-tflm-greedymemoryplanner") on partition standard ended FAILED after 5s, exit code 1.
   It used 6% of its CPU time and a peak of 583 MB of 126832 MB memory.
 Evidence:
-  [python-import] Python package not installed in the environment: log: ModuleNotFoundError: No module named 'matplotlib'
-  [download] A download failed: log: curl: (22) The requested URL returned error: 404
+  [python-import] Python package not installed in the environment: untrusted log line: ModuleNotFoundError: No module named 'matplotlib'
+  [download] A download failed: untrusted log line: curl: (22) The requested URL returned error: 404
   log: /home/alice_ucr_edu/deep-research-lab/run_30/job.log
 
 ----- reply draft (edit before sending) -----

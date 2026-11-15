@@ -5,7 +5,7 @@ set -u
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=${GOTOOLCHAIN:-go1.26.8} PYTHONDONTWRITEBYTECODE=1
 BK=$(mktemp -d)
-FILES="internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go internal/backend/ssh.go internal/discover/discover.go internal/discover/record.go internal/discover/hostkeys.go cmd/clusterwand/discover.go internal/mcpserver/server.go"
+FILES="internal/policy/audit.go internal/core/jobs.go internal/backend/command.go internal/core/service.go internal/policy/redact.go internal/core/a1.go internal/core/staging.go internal/core/results.go internal/slurm/types.go internal/core/cluster.go internal/rules/rules.go internal/core/files.go internal/core/helpers.go internal/backend/files.go internal/core/p2.go internal/core/shared.go internal/config/config.go internal/core/catalog.go internal/core/dbcheck.go internal/slurm/sacctrows.go internal/core/allocation.go internal/site/site.go sites/ursa-major/site.yaml internal/slurm/text.go internal/core/access.go internal/core/slurmread.go internal/backend/ssh.go internal/discover/discover.go internal/discover/record.go internal/discover/hostkeys.go cmd/clusterwand/discover.go internal/mcpserver/server.go"
 for f in $FILES; do mkdir -p "$BK/$(dirname "$f")"; cp "$f" "$BK/$f"; done
 restore() { for f in $FILES; do cp "$BK/$f" "$f"; done; }
 trap restore EXIT
@@ -56,7 +56,7 @@ mutate "A1 single-use token"  internal/core/a1.go 'delete(st.Pending, key) // si
 mutate "A1 token expiry"      internal/core/a1.go 'if s.Now().After(p.Expires) {
 		return pending{}, errors.New("confirm_token expired' 'if false {
 		return pending{}, errors.New("confirm_token expired'
-mutate "A1 plan hash check"   internal/core/a1.go 'if submitHash(p.Dir, p.Opts, hashOf(p.Script)) != p.Hash {' 'if submitHash(p.Dir, p.Opts, hashOf(p.Script)) == "never" {'
+mutate "A1 plan hash check"   internal/core/a1.go 'if submitHash(p.Dir, p.Opts, hashOf(p.Script), p.InputsSHA256) != p.Hash {' 'if submitHash(p.Dir, p.Opts, hashOf(p.Script), p.InputsSHA256) == "never" {'
 mutate "MPI prerequisite"     internal/core/cluster.go 'if loadedBefore(lines, mpi) {' 'if true {'
 mutate "A1 node cap"          internal/core/a1.go 'if nodes > caps.MaxNodes {' 'if false {'
 mutate "A1 hour cap"          internal/core/a1.go 'if float64(mins) > caps.MaxHours*60 {' 'if false {'
@@ -82,7 +82,7 @@ mutate "v07 user root check"     internal/core/files.go 'if p == r {
 		}
 		if true {'
 mutate "v07 hidden component"     internal/core/files.go '				if hiddenOrSensitive(part) {' '				if false {'
-mutate "v07 realpath recheck"     internal/core/files.go '	if err := checkUserPath(real, roots); err != nil {' '	if err := checkUserPath(p, roots); err != nil {'
+mutate "v07 realpath recheck"     internal/core/files.go '		if err := checkUserPath(real, uRoots); err != nil {' '		if err := checkUserPath(p, uRoots); err != nil {'
 mutate "v07 listing hides"        internal/core/files.go '		if hiddenOrSensitive(name) {
 			l.Hidden++' '		if false {
 			l.Hidden++'
@@ -157,15 +157,21 @@ mutate "v080 interactive share"          internal/core/helpers.go '		share = cr.
 mutate "v080 interactive no-cpu warning" internal/core/helpers.go '		if in.CPUs == 0 {
 			r.Warnings' '		if false {
 			r.Warnings'
-mutate "v093 job_ids filter applied" internal/core/jobs.go '			if want[strings.SplitN(j.JobID, "_", 2)[0]] {' '			if true {'
+mutate "v093 job_ids filter applied" internal/core/jobs.go '			if wantExact[j.JobID] || wantExact[raw] || (isArr && wantParent[parent]) || (!isArr && querySet[j.JobID]) {' '			if true {'
 mutate "v093 job_ids validated" internal/core/jobs.go '		if err := backend.ValidJobID(id); err != nil {
 			return nil, err
 		}
-		want[' '		if false {
+		wantExact[' '		if false {
 			return nil, nil
 		}
-		want['
-mutate "v093 job_ids count cap" internal/core/jobs.go '	if len(in.JobIDs) > MaxJobIDs {' '	if false {'
+		wantExact['
+mutate "v093 job_ids count cap" internal/core/jobs.go '	if len(in.JobIDs) > MaxJobIDs {
+		return nil, fmt.Errorf("job_ids: at most %d ids per call, got %d", MaxJobIDs, len(in.JobIDs))
+	}
+	wantExact' '	if false {
+		return nil, fmt.Errorf("job_ids: at most %d ids per call, got %d", MaxJobIDs, len(in.JobIDs))
+	}
+	wantExact'
 mutate "v093 restarts on queue rows" internal/core/jobs.go '		Restarts: j.RestartCnt.Int(),' '		Restarts: 0,'
 mutate "v093 restarts on accounting rows" internal/core/jobs.go 'ExitCode: j.ExitCode.String(), Restarts: j.RestartCnt,' 'ExitCode: j.ExitCode.String(),'
 mutate "v094 redirect ends module list" internal/core/cluster.go '		if strings.ContainsAny(w, "<>") {
@@ -182,7 +188,7 @@ mutate "v096 env reports job"      internal/core/helpers.go '			r.JobID, r.Node 
 mutate "v096 env timeout"          internal/backend/files.go '	return Command{argv: argv, kind: KindNoCache, timeout: 200 * time.Second}, nil' '	return Command{argv: argv, kind: KindNoCache, timeout: 120 * time.Second}, nil'
 mutate "v096 config partition"     internal/config/config.go '	if c.EnvPartition != "" && !rePartitionName.MatchString(c.EnvPartition) {' '	if false {'
 mutate "v097 job_ids uncached"     internal/backend/command.go '	return Command{argv: []string{"squeue", "--json", "-j", list}, kind: KindNoCache, okExit: []int{1}}, nil' '	return Command{argv: []string{"squeue", "--json", "-j", list}, kind: KindQueue, okExit: []int{1}}, nil'
-mutate "v097 job_ids by id"        internal/core/jobs.go '	byID := len(want) > 0 && !in.All' '	byID := false'
+mutate "v097 job_ids by id"        internal/core/jobs.go '	byID := len(querySet) > 0 && !in.All' '	byID := false'
 mutate "v097 own queue rows only"  internal/core/jobs.go '		if byID && j.UserName != who {' '		if false {'
 mutate "v097 own acct rows only"   internal/core/jobs.go '		if byID && j.User != who {' '		if false {'
 mutate "v097 job list validated"   internal/backend/command.go '		if err := ValidJobID(id); err != nil {
@@ -190,8 +196,8 @@ mutate "v097 job list validated"   internal/backend/command.go '		if err := Vali
 			return "", nil'
 mutate "v098 idle alt order"       sites/ursa-major/site.yaml '  fallback_idle: [standard, spot, computehigh, nvmescratch, highmem]' '  fallback_idle: [computehigh, standard, spot, nvmescratch, highmem]'
 mutate "v098 cold alt order"       sites/ursa-major/site.yaml '  fallback_cold: [standard, spot, computehigh]' '  fallback_cold: [computehigh, standard, spot]'
-mutate "v099 time over MaxTime"     internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); false && ok && hasTime && maxMin > 0 && mins > maxMin {'
-mutate "v099 time unlimited ok"    internal/core/cluster.go '		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '		if maxMin, ok := slurmMinutes(p.TimeLimit); hasTime && mins > maxMin && ok || p.TimeLimit == "infinite" {'
+mutate "v099 time over MaxTime"     internal/core/cluster.go '			if maxMin, ok := slurmMinutes(mp.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '			if maxMin, ok := slurmMinutes(mp.TimeLimit); false && ok && hasTime && maxMin > 0 && mins > maxMin {'
+mutate "v099 time unlimited ok"    internal/core/cluster.go '			if maxMin, ok := slurmMinutes(mp.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {' '			if maxMin, ok := slurmMinutes(mp.TimeLimit); hasTime && mins > maxMin && ok || mp.TimeLimit == "infinite" {'
 mutate "v099 avx partitions"       internal/core/cluster.go '		if s.Site.AVX2Only(part) {' '		if true {'
 mutate "v099 avx comments"         internal/core/cluster.go '			if m := reAVX512.FindString(codeOnly(script)); m != "" {' '			if m := reAVX512.FindString(script); m != "" {'
 mutate "v099 mpi hint multinode"   internal/core/cluster.go 'ok && nodes > 1 && reMPIRun.MatchString(codeOnly(script)) {' 'ok && reMPIRun.MatchString(codeOnly(script)) {'
@@ -323,7 +329,7 @@ mutate "f2 unknown limits allow"        internal/core/access.go '	if a == nil {
 	}
 	p, ok := a.parts[part]'
 mutate "f2 partitions hide locked"      internal/core/cluster.go '		if !acc.allowed(p.Name) {' '		if false {'
-mutate "f2 script_check locked"         internal/core/cluster.go '			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); why != "" {' '			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); false && why != "" && fix != "" {'
+mutate "f2 script_check locked"         internal/core/cluster.go '			if why, fix := acc.check(member, sc.Request["account"]); why != "" {' '			if why, fix := acc.check(member, sc.Request["account"]); false && why != "" && fix != "" {'
 mutate "f2 interactive locked"          internal/core/helpers.go '	if why, fix := s.partitionAccess(ctx).check(part, ""); why != "" {' '	if why, fix := s.partitionAccess(ctx).check(part, ""); false && why != "" && fix != "" {'
 mutate "f2 fallback skips locked"       internal/core/a1.go '		if p != part && upIdle[p] && acc.allowed(p) {' '		if p != part && upIdle[p] && acc != nil {'
 mutate "f2 invalidate text queue"       internal/core/a1.go 'strings.Contains(k, "exec squeue ") ||' 'false ||'
@@ -372,6 +378,17 @@ mutate "v051 audit not stdout"         internal/policy/audit.go 'var auditStream
 # v0.6.0 cleanup: tool descriptions never promise cost the caller cannot see
 mutate "v060 status desc cost gated"     internal/mcpserver/server.go '	if s.CanSeeCost() {' '	if true {'
 mutate "v060 partitions desc gated"      internal/mcpserver/server.go '	if s.CanSeeCharge() {' '	if true {'
+# v0.7.0 parity & SSH staging guards
+mutate "v070 ssh strips pythonpath"      internal/backend/ssh.go 'if strings.HasPrefix(kv, "PYTHONPATH=") || strings.HasPrefix(kv, "PYTHONHOME=") {' 'if false {'
+mutate "v070 public symlink containment" internal/core/files.go 'if err := checkUserPath(real, pRoots); err != nil {' 'if false {'
+mutate "v070 download blocks public"     internal/core/files.go 'real, err := s.resolveReadPath(ctx, in.Path, false)' 'real, err := s.resolveReadPath(ctx, in.Path, true)'
+mutate "v070 staging blocks symlink"     internal/core/staging.go 'if fi.Mode()&os.ModeSymlink != 0 {' 'if false {'
+mutate "v070 staging blocks sensitive"   internal/core/staging.go 'if hiddenOrSensitive(filepath.Base(abs)) {' 'if false {'
+mutate "v070 staging archive traversal"  internal/core/staging.go 'if path.IsAbs(entryName) || entryName == ".." || strings.HasPrefix(entryName, "../") {' 'if false {'
+mutate "v070 staging archive links"      internal/core/staging.go 'return nil, "", 0, nil, fmt.Errorf("%w: archive %s contains non-regular entry %q (symlinks/devices are refused)", policy.ErrDenied, rel, hdr.Name)' 'continue'
+mutate "v070 submit hash binds inputs"   internal/core/a1.go 'return hashOf("submit", dir, o.Partition, strconv.Itoa(o.Nodes), strconv.Itoa(o.TimeMin), o.JobName, scriptHash, inputsSHA)' 'return hashOf("submit", dir, o.Partition, strconv.Itoa(o.Nodes), strconv.Itoa(o.TimeMin), o.JobName, scriptHash)'
+mutate "v070 submit confirm destructive" internal/mcpserver/server.go 'Tokens are single use and expire.", true),' 'Tokens are single use and expire.", false),'
+mutate "v070 wait failure tails redact"  internal/core/jobs.go 'ft.StdoutTail = policy.Wrap(txt, s.Cfg.Limits.UntrustedCh)' 'ft.StdoutTail = &policy.Untrusted{Text: txt}'
 restore
 for f in $FILES; do diff -q "$BK/$f" "$f" >/dev/null || { echo "NOT RESTORED: $f"; FAIL=1; }; done
 exit $FAIL

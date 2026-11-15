@@ -29,6 +29,8 @@ type Service struct {
 	Audit   *policy.Audit
 	Limiter *policy.Limiter
 	Now     func() time.Time
+	// Sleep waits between job_wait polls; tests override it so polling tests run instantly.
+	Sleep func(ctx context.Context, d time.Duration) error
 
 	mu    sync.Mutex
 	cache map[string]cacheEntry
@@ -471,6 +473,12 @@ func stripCostFields(s *Service, data any) {
 		if v != nil {
 			v.CostUSD = 0
 		}
+	case *JobWaitResult:
+		if v != nil {
+			for i := range v.Jobs {
+				v.Jobs[i].CostUSD = 0
+			}
+		}
 	case *Usage:
 		if v != nil {
 			for i := range v.Rows {
@@ -543,8 +551,9 @@ func numTS(n slurm.Num) string {
 	return ts(n.Int())
 }
 
-// sinceTime converts now-7days / now-12hours / YYYY-MM-DD to a time.
+// sinceTime converts now-7days / 24h / 7d / YYYY-MM-DD to a time.
 func sinceTime(now time.Time, s string) (time.Time, error) {
+	s = backend.NormalizeSince(s)
 	if err := backend.ValidSince(s); err != nil {
 		return time.Time{}, err
 	}
