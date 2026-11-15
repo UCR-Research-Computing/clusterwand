@@ -195,7 +195,7 @@ Things to ask:
 
 | Tier | Who | Tools |
 |---|---|---|
-| **R1** read | everyone | `cluster_status`, `partitions`, `jobs_list`, `job_show`, `job_explain`, `job_log_tail`, `job_results`, `modules_search`, `module_show`, `recipes`, `script_check`, `my_usage`, `waste_report`, `storage_usage`, `files_list`, `files_read`, `env_check`, `interactive_help`, `my_allocation` |
+| **R1** read | everyone | `cluster_status`, `partitions`, `jobs_list`, `job_wait`, `job_show`, `job_explain`, `job_log_tail`, `job_results`, `modules_search`, `module_show`, `recipes`, `script_check`, `my_usage`, `waste_report`, `storage_usage`, `files_list`, `files_read`, `files_download`, `env_check`, `interactive_help`, `my_allocation` |
 | **A1** act | opt-in per person | `job_submit` + `job_submit_confirm`, `job_cancel` / `job_hold` / `job_release` + `_confirm` |
 | **R2** staff | cluster administrators | `jobs_list_all`, `job_show_any`, `job_explain_any`, `usage_report`, `waste_report_all`, `health`, `ticket_draft` |
 
@@ -208,10 +208,10 @@ answer can be checked rather than trusted.
 The CLI mirrors the tools (`clusterwand --help` lists every flag):
 
 ```text
-clusterwand status | partitions | jobs | job show|explain|log <id>
-clusterwand modules <query> | module <name> | recipes | check <script.sh>
-clusterwand usage | waste | storage | ls | cat | env | interactive | allocation
-clusterwand submit <script.sh> | cancel|hold|release <id> | confirm <token>   (tier A1)
+clusterwand status | partitions | jobs | wait <id>... | job show|explain|log <id>
+clusterwand modules <query> | module <name> | recipes | check [--partition P] <script.sh>
+clusterwand usage | waste | storage | ls | cat | download <path> | env | interactive | allocation
+clusterwand submit <script.sh> [--input LOCAL[:REMOTE]]... [--unpack] | cancel|hold|release <id> | confirm <token>   (tier A1)
 clusterwand health | ticket <id>                                              (tier R2)
 clusterwand mcp | config init|show|path | doctor | version
 ```
@@ -287,6 +287,7 @@ Details: [SECURITY.md](SECURITY.md) and [docs/SPEC.md](docs/SPEC.md) section 11.
 | F3 | `clusterwand discover`: draft a site profile from a read-only login-node survey; host-key pin; review gate | done, v0.4.0 |
 | F4 | Live campaign on a real cluster over plain SSH ([report](docs/LIVE_CAMPAIGN_F4.md)) | done, v0.5.0 |
 | Cleanup | Dead hosted-mode plumbing removed from core; [docs/SPEC.md](docs/SPEC.md) rewritten for ClusterWand | done, v0.6.0 |
+| Parity + SSH staging | `job_wait`, `files_download`, local-SSH `job_submit` input/archive staging, job-array rollups (text + JSON), `script_check` & diagnosis upgrades | done, v0.7.0 |
 | Later | Multi-cluster configs | not started |
 
 ## Development

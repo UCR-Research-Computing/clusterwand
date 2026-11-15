@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -237,13 +238,52 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 			}
 			return sacctRowsFromJSON(b)
 		}
-		if a[2] == submitTemplate {
+		if a[2] == submitTemplate || a[2] == submitStagedTemplate {
+			if f.Files != nil && len(a) > 4 {
+				dir := "/home/" + f.User + "/" + a[4]
+				if f.Files[dir] == nil {
+					f.Files[dir] = map[string]string{}
+				}
+				f.Files[dir]["job.sbatch"] = string(c.stdin)
+			}
 			if f.NextJobID == 0 {
 				f.NextJobID = 9001
 			}
 			id := f.NextJobID
 			f.NextJobID++
 			return []byte(fmt.Sprintf("%d\n", id)), nil
+		}
+		if a[2] == stageInputsTemplate {
+			if f.Files == nil {
+				f.Files = map[string]map[string]string{}
+			}
+			dir := "/home/" + f.User + "/" + a[4]
+			if f.Files[dir] == nil {
+				f.Files[dir] = map[string]string{}
+			}
+			gz, err := gzip.NewReader(bytes.NewReader(c.stdin))
+			if err != nil {
+				return nil, err
+			}
+			tr := tar.NewReader(gz)
+			for {
+				hdr, err := tr.Next()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return nil, err
+				}
+				if hdr.Typeflag == tar.TypeReg {
+					data, err := io.ReadAll(tr)
+					if err != nil {
+						return nil, err
+					}
+					rel := strings.TrimPrefix(hdr.Name, "./")
+					f.Files[dir]["inputs/"+rel] = string(data)
+				}
+			}
+			return nil, nil
 		}
 	case "sbatch":
 		if f.TestOnly != "" {
@@ -295,7 +335,17 @@ func (f *Fixture) Run(_ context.Context, c Command) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("head exited 1: cannot open %s", p)
 	case "tar":
-		return fakeTar(f.Files[a[2]], a)
+		files := f.Files[a[2]]
+		if len(files) == 0 && len(f.Paths) > 0 {
+			prefix := strings.TrimSuffix(a[2], "/") + "/"
+			files = map[string]string{}
+			for k, v := range f.Paths {
+				if strings.HasPrefix(k, prefix) && !strings.HasSuffix(k, "/") {
+					files[strings.TrimPrefix(k, prefix)] = v
+				}
+			}
+		}
+		return fakeTar(files, a)
 	}
 	if a[0] == "scontrol" && (a[1] == "hold" || a[1] == "release") {
 		return nil, nil
@@ -312,7 +362,7 @@ func flag(argv []string, name string) string {
 	return ""
 }
 
-// filterJobs keeps jobs whose job_id matches id (array suffix ignored).
+// filterJobs keeps jobs whose job_id or array parent job_id matches id.
 func filterJobs(b []byte, id, key string) ([]byte, error) {
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(b, &doc); err != nil {
@@ -324,11 +374,26 @@ func filterJobs(b []byte, id, key string) ([]byte, error) {
 	}
 	want := map[string]bool{}
 	for _, x := range strings.Split(id, ",") {
-		want[strings.SplitN(x, "_", 2)[0]] = true
+		want[strings.TrimSpace(x)] = true
+		want[strings.SplitN(strings.TrimSpace(x), "_", 2)[0]] = true
 	}
 	var keep []map[string]json.RawMessage
 	for _, j := range jobs {
-		if want[strings.TrimSpace(string(j[key]))] {
+		jid := strings.TrimSpace(string(j[key]))
+		matched := want[jid]
+		if !matched {
+			var arr struct {
+				JobID int64 `json:"job_id"`
+			}
+			if raw, ok := j["array"]; ok && json.Unmarshal(raw, &arr) == nil && arr.JobID > 0 && want[fmt.Sprint(arr.JobID)] {
+				matched = true
+			}
+			var qArr textNum
+			if raw, ok := j["array_job_id"]; ok && json.Unmarshal(raw, &qArr) == nil && qArr.Set && int64(qArr.Number) > 0 && want[fmt.Sprint(int64(qArr.Number))] {
+				matched = true
+			}
+		}
+		if matched {
 			keep = append(keep, j)
 		}
 	}

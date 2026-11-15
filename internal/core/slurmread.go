@@ -62,8 +62,14 @@ func (s *Service) queue(ctx context.Context, sel queueSel) ([]slurm.QueueJob, er
 		return nil, err
 	}
 	if s.useJSON() {
+		if len(strings.TrimSpace(string(b))) == 0 {
+			return []slurm.QueueJob{}, nil
+		}
 		var q slurm.QueueResponse
 		if err := slurm.Decode(b, &q); err != nil {
+			if (sel.job != "" || len(sel.jobs) > 0) && strings.Contains(err.Error(), "Invalid job id") {
+				return []slurm.QueueJob{}, nil
+			}
 			return nil, err
 		}
 		return q.Jobs, nil

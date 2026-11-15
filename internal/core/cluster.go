@@ -51,6 +51,12 @@ type ClusterStatus struct {
 
 // ClusterStatus reads node and queue state.
 func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
+	return s.ClusterStatusFiltered(ctx, "")
+}
+
+// ClusterStatusFiltered reads node and queue state, optionally keeping only one partition.
+func (s *Service) ClusterStatusFiltered(ctx context.Context, partition string) (*ClusterStatus, error) {
+	partition = strings.TrimSpace(partition)
 	ns, release, err := s.nodes(ctx)
 	if err != nil {
 		return nil, err
@@ -73,6 +79,9 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 	cs := &ClusterStatus{Cluster: s.Cfg.Cluster, SlurmVersion: release, PendingByWhy: map[string]int{}}
 	for _, n := range nr.Nodes {
 		for _, pn := range n.Partitions {
+			if partition != "" && pn != partition {
+				continue
+			}
 			p := get(pn)
 			p.NodesTotal++
 			switch {
@@ -101,6 +110,9 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 		}
 	}
 	for _, j := range q.Jobs {
+		if partition != "" && j.Partition != partition {
+			continue
+		}
 		p := get(j.Partition)
 		switch j.State() {
 		case "RUNNING", "COMPLETING", "CONFIGURING":
@@ -111,6 +123,16 @@ func (s *Service) ClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 			cs.JobsPending++
 			cs.PendingByWhy[j.StateReason]++
 		}
+	}
+	if partition != "" && len(byName) == 0 {
+		if cat != nil {
+			if _, ok := cat.Partition(partition); !ok {
+				return nil, fmt.Errorf("partition %q not found", partition)
+			}
+		} else {
+			return nil, fmt.Errorf("partition %q not found", partition)
+		}
+		get(partition)
 	}
 	var burn float64
 	priced := false
@@ -434,6 +456,15 @@ var (
 // ScriptCheck checks a batch script against the cluster's partitions and modules.
 // Nothing is submitted; the script is never sent to the cluster.
 func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck, error) {
+	return s.ScriptCheckWithPartition(ctx, script, "")
+}
+
+// ScriptCheckWithPartition runs ScriptCheck, optionally overriding the script's partition.
+func (s *Service) ScriptCheckWithPartition(ctx context.Context, script, partitionOverride string) (*ScriptCheck, error) {
+	partitionOverride = strings.TrimSpace(partitionOverride)
+	if partitionOverride != "" {
+		script = withPartition(script, partitionOverride)
+	}
 	if len(script) > s.Cfg.Limits.ScriptBytes {
 		return nil, fmt.Errorf("script is %d bytes; limit %d", len(script), s.Cfg.Limits.ScriptBytes)
 	}
@@ -450,6 +481,11 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 	if len(lines) == 0 || !strings.HasPrefix(lines[0], "#!") {
 		add("error", 1, "first line must be a shebang such as #!/bin/bash (sbatch rejects scripts without one)")
 	}
+	type modUse struct {
+		name string
+		line int
+	}
+	var modUses []modUse
 	bodyStarted := false
 	for i, raw := range lines {
 		ln := strings.TrimSpace(raw)
@@ -470,10 +506,13 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 		for _, m := range reModLoad.FindAllStringSubmatch(raw, -1) {
 			for _, mod := range moduleWords(m[1]) {
 				sc.Modules = append(sc.Modules, mod)
+				modUses = append(modUses, modUse{name: mod, line: i + 1})
+				baseMod, _, _ := strings.Cut(mod, "/")
+				_, scoped := s.Site.Modules.ModulePartitions[baseMod]
 				ok, _ := cat.ModuleExists(mod)
 				needs, satisfied := mpiSatisfied(lines[:i+1], cat.ModuleRequires(mod))
 				switch {
-				case !ok:
+				case !ok && !scoped:
 					msg := "module %q not found in the cluster catalog"
 					if c := cat.Closest(mod, 3); len(c) > 0 {
 						msg += "; closest: " + strings.Join(c, ", ")
@@ -497,8 +536,7 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 	part := firstNonEmpty(sc.Request["partition"], cat.DefaultPartition())
 	sc.Partition = part
 	// A comma list (-p tpuspot,tpu) is legal Slurm: the job starts on whichever has a node
-	// first. Check every member exists, then run the checks below against the dearest one
-	// so limits and the cost estimate are the worst case.
+	// first. Check every member exists and fits the request, then price against the dearest one.
 	part, unknown := s.resolvePartitionList(cat, part)
 	if len(unknown) == 0 && part != sc.Partition {
 		add("info", 0, "partition list %s: Slurm starts the job on whichever has a node first; checks and cost use %s (the dearest)", sc.Partition, part)
@@ -519,35 +557,60 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 		if sc.Request["partition"] == "" {
 			add("info", 0, "no partition given; Slurm will use the default (%s)", part)
 		}
-		// lab-locked partitions: every member of a list must be usable
-		acc := s.partitionAccess(ctx)
-		for _, member := range strings.Split(sc.Partition, ",") {
-			if why, fix := acc.check(strings.TrimSpace(member), sc.Request["account"]); why != "" {
-				add("error", 0, "%s", lockedNote(why, fix))
+		members := strings.Split(sc.Partition, ",")
+		// Partition-scoped modules (e.g. python-tpu on tpu*): must match every target partition.
+		for _, mu := range modUses {
+			baseMod, _, _ := strings.Cut(mu.name, "/")
+			if allowed, scoped := s.Site.Modules.ModulePartitions[baseMod]; scoped {
+				for _, m := range members {
+					m = strings.TrimSpace(m)
+					if m != "" && !contains(allowed, m) {
+						add("error", mu.line, "module %q is only installed on partition(s) %s (this script targets %s)", mu.name, strings.Join(allowed, ", "), m)
+					}
+				}
 			}
 		}
-		// the partition's MaxTime (catalog time_limit, e.g. check's 15:00): a longer
-		// --time is held by Slurm forever with reason PartitionTimeLimit (v0.9.9)
-		if maxMin, ok := slurmMinutes(p.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {
-			add("error", 0, "--time %s is over %s's limit of %s; Slurm would hold the job (PartitionTimeLimit). Lower --time%s",
-				sc.Request["time"], part, minutesText(maxMin), s.Site.Partitions.TimeHint[part])
-		}
+		// lab-locked partitions and per-member resource caps: every member of a list must fit
+		acc := s.partitionAccess(ctx)
 		nodes := atoiDefault(sc.Request["nodes"], 1)
-		if nodes > p.MaxNodes {
-			add("error", 0, "%d nodes requested; %s has %d", nodes, part, p.MaxNodes)
-		}
-		if c := cpusPerNode(sc.Request); c > p.CPUsPerNode {
-			add("error", 0, "%d CPUs per node requested; %s nodes have %d physical cores (no hyperthreads)", c, part, p.CPUsPerNode)
-		}
-		if mem, ok := memMB(sc.Request["mem"]); ok && float64(mem) > p.MemGBPerNode*1024 {
-			add("error", 0, "--mem %s is more than a %s node has (%.0f GB)", sc.Request["mem"], part, p.MemGBPerNode)
-		}
+		cpus := cpusPerNode(sc.Request)
+		memVal, hasMem := memMB(sc.Request["mem"])
+		mpcVal, hasMPC := memMB(sc.Request["mem-per-cpu"])
 		g := gpusRequested(sc.Request)
-		if g > 0 && p.GPUsPerNode == 0 {
-			add("error", 0, "GPUs requested on %s, which has no GPUs%s", part, s.useGPU())
-		}
-		if g > p.GPUsPerNode && p.GPUsPerNode > 0 {
-			add("error", 0, "%d GPUs per node requested; %s has %d", g, part, p.GPUsPerNode)
+		for _, rawMember := range members {
+			member := strings.TrimSpace(rawMember)
+			if member == "" {
+				continue
+			}
+			if why, fix := acc.check(member, sc.Request["account"]); why != "" {
+				add("error", 0, "%s", lockedNote(why, fix))
+			}
+			mp, mok := cat.Partition(member)
+			if !mok {
+				continue
+			}
+			if maxMin, ok := slurmMinutes(mp.TimeLimit); ok && hasTime && maxMin > 0 && mins > maxMin {
+				add("error", 0, "--time %s is over %s's limit of %s; Slurm would hold the job (PartitionTimeLimit). Lower --time%s",
+					sc.Request["time"], member, minutesText(maxMin), s.Site.Partitions.TimeHint[member])
+			}
+			if nodes > mp.MaxNodes {
+				add("error", 0, "%d nodes requested; %s has %d", nodes, member, mp.MaxNodes)
+			}
+			if cpus > mp.CPUsPerNode {
+				add("error", 0, "%d CPUs per node requested; %s nodes have %d physical cores (no hyperthreads)", cpus, member, mp.CPUsPerNode)
+			}
+			if hasMem && float64(memVal) > mp.MemGBPerNode*1024 {
+				add("error", 0, "--mem %s is more than a %s node has (%.0f GB)", sc.Request["mem"], member, mp.MemGBPerNode)
+			}
+			if hasMPC && float64(mpcVal*int64(cpus)) > mp.MemGBPerNode*1024 {
+				add("error", 0, "--mem-per-cpu %s x %d CPUs (%d MB) is more than a %s node has (%.0f GB)", sc.Request["mem-per-cpu"], cpus, mpcVal*int64(cpus), member, mp.MemGBPerNode)
+			}
+			if g > 0 && mp.GPUsPerNode == 0 {
+				add("error", 0, "GPUs requested on %s, which has no GPUs%s", member, s.useGPU())
+			}
+			if g > mp.GPUsPerNode && mp.GPUsPerNode > 0 {
+				add("error", 0, "%d GPUs per node requested; %s has %d", g, member, mp.GPUsPerNode)
+			}
 		}
 		if g == 0 && p.GPUsPerNode > 0 {
 			add("warning", 0, "running on %s without --gres=gpu:1; the GPU will not be visible to the job", part)
@@ -612,8 +675,17 @@ func (s *Service) ScriptCheck(ctx context.Context, script string) (*ScriptCheck,
 	if strings.Contains(code, "python") && !s.rePythonEnv().MatchString(code) {
 		add("warning", 0, "%s", s.Site.Text("script_python_env", "calls python without loading a Python module or an environment (venv, conda, pixi, uv)"))
 	}
-	if strings.Contains(code, "apptainer") && strings.Contains(code, "--nv") && p.GPUsPerNode == 0 {
-		add("warning", 0, "apptainer --nv on a partition without GPUs")
+	usesContainer := regexp.MustCompile(`\b(apptainer|singularity)\b`).MatchString(code)
+	if usesContainer && strings.Contains(code, "--nv") && ok && p.GPUsPerNode == 0 {
+		add("warning", 0, "apptainer/singularity --nv on %s, which has no GPUs", part)
+	}
+	if usesContainer && !loadedBefore(lines, "apptainer") && !loadedBefore(lines, "singularity") {
+		if hasMod, _ := cat.ModuleExists("apptainer"); hasMod {
+			add("warning", 0, "calls apptainer/singularity without `module load apptainer`")
+		}
+	}
+	if usesContainer && loadedBefore(lines, "cuda") {
+		add("info", 0, "containers bring their own CUDA user-space: `apptainer exec --nv` exposes the host GPU driver without `module load cuda`")
 	}
 	dbChecks(cat, script, sc.Request["array"], add)
 	sc.OK = true
@@ -738,7 +810,7 @@ func (s *Service) rePythonEnv() *regexp.Regexp {
 	for _, m := range s.Site.Modules.Python {
 		alts = append(alts, regexp.QuoteMeta(m))
 	}
-	alts = append(alts, "venv", "conda", "pixi", "uv ", "apptainer", "miniforge")
+	alts = append(alts, "venv", "conda", "pixi", "uv ", "apptainer", "singularity", "miniforge")
 	return regexp.MustCompile(strings.Join(alts, "|"))
 }
 

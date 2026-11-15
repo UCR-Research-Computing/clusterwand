@@ -127,6 +127,7 @@ func (s *SSH) Run(ctx context.Context, c Command) ([]byte, error) {
 	defer cancel()
 	full := append(append([]string{}, argv[1:]...), "--", dest, RemoteLine(c))
 	cmd := exec.CommandContext(ctx, argv[0], full...)
+	cmd.Env = cleanSSHEnv(os.Environ())
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if c.merge {
@@ -191,4 +192,18 @@ func controlDir(runtime, tmp string) string {
 		}
 	}
 	return "/tmp"
+}
+
+// cleanSSHEnv strips leaked Python variables from ssh's environment so SSH
+// ProxyCommand helpers (such as gcloud compute start-iap-tunnel) never crash on
+// a caller's mismatched PYTHONPATH/PYTHONHOME.
+func cleanSSHEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "PYTHONPATH=") || strings.HasPrefix(kv, "PYTHONHOME=") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }

@@ -41,26 +41,30 @@ var ErrCapExceeded = errors.New("over cap")
 
 // SubmitPlan is what job_submit returns before confirmation.
 type SubmitPlan struct {
-	Token        string          `json:"confirm_token"`
-	ExpiresAt    string          `json:"expires_at"`
-	PlanHash     string          `json:"plan_hash"`
-	Partition    string          `json:"partition"`
-	Nodes        int             `json:"nodes"`
-	TimeLimit    string          `json:"time_limit"`
-	JobName      string          `json:"job_name"`
-	RemoteDir    string          `json:"remote_dir"`
-	ScriptBytes  int             `json:"script_bytes"`
-	ScriptSHA256 string          `json:"script_sha256"`
-	USDPerNodeH  float64         `json:"usd_per_node_hour,omitempty"`
-	WorstCaseUSD float64         `json:"worst_case_usd"`
-	SpentTodayUS float64         `json:"committed_today_usd"`
-	DayCapUSD    float64         `json:"day_cap_usd"`
-	Scheduler    string          `json:"scheduler_test"` // sbatch --test-only answer
-	Warnings     []string        `json:"warnings"`
-	Overrides    []string        `json:"overrides"` // #SBATCH values clusterwand replaced
-	Next         string          `json:"next"`
-	Allocation   *PlanAllocation `json:"allocation"`
-	Charge       *PlanCharge     `json:"charge,omitempty"` // sites charged in service units
+	Token          string          `json:"confirm_token"`
+	ExpiresAt      string          `json:"expires_at"`
+	PlanHash       string          `json:"plan_hash"`
+	Partition      string          `json:"partition"`
+	Nodes          int             `json:"nodes"`
+	TimeLimit      string          `json:"time_limit"`
+	JobName        string          `json:"job_name"`
+	RemoteDir      string          `json:"remote_dir"`
+	ScriptBytes    int             `json:"script_bytes"`
+	ScriptSHA256   string          `json:"script_sha256"`
+	Inputs         []StagedFile    `json:"inputs,omitempty"`
+	InputsBytes    int64           `json:"inputs_bytes,omitempty"`
+	InputsSHA256   string          `json:"inputs_sha256,omitempty"`
+	UnpackArchives bool            `json:"unpack_archives,omitempty"`
+	USDPerNodeH    float64         `json:"usd_per_node_hour,omitempty"`
+	WorstCaseUSD   float64         `json:"worst_case_usd"`
+	SpentTodayUS   float64         `json:"committed_today_usd"`
+	DayCapUSD      float64         `json:"day_cap_usd"`
+	Scheduler      string          `json:"scheduler_test"` // sbatch --test-only answer
+	Warnings       []string        `json:"warnings"`
+	Overrides      []string        `json:"overrides"` // #SBATCH values clusterwand replaced
+	Next           string          `json:"next"`
+	Allocation     *PlanAllocation `json:"allocation"`
+	Charge         *PlanCharge     `json:"charge,omitempty"` // sites charged in service units
 }
 
 // PlanCharge is a plan's cost on a site not charged in dollars.
@@ -129,34 +133,39 @@ type ActionPlan struct {
 
 // Confirmed is the result of a confirmed action.
 type Confirmed struct {
-	Action    string  `json:"action"`
-	JobID     string  `json:"job_id"`
-	RemoteDir string  `json:"remote_dir,omitempty"`
-	Committed float64 `json:"committed_usd,omitempty"`
-	Message   string  `json:"message"`
-	Next      string  `json:"next,omitempty"`
+	Action       string  `json:"action"`
+	JobID        string  `json:"job_id"`
+	RemoteDir    string  `json:"remote_dir,omitempty"`
+	StagedInputs int     `json:"staged_inputs,omitempty"`
+	Committed    float64 `json:"committed_usd,omitempty"`
+	Message      string  `json:"message"`
+	Next         string  `json:"next,omitempty"`
 }
 
 // SubmitInput is a submit request.
 type SubmitInput struct {
-	Script    string
-	Partition string // overrides #SBATCH -p
-	Nodes     int    // overrides #SBATCH -N
-	Time      string // overrides #SBATCH -t (Slurm format)
-	JobName   string // overrides #SBATCH -J
+	Script         string
+	Partition      string      // overrides #SBATCH -p
+	Nodes          int         // overrides #SBATCH -N
+	Time           string      // overrides #SBATCH -t (Slurm format)
+	JobName        string      // overrides #SBATCH -J
+	Inputs         []InputSpec // optional local files or inline text/base64 staged into inputs/
+	UnpackArchives bool        // unpack .tar.gz / .tgz inputs inside inputs/ before sbatch
 }
 
 // pending is one stored action awaiting confirmation.
 type pending struct {
-	Kind     string    `json:"kind"` // submit | cancel | hold | release
-	Hash     string    `json:"hash"`
-	Created  time.Time `json:"created"`
-	Expires  time.Time `json:"expires"`
-	JobID    string    `json:"job_id,omitempty"`
-	Dir      string    `json:"dir,omitempty"`
-	Script   string    `json:"script,omitempty"`
-	Opts     subOpts   `json:"opts,omitempty"`
-	WorstUSD float64   `json:"worst_usd,omitempty"`
+	Kind         string    `json:"kind"` // submit | cancel | hold | release
+	Hash         string    `json:"hash"`
+	Created      time.Time `json:"created"`
+	Expires      time.Time `json:"expires"`
+	JobID        string    `json:"job_id,omitempty"`
+	Dir          string    `json:"dir,omitempty"`
+	Script       string    `json:"script,omitempty"`
+	Opts         subOpts   `json:"opts,omitempty"`
+	WorstUSD     float64   `json:"worst_usd,omitempty"`
+	InputsSHA256 string    `json:"inputs_sha256,omitempty"`
+	InputsCount  int       `json:"inputs_count,omitempty"`
 }
 
 type subOpts struct {
@@ -247,6 +256,7 @@ func (s *Service) saveState(st *a1State) error {
 			delete(st.Pending, k)
 		}
 	}
+	s.cleanStagedArchives(st)
 	cut := now.Add(-40 * 24 * time.Hour) // keep ~a month of ledger
 	keep := st.Ledger[:0]
 	for _, e := range st.Ledger {
@@ -474,6 +484,11 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 		return nil, fmt.Errorf("%w: %d submissions today (cap %d)", ErrCapExceeded, n, caps.MaxSubmitsPerDay)
 	}
 
+	tarGz, inputsSHA, inputsBytes, stagedFiles, err := prepareStagedInputs(in.Inputs, in.UnpackArchives)
+	if err != nil {
+		return nil, err
+	}
+
 	scriptHash := hashOf(in.Script)
 	stamp := s.Now().Format("20060102-150405")
 	slug := strings.ToLower(regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(strings.ToLower(name), "-"))
@@ -486,7 +501,7 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 	}
 	dir := s.Cfg.JobsRoot + "/" + stamp + "-" + slug
 	opts := subOpts{Partition: slurmPart, Nodes: nodes, TimeMin: mins, JobName: name}
-	planHash := submitHash(dir, opts, scriptHash)
+	planHash := submitHash(dir, opts, scriptHash, inputsSHA)
 	opts.Comment = "clusterwand:" + planHash[:12]
 
 	// ask the scheduler (no submission)
@@ -510,20 +525,36 @@ func (s *Service) PrepareSubmit(ctx context.Context, in SubmitInput) (*SubmitPla
 		plan.Warnings = append(plan.Warnings, w)
 	}
 
+	if len(tarGz) > 0 {
+		sp := s.stagedTarPath(planHash)
+		if err := os.MkdirAll(filepath.Dir(sp), 0o700); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(sp, tarGz, 0o600); err != nil {
+			return nil, err
+		}
+	}
+
 	tok, err := newToken()
 	if err != nil {
 		return nil, err
 	}
 	exp := s.Now().Add(time.Duration(caps.ConfirmTTLMinutes) * time.Minute)
 	st.Pending[tokenKey(tok)] = pending{Kind: "submit", Hash: planHash, Created: s.Now(), Expires: exp,
-		Dir: dir, Script: in.Script, Opts: opts, WorstUSD: worst}
+		Dir: dir, Script: in.Script, Opts: opts, WorstUSD: worst, InputsSHA256: inputsSHA, InputsCount: len(stagedFiles)}
 	if err := s.saveState(st); err != nil {
 		return nil, err
 	}
 
+	shortInputsSHA := ""
+	if len(inputsSHA) >= 16 {
+		shortInputsSHA = inputsSHA[:16]
+	}
 	*plan = SubmitPlan{Token: tok, ExpiresAt: exp.Format(time.RFC3339), PlanHash: planHash[:12],
 		Partition: slurmPart, Nodes: nodes, TimeLimit: minutesText(mins), JobName: name, RemoteDir: "~/" + dir,
-		ScriptBytes: len(in.Script), ScriptSHA256: scriptHash[:16], USDPerNodeH: price, WorstCaseUSD: worst,
+		ScriptBytes: len(in.Script), ScriptSHA256: scriptHash[:16],
+		Inputs: stagedFiles, InputsBytes: inputsBytes, InputsSHA256: shortInputsSHA, UnpackArchives: in.UnpackArchives && len(stagedFiles) > 0,
+		USDPerNodeH: price, WorstCaseUSD: worst,
 		SpentTodayUS: spent, DayCapUSD: dayCap, Scheduler: plan.Scheduler,
 		Warnings: plan.Warnings, Overrides: plan.Overrides,
 		Next: "Show this plan to the user. Only if they approve, call job_submit_confirm with the confirm_token. Nothing has been submitted yet."}
@@ -583,14 +614,29 @@ func (s *Service) partitionTrouble(ctx context.Context, part string) string {
 	}
 	alt := ""
 	acc := s.partitionAccess(ctx)
-	for _, p := range s.Site.Partitions.FallbackIdle {
+	cat, _ := s.Catalog(ctx)
+	isTPU := contains(s.Site.Partitions.TPU, part)
+	isGPU := part != "" && part == s.Site.Partitions.GPU
+	if !isGPU && cat != nil {
+		if cp, ok := cat.Partition(part); ok && cp.GPUsPerNode > 0 {
+			isGPU = true
+		}
+	}
+	idleCands, coldCands := s.Site.Partitions.FallbackIdle, s.Site.Partitions.FallbackCold
+	switch {
+	case isTPU:
+		idleCands, coldCands = s.Site.Partitions.FallbackTPU, s.Site.Partitions.FallbackTPU
+	case isGPU:
+		idleCands, coldCands = s.Site.Partitions.FallbackGPU, s.Site.Partitions.FallbackGPU
+	}
+	for _, p := range idleCands {
 		if p != part && upIdle[p] && acc.allowed(p) {
 			alt = p + " (a node is already up and idle)"
 			break
 		}
 	}
 	if alt == "" {
-		for _, p := range s.Site.Partitions.FallbackCold {
+		for _, p := range coldCands {
 			if p != part && !troubled[p] && acc.allowed(p) {
 				alt = p
 				break
@@ -624,9 +670,12 @@ func minutesText(m int) string {
 	return fmt.Sprintf("%d h %02d min", m/60, m%60)
 }
 
-// submitHash binds a plan to its folder, resources and script.
-func submitHash(dir string, o subOpts, scriptHash string) string {
-	return hashOf("submit", dir, o.Partition, strconv.Itoa(o.Nodes), strconv.Itoa(o.TimeMin), o.JobName, scriptHash)
+// submitHash binds a plan to its folder, resources, script and staged inputs.
+func submitHash(dir string, o subOpts, scriptHash, inputsSHA string) string {
+	if inputsSHA == "" {
+		return hashOf("submit", dir, o.Partition, strconv.Itoa(o.Nodes), strconv.Itoa(o.TimeMin), o.JobName, scriptHash)
+	}
+	return hashOf("submit", dir, o.Partition, strconv.Itoa(o.Nodes), strconv.Itoa(o.TimeMin), o.JobName, scriptHash, inputsSHA)
 }
 
 // take removes and returns a pending action if the token is valid.
@@ -662,8 +711,22 @@ func (s *Service) ConfirmSubmit(ctx context.Context, tok string) (*Confirmed, er
 		_ = s.saveState(st)
 		return nil, err
 	}
+	var stagedTar []byte
+	if p.InputsSHA256 != "" {
+		b, rerr := os.ReadFile(s.stagedTarPath(p.Hash))
+		if rerr != nil {
+			_ = s.saveState(st)
+			return nil, fmt.Errorf("staged input snapshot is missing (%v); prepare the submission again", rerr)
+		}
+		sum := sha256.Sum256(b)
+		if hex.EncodeToString(sum[:]) != p.InputsSHA256 {
+			_ = s.saveState(st)
+			return nil, errors.New("staged input snapshot does not match its plan hash; refusing")
+		}
+		stagedTar = b
+	}
 	// integrity: the stored action must still hash to the plan
-	if submitHash(p.Dir, p.Opts, hashOf(p.Script)) != p.Hash {
+	if submitHash(p.Dir, p.Opts, hashOf(p.Script), p.InputsSHA256) != p.Hash {
 		_ = s.saveState(st)
 		return nil, errors.New("stored plan does not match its hash; refusing")
 	}
@@ -680,7 +743,21 @@ func (s *Service) ConfirmSubmit(ctx context.Context, tok string) (*Confirmed, er
 		_ = s.saveState(st)
 		return nil, fmt.Errorf("%w: %d submissions today since the plan was made (cap %d)", ErrCapExceeded, n, s.Cfg.Caps.MaxSubmitsPerDay)
 	}
-	c, err := backend.SubmitBatch(p.Dir, backend.SubmitOpts(p.Opts), []byte(p.Script))
+	var c backend.Command
+	if len(stagedTar) > 0 {
+		scmd, serr := backend.StageInputs(p.Dir, stagedTar)
+		if serr != nil {
+			_ = s.saveState(st)
+			return nil, serr
+		}
+		if _, serr := s.run(ctx, scmd); serr != nil {
+			_ = s.saveState(st)
+			return nil, fmt.Errorf("staging inputs over SSH failed: %w", serr)
+		}
+		c, err = backend.SubmitStagedBatch(p.Dir, backend.SubmitOpts(p.Opts), []byte(p.Script))
+	} else {
+		c, err = backend.SubmitBatch(p.Dir, backend.SubmitOpts(p.Opts), []byte(p.Script))
+	}
 	if err != nil {
 		_ = s.saveState(st)
 		return nil, err
@@ -700,9 +777,9 @@ func (s *Service) ConfirmSubmit(ctx context.Context, tok string) (*Confirmed, er
 		return nil, fmt.Errorf("job %s was submitted but the ledger could not be saved: %w", id, err)
 	}
 	s.invalidateQueue()
-	return &Confirmed{Action: "submit", JobID: id, RemoteDir: "~/" + p.Dir, Committed: p.WorstUSD,
+	return &Confirmed{Action: "submit", JobID: id, RemoteDir: "~/" + p.Dir, StagedInputs: p.InputsCount, Committed: p.WorstUSD,
 		Message: fmt.Sprintf("Submitted job %s (%s, %d node(s), %s).", id, p.Opts.Partition, p.Opts.Nodes, minutesText(p.Opts.TimeMin)),
-		Next:    fmt.Sprintf("Follow with job_show %s; when it ends, job_results %s lists and downloads the outputs.", id, id)}, nil
+		Next:    fmt.Sprintf("Follow with job_wait %s (or job_show %s); when it ends, job_results %s lists and downloads the outputs.", id, id, id)}, nil
 }
 
 // PrepareAction stores a cancel/hold/release of one of the caller's jobs.

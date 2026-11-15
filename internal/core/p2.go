@@ -548,8 +548,12 @@ func replyText(t *TicketDraft, errs []rules.Finding, ex *Explanation, site strin
 		for _, f := range errs {
 			b.WriteString("- " + f.Title)
 			for _, ev := range f.Evidence {
-				if strings.HasPrefix(ev, "log: ") {
-					b.WriteString(" (the log shows: " + strings.TrimPrefix(ev, "log: ") + ")")
+				if q, ok := strings.CutPrefix(ev, "untrusted log line: "); ok {
+					b.WriteString(" (the log shows: " + policy.CleanLabel(q, 240) + ")")
+					break
+				}
+				if q, ok := strings.CutPrefix(ev, "log: "); ok {
+					b.WriteString(" (the log shows: " + policy.CleanLabel(q, 240) + ")")
 					break
 				}
 			}

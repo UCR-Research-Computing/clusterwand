@@ -38,16 +38,17 @@ const usage = `clusterwand - read-only bridge between AI assistants and your Slu
 
 Usage:
   clusterwand mcp                              run the MCP server on stdio
-  clusterwand status                           cluster status (nodes, queue, $/hour)
+  clusterwand status [--partition P]           cluster status (nodes, queue, $/hour)
   clusterwand partitions                       partitions from the cluster catalog
   clusterwand jobs [--state S] [--since T] [--all] [--user U]
+  clusterwand wait <id>... [--timeout S] [--poll S]   wait for jobs/arrays to finish
   clusterwand job show <id> [--script] [--any]
   clusterwand job explain <id> [--lines N] [--any]
   clusterwand job log <id> [--stderr] [--lines N] [--start N] [--grep RE] [--any]
   clusterwand modules [query]                  search software modules
   clusterwand module [--mpi M] <name>          module show (MPI-built ones under their MPI)
   clusterwand recipes [query]                  known-good recipes and site rules
-  clusterwand check <script.sh|->              static check of a batch script
+  clusterwand check [--partition P] <script.sh|->     static check of a batch script
   clusterwand allocation                       your allocation and use
   clusterwand usage [--since T] [--until T] [--by partition|state|user] [--all]
   clusterwand waste [--since T] [--cpu PCT] [--all] [--user U]   avoidable spend
@@ -58,9 +59,11 @@ Usage:
   clusterwand storage                          space used in your home and scratch folders
   clusterwand ls [PATH] [--pattern GLOB] [--offset N]   a folder under your home or scratch
   clusterwand cat PATH [--offset N] [--bytes N] [--grep RE]   a text file under home or scratch
+  clusterwand download PATH [--out DIR]        copy one file from home or scratch over SSH
   clusterwand env [--module M]... [CMD...]     what modules load and which tools you get
   clusterwand interactive [--partition P] [--nodes N] [--cpus N] [--gpus N] [--time T] [--mem M]
-  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]   (A1)
+  clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J]
+                  [--input LOCAL[:REMOTE]]... [--unpack] [--yes]   (A1)
   clusterwand cancel|hold|release <id> [--yes]                      (A1)
   clusterwand confirm <token>                  confirm a prepared action (A1)
   clusterwand config init|show|path
@@ -70,7 +73,7 @@ Usage:
   clusterwand version
 
 Global flags (anywhere): --json  --config PATH
-Times: now-7days, now-12hours, YYYY-MM-DD. --all/--any need tier R2 in the config.
+Times: now-7days, 7d, 24h, 30m, YYYY-MM-DD. --all/--any need tier R2 in the config.
 `
 
 type moduleResult struct {
@@ -154,7 +157,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "status":
-		r, err := core.Call(ctx, svc, "cli", "cluster_status", "R1", nil, false, svc.ClusterStatus)
+		fs := newFlags("status")
+		part := fs.String("partition", "", "partition filter")
+		if err := fs.Parse(rest); err != nil {
+			return fail(stdout, stderr, g, err)
+		}
+		var args map[string]any
+		if *part != "" {
+			args = map[string]any{"partition": *part}
+		}
+		r, err := core.Call(ctx, svc, "cli", "cluster_status", "R1", args, false, func(ctx context.Context) (*core.ClusterStatus, error) {
+			return svc.ClusterStatusFiltered(ctx, *part)
+		})
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printStatus(w, r.Data, svc.Site) })
 	case "partitions":
 		r, err := core.Call(ctx, svc, "cli", "partitions", "R1", nil, false, svc.Partitions)
@@ -177,7 +191,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		r, err := core.Call(ctx, svc, "cli", tool, tier, map[string]any{"state": *state, "since": *since, "user": *user, "all": *all}, false,
 			func(ctx context.Context) ([]core.JobSummary, error) { return svc.JobsList(ctx, in) })
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printJobs(w, r.Data, *all || *user != "") })
+	case "wait":
+		return waitCmd(ctx, svc, rest, stdout, stderr, g)
 	case "job":
+		if len(rest) >= 1 && rest[0] == "wait" {
+			return waitCmd(ctx, svc, rest[1:], stdout, stderr, g)
+		}
 		return jobCmd(ctx, svc, rest, stdout, stderr, g)
 	case "modules":
 		q := strings.Join(rest, " ")
@@ -223,20 +242,39 @@ func run(args []string, stdout, stderr io.Writer) int {
 			})
 		return out(stdout, stderr, g, r, err, func(w io.Writer) { printRecipes(w, r.Data) })
 	case "check":
-		if len(rest) != 1 {
-			return fail(stdout, stderr, g, errors.New("usage: clusterwand check <script.sh|->"))
+		fs := newFlags("check")
+		part := fs.String("partition", "", "override partition for static check")
+		var pos []string
+		for i := 0; i < len(rest); i++ {
+			switch {
+			case rest[i] == "--partition" || rest[i] == "-p":
+				if i+1 >= len(rest) {
+					return fail(stdout, stderr, g, errors.New("--partition needs a name"))
+				}
+				i++
+				*part = rest[i]
+			case strings.HasPrefix(rest[i], "--partition="):
+				*part = strings.TrimPrefix(rest[i], "--partition=")
+			default:
+				pos = append(pos, rest[i])
+			}
+		}
+		if len(pos) != 1 {
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand check [--partition P] <script.sh|->"))
 		}
 		var b []byte
-		if rest[0] == "-" {
+		if pos[0] == "-" {
 			b, err = io.ReadAll(io.LimitReader(os.Stdin, int64(cfg.Limits.ScriptBytes)+1))
 		} else {
-			b, err = os.ReadFile(rest[0])
+			b, err = os.ReadFile(pos[0])
 		}
 		if err != nil {
 			return fail(stdout, stderr, g, err)
 		}
-		r, err := core.Call(ctx, svc, "cli", "script_check", "R1", map[string]any{"file": rest[0]}, false,
-			func(ctx context.Context) (*core.ScriptCheck, error) { return svc.ScriptCheck(ctx, string(b)) })
+		r, err := core.Call(ctx, svc, "cli", "script_check", "R1", map[string]any{"file": pos[0], "partition": *part}, false,
+			func(ctx context.Context) (*core.ScriptCheck, error) {
+				return svc.ScriptCheckWithPartition(ctx, string(b), *part)
+			})
 		code := out(stdout, stderr, g, r, err, func(w io.Writer) { printCheck(w, r.Data) })
 		if code == 0 && r.Data != nil && !r.Data.OK {
 			return 2
@@ -417,6 +455,23 @@ func run(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(w, "\n# more: --offset %d (of %d bytes)\n", r.Data.Chunk.NextOffset, r.Data.Chunk.FileBytes)
 			}
 		})
+	case "download":
+		if len(rest) < 1 {
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand download PATH [--out DIR]"))
+		}
+		p := rest[0]
+		fs := newFlags("download")
+		outDir := fs.String("out", "", "local destination folder (default: results_dir/files)")
+		if err := fs.Parse(rest[1:]); err != nil {
+			return fail(stdout, stderr, g, err)
+		}
+		r, err := core.Call(ctx, svc, "cli", "files_download", "R1", map[string]any{"path": p, "out": *outDir}, false,
+			func(ctx context.Context) (*core.FileDownload, error) {
+				return svc.FilesDownload(ctx, core.FilesDownloadInput{Path: p, OutDir: *outDir})
+			})
+		return out(stdout, stderr, g, r, err, func(w io.Writer) {
+			fmt.Fprintf(w, "Downloaded %s (%d bytes) -> %s/%s\n", r.Data.RemotePath, r.Data.TotalBytes, r.Data.DownloadedTo, strings.Join(r.Data.Saved, ", "))
+		})
 	case "env":
 		fs := newFlags("env")
 		var mods multiFlag
@@ -472,7 +527,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		})
 	case "submit":
 		if len(rest) < 1 {
-			return fail(stdout, stderr, g, errors.New("usage: clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--yes]"))
+			return fail(stdout, stderr, g, errors.New("usage: clusterwand submit <script.sh|-> [--partition P] [--nodes N] [--time T] [--name J] [--input LOCAL[:REMOTE]]... [--unpack] [--yes]"))
 		}
 		src := rest[0]
 		fs := newFlags("submit")
@@ -480,9 +535,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 		nodes := fs.Int("nodes", 0, "nodes")
 		tl := fs.String("time", "", "time limit")
 		name := fs.String("name", "", "job name")
+		var inputs multiFlag
+		fs.Var(&inputs, "input", "local file to stage into inputs/ (LOCAL or LOCAL:REMOTE, repeatable)")
+		unpack := fs.Bool("unpack", false, "unpack .tar.gz / .tgz staged inputs inside inputs/")
 		yes := fs.Bool("yes", false, "confirm without asking (still within caps)")
 		if err := fs.Parse(rest[1:]); err != nil {
 			return fail(stdout, stderr, g, err)
+		}
+		var specs []core.InputSpec
+		for _, raw := range inputs {
+			lp, rp, ok := strings.Cut(raw, ":")
+			if ok && rp != "" {
+				specs = append(specs, core.InputSpec{LocalPath: lp, Path: rp})
+			} else {
+				specs = append(specs, core.InputSpec{LocalPath: raw})
+			}
 		}
 		var b []byte
 		if src == "-" {
@@ -493,9 +560,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(stdout, stderr, g, err)
 		}
-		r, err := core.Call(ctx, svc, "cli", "job_submit", "A1", map[string]any{"file": src, "partition": *part, "nodes": *nodes, "time": *tl}, false,
+		r, err := core.Call(ctx, svc, "cli", "job_submit", "A1", map[string]any{"file": src, "partition": *part, "nodes": *nodes, "time": *tl, "inputs": len(specs)}, false,
 			func(ctx context.Context) (*core.SubmitPlan, error) {
-				in := core.SubmitInput{Script: string(b), Partition: *part, Nodes: *nodes, Time: *tl, JobName: *name}
+				in := core.SubmitInput{Script: string(b), Partition: *part, Nodes: *nodes, Time: *tl, JobName: *name, Inputs: specs, UnpackArchives: *unpack}
 				return svc.PrepareSubmit(ctx, in)
 			})
 		if err != nil {
@@ -571,9 +638,44 @@ func confirmCmd(ctx context.Context, svc *core.Service, kind, token string, stdo
 			fmt.Fprintf(w, "folder on the cluster: %s\n", r.Data.RemoteDir)
 		}
 		if r.Data.JobID != "" && kind == "submit" {
-			fmt.Fprintf(w, "watch: clusterwand job show %s    results: clusterwand results %s --download\n", r.Data.JobID, r.Data.JobID)
+			fmt.Fprintf(w, "watch: clusterwand wait %s    results: clusterwand results %s --download\n", r.Data.JobID, r.Data.JobID)
 		}
 	})
+}
+
+func waitCmd(ctx context.Context, svc *core.Service, args []string, stdout, stderr io.Writer, g globals) int {
+	var ids []string
+	var flagArgs []string
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-") {
+			flagArgs = append(flagArgs, args[i])
+			if (args[i] == "--timeout" || args[i] == "--poll") && i+1 < len(args) {
+				i++
+				flagArgs = append(flagArgs, args[i])
+			}
+			continue
+		}
+		ids = append(ids, args[i])
+	}
+	fs := newFlags("wait")
+	timeoutS := fs.Int("timeout", core.DefaultWaitTimeoutS, "max seconds to wait")
+	pollS := fs.Int("poll", core.DefaultWaitPollS, "seconds between polls")
+	if err := fs.Parse(flagArgs); err != nil {
+		return fail(stdout, stderr, g, err)
+	}
+	ids = append(ids, fs.Args()...)
+	if len(ids) == 0 {
+		return fail(stdout, stderr, g, errors.New("usage: clusterwand wait <job id>... [--timeout S] [--poll S]"))
+	}
+	r, err := core.Call(ctx, svc, "cli", "job_wait", "R1", map[string]any{"job_ids": ids, "timeout_s": *timeoutS, "poll_s": *pollS}, false,
+		func(ctx context.Context) (*core.JobWaitResult, error) {
+			return svc.JobWait(ctx, core.JobWaitInput{JobIDs: ids, TimeoutS: *timeoutS, PollS: *pollS})
+		})
+	code := out(stdout, stderr, g, r, err, func(w io.Writer) { printWait(w, r.Data) })
+	if code == 0 && r.Data != nil && r.Data.TimedOut {
+		return 2
+	}
+	return code
 }
 
 func askYes(w io.Writer, q string) bool {

@@ -83,11 +83,40 @@ type Backend interface {
 var ErrUnreachable = errors.New("cannot reach the cluster")
 
 var (
-	reUser      = regexp.MustCompile(`^[a-z_][a-z0-9_.-]{0,63}$`)
-	reModule    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,80}(/[A-Za-z0-9._+-]{1,40})?$`)
-	reSince     = regexp.MustCompile(`^(now-\d{1,4}(days|hours|minutes)|\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?)$`)
-	reStateList = regexp.MustCompile(`^[A-Z_]{2,20}(,[A-Z_]{2,20}){0,10}$`)
+	reUser           = regexp.MustCompile(`^[a-z_][a-z0-9_.-]{0,63}$`)
+	reModule         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,80}(/[A-Za-z0-9._+-]{1,40})?$`)
+	reSince          = regexp.MustCompile(`^(now-\d{1,4}(days|hours|minutes)|\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?)$`)
+	reSinceShorthand = regexp.MustCompile(`^(?:now-)?(\d{1,4})\s*(d|day|days|h|hr|hrs|hour|hours|m|min|mins|minute|minutes|w|wk|wks|week|weeks)$`)
+	reStateList      = regexp.MustCompile(`^[A-Z_]{2,20}(,[A-Z_]{2,20}){0,10}$`)
 )
+
+// NormalizeSince expands common duration shorthands ("24h", "7d", "30m", "2w",
+// "now-1hour", "now-1day") into Slurm's canonical "now-N(days|hours|minutes)".
+func NormalizeSince(s string) string {
+	s = strings.TrimSpace(s)
+	m := reSinceShorthand.FindStringSubmatch(strings.ToLower(s))
+	if m == nil {
+		return s
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil || n <= 0 {
+		return s
+	}
+	switch m[2] {
+	case "d", "day", "days":
+		return fmt.Sprintf("now-%ddays", n)
+	case "h", "hr", "hrs", "hour", "hours":
+		return fmt.Sprintf("now-%dhours", n)
+	case "m", "min", "mins", "minute", "minutes":
+		return fmt.Sprintf("now-%dminutes", n)
+	case "w", "wk", "wks", "week", "weeks":
+		if n*7 > 9999 {
+			return s
+		}
+		return fmt.Sprintf("now-%ddays", n*7)
+	}
+	return s
+}
 
 // ValidJobID accepts "260" and array forms "260_3".
 func ValidJobID(id string) error {
@@ -105,10 +134,11 @@ func ValidUser(u string) error {
 	return nil
 }
 
-// ValidSince checks a sacct time (now-7days or 2026-09-01[T10:00]).
+// ValidSince checks a sacct time (now-7days, 24h, 7d or 2026-09-01[T10:00]).
 func ValidSince(s string) error {
+	s = NormalizeSince(s)
 	if !reSince.MatchString(s) {
-		return fmt.Errorf("time %q: use now-7days, now-12hours or YYYY-MM-DD", s)
+		return fmt.Errorf("time %q: use now-7days (or 7d, 24h, 30m) or YYYY-MM-DD", s)
 	}
 	return nil
 }
@@ -202,12 +232,14 @@ func SacctAll(since, until string) (Command, error) {
 }
 
 func sacctRange(who []string, since, until string) (Command, error) {
+	since = NormalizeSince(since)
 	if err := ValidSince(since); err != nil {
 		return Command{}, err
 	}
 	argv := append([]string{"sacct", "--json"}, who...)
 	argv = append(argv, "-S", since)
 	if until != "" {
+		until = NormalizeSince(until)
 		if err := ValidSince(until); err != nil {
 			return Command{}, err
 		}
@@ -630,6 +662,14 @@ func SbatchTestOnly(o SubmitOpts, script []byte) (Command, error) {
 // positional parameters, never spliced into the shell code.
 const submitTemplate = `set -e; d="$HOME/$1"; shift; if [ -e "$d" ]; then echo "clusterwand: $d already exists" >&2; exit 3; fi; mkdir -p "$d"; cat > "$d/job.sbatch"; cd "$d"; exec sbatch --parsable --chdir="$d" "$@" job.sbatch`
 
+// stageInputsTemplate unpacks a Go-validated gzip tarball from stdin into a
+// fresh ~/clusterwand-jobs/<dir>/inputs folder before submission.
+const stageInputsTemplate = `set -e; d="$HOME/$1"; if [ -e "$d" ]; then echo "clusterwand: $d already exists" >&2; exit 3; fi; mkdir -p "$d/inputs"; tar -xzf - --no-same-owner --no-same-permissions -C "$d/inputs"`
+
+// submitStagedTemplate writes job.sbatch into a folder just created by
+// stageInputsTemplate and submits it.
+const submitStagedTemplate = `set -e; d="$HOME/$1"; shift; if [ -e "$d/job.sbatch" ] || [ ! -d "$d/inputs" ]; then echo "clusterwand: $d is not a staged job folder" >&2; exit 3; fi; cat > "$d/job.sbatch"; cd "$d"; exec sbatch --parsable --chdir="$d" "$@" job.sbatch`
+
 // SubmitBatch writes the script into a new ~/clusterwand-jobs/<dir> folder and
 // submits it with the enforced options. Returns the job id on stdout.
 func SubmitBatch(dir string, o SubmitOpts, script []byte) (Command, error) {
@@ -643,6 +683,34 @@ func SubmitBatch(dir string, o SubmitOpts, script []byte) (Command, error) {
 		return Command{}, fmt.Errorf("empty script")
 	}
 	argv := append([]string{"bash", "-c", submitTemplate, "clusterwand", dir}, o.flags()...)
+	return Command{argv: argv, kind: KindNoCache, stdin: script, write: true}, nil
+}
+
+// StageInputs creates ~/clusterwand-jobs/<dir>/inputs and unpacks a pre-verified
+// .tar.gz archive of staged input files over stdin.
+func StageInputs(dir string, tarGz []byte) (Command, error) {
+	if !reJobsDir.MatchString(dir) {
+		return Command{}, fmt.Errorf("job folder %q is not a clusterwand-jobs path", dir)
+	}
+	if len(tarGz) == 0 {
+		return Command{}, fmt.Errorf("empty input archive")
+	}
+	return Command{argv: []string{"bash", "-c", stageInputsTemplate, "clusterwand", dir}, kind: KindNoCache, stdin: tarGz, write: true, big: true}, nil
+}
+
+// SubmitStagedBatch writes job.sbatch into ~/clusterwand-jobs/<dir> after
+// StageInputs populated inputs/, then runs sbatch.
+func SubmitStagedBatch(dir string, o SubmitOpts, script []byte) (Command, error) {
+	if !reJobsDir.MatchString(dir) {
+		return Command{}, fmt.Errorf("job folder %q is not a clusterwand-jobs path", dir)
+	}
+	if err := o.validate(); err != nil {
+		return Command{}, err
+	}
+	if len(script) == 0 {
+		return Command{}, fmt.Errorf("empty script")
+	}
+	argv := append([]string{"bash", "-c", submitStagedTemplate, "clusterwand", dir}, o.flags()...)
 	return Command{argv: argv, kind: KindNoCache, stdin: script, write: true}, nil
 }
 
